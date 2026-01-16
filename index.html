@@ -513,10 +513,16 @@
             });
 
             // Send to Google Sheet
-            // Using standard fetch with JSON body since your script uses JSON.parse(e.postData.contents)
-            // No Content-Type header ensures simple request (text/plain) to avoid preflight issues
+            // We use 'no-cors' mode because Apps Scripts often don't return proper CORS headers for simple POSTs
+            // This means we won't get a readable response, but the data will send.
+            
+            // IMPORTANT: Using text/plain prevents the browser from doing a CORS preflight options check
+            // which Google Apps Script web apps often fail on. The script will still receive the body string.
             fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8',
+                },
                 body: JSON.stringify(payload)
             })
             .then(async response => {
@@ -588,9 +594,9 @@
             const password = document.getElementById('adminPassword').value;
             
             // Obfuscated verification for "Bulldog!1" 
-            // This ensures it works in all environments (even those without Secure Context for crypto)
-            // Logic: Base64(Reversed("Bulldog!1")) -> "1!godlluB" -> "MTFnb2RsbHVC"
-            const target = "MTFnb2RsbHVC";
+            // Logic: Base64(Reversed("Bulldog!1")) -> "1!godlluB" -> "MSFnb2RsbHVC"
+            // Note: Previous hash was incorrect, updated here.
+            const target = "MSFnb2RsbHVC";
             
             try {
                 // Simple obfuscation to hide password from plain text source view
