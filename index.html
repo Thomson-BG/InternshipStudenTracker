@@ -248,9 +248,14 @@
                         <div id="adminData" class="hidden">
                             <div class="flex justify-between items-center mb-4 bg-gray-100/50 dark:bg-black/20 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                                 <span class="text-xs text-gray-500 dark:text-gray-400 font-mono"><i class="fab fa-google-drive"></i> Connected to Sheets</span>
-                                <button onclick="fetchAdminData()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2">
-                                    <i class="fas fa-sync"></i> Refresh
-                                </button>
+                                <div class="flex gap-2">
+                                    <a href="https://docs.google.com/spreadsheets/d/14f4wIwY5hDP1gFZdvy7o5j3ekYR-8zGf0N027N4wBRI/edit" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2">
+                                        <i class="fas fa-table"></i> Open Sheet
+                                    </a>
+                                    <button onclick="fetchAdminData()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2">
+                                        <i class="fas fa-sync"></i> Refresh
+                                    </button>
+                                </div>
                             </div>
                             <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner max-h-[60vh]">
                                 <table class="w-full text-sm text-left text-gray-600 dark:text-gray-300">
@@ -498,7 +503,6 @@
                 name: student,
                 type: actionType,
                 location: nearestSite.name,
-                // Sending lat/lng in case you update the script later to use them
                 lat: currentUserPos.lat,
                 lng: currentUserPos.lng,
                 timestamp: timestamp.toISOString()
@@ -513,30 +517,24 @@
             });
 
             // Send to Google Sheet
-            // We use 'no-cors' mode because Apps Scripts often don't return proper CORS headers for simple POSTs
-            // This means we won't get a readable response, but the data will send.
-            
-            // IMPORTANT: Using text/plain prevents the browser from doing a CORS preflight options check
-            // which Google Apps Script web apps often fail on. The script will still receive the body string.
+            // FIX: Using no-cors mode with standard text/plain body
+            // This bypasses strict CORS blocks on POST requests, but we cannot read the response.
             fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
+                mode: 'no-cors', 
                 headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
+                    'Content-Type': 'text/plain',
                 },
                 body: JSON.stringify(payload)
             })
-            .then(async response => {
-                const result = await response.json();
-                if(result.result === 'success') {
-                    msgEl.innerHTML = `<span class="text-green-600 dark:text-green-400 flex items-center justify-center gap-2"><i class="fas fa-check"></i> Success! ${actionType} recorded.</span>`;
-                } else {
-                    throw new Error(result.error || 'Unknown error');
-                }
+            .then(() => {
+                // With no-cors, we get an opaque response. We must assume success if no network error occurred.
+                msgEl.innerHTML = `<span class="text-green-600 dark:text-green-400 flex items-center justify-center gap-2"><i class="fas fa-check"></i> Recorded! (Cloud Sync Initiated)</span>`;
                 setTimeout(() => msgEl.innerHTML = '', 3000);
             })
             .catch(err => {
-                console.error(err);
-                msgEl.innerHTML = `<span class="text-yellow-600 dark:text-yellow-400 text-xs">Saved locally. Cloud sync pending/error.</span>`;
+                console.error("Fetch error:", err);
+                msgEl.innerHTML = `<span class="text-yellow-600 dark:text-yellow-400 text-xs">Saved locally. Cloud sync failed (check internet).</span>`;
             });
         }
 
@@ -594,12 +592,9 @@
             const password = document.getElementById('adminPassword').value;
             
             // Obfuscated verification for "Bulldog!1" 
-            // Logic: Base64(Reversed("Bulldog!1")) -> "1!godlluB" -> "MSFnb2RsbHVC"
-            // Note: Previous hash was incorrect, updated here.
             const target = "MSFnb2RsbHVC";
             
             try {
-                // Simple obfuscation to hide password from plain text source view
                 const attempt = btoa(password.split('').reverse().join(''));
                 
                 if (attempt === target) {
@@ -622,10 +617,12 @@
             tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center"><div class="flex flex-col items-center justify-center gap-2"><span class="loader border-t-blue-500"></span><span class="text-sm text-gray-500">Syncing with Google Sheets...</span></div></td></tr>';
 
             try {
-                const response = await fetch(APPS_SCRIPT_URL);
+                // Add unique timestamp to prevent caching and ensure fresh fetch
+                const url = APPS_SCRIPT_URL + '?t=' + new Date().getTime();
+                
+                const response = await fetch(url);
                 if (!response.ok) throw new Error("Network response was not ok");
                 
-                // Your script returns array of objects: [{id, timestamp, name, location, type}, ...]
                 const data = await response.json(); 
                 
                 if (data.length === 0) {
@@ -639,7 +636,6 @@
                     const action = row.type || '-';
                     const site = row.location || '-';
                     
-                    // Coordinates aren't returned by your current script, so we use search
                     const mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site)}`;
                     
                     let displayTime = ts;
@@ -665,12 +661,13 @@
                 }).join('');
 
             } catch (error) {
-                console.error(error);
+                console.error("Fetch Admin Data Error:", error);
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="5" class="px-4 py-4 text-center text-red-500 text-sm p-8 bg-red-50 dark:bg-red-900/20 rounded-lg m-4">
                             <div class="font-bold mb-1"><i class="fas fa-exclamation-circle"></i> Failed to load data</div>
-                            <div class="text-xs opacity-75">Ensure the Google Apps Script is deployed as "Web App" with access set to "Anyone".</div>
+                            <div class="text-xs opacity-75 mb-2">Possible reasons: Browser security blocks or script permissions.</div>
+                            <a href="https://docs.google.com/spreadsheets/d/14f4wIwY5hDP1gFZdvy7o5j3ekYR-8zGf0N027N4wBRI/edit" target="_blank" class="inline-block text-blue-600 underline text-xs">View Sheet Directly</a>
                         </td>
                     </tr>`;
             }
