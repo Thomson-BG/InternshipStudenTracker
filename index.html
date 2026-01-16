@@ -1,707 +1,678 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Car, 
-  MapPin, 
-  User, 
-  LogIn, 
-  LogOut, 
-  ShieldCheck, 
-  Search, 
-  FileText,
-  ChevronLeft,
-  Activity,
-  Sun,
-  Moon,
-  Clock
-} from 'lucide-react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInAnonymously, 
-  onAuthStateChanged,
-  signInWithCustomToken 
-} from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  serverTimestamp 
-} from 'firebase/firestore';
-
-// --- Firebase Configuration & Init ---
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-// --- Components ---
-
-// 1. Navigation Header
-const Header = ({ setView, view, isDarkMode, toggleTheme }) => (
-  <header className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b shadow-lg transition-all duration-300 ${
-    isDarkMode 
-      ? 'bg-neutral-900/90 border-white/10' 
-      : 'bg-white/90 border-slate-200'
-  }`}>
-    <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-      <div 
-        className="flex items-center space-x-3 cursor-pointer group" 
-        onClick={() => setView('home')}
-      >
-        {/* Logo: Red Gradient */}
-        <div className={`p-2.5 rounded-xl shadow-lg group-hover:scale-105 transition-transform duration-300 border ${
-          isDarkMode 
-            ? 'bg-gradient-to-br from-red-600 to-red-900 shadow-red-900/20 border-white/10' 
-            : 'bg-gradient-to-br from-red-500 to-red-700 shadow-red-200 border-white/20'
-        }`}>
-          <Car className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>BulldogTrack</h1>
-          <p className={`text-[10px] font-bold tracking-[0.2em] uppercase ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Internship Log</p>
-        </div>
-      </div>
-      
-      <div className="flex items-center space-x-3">
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className={`p-2 rounded-full border shadow-sm backdrop-blur-sm transition-all ${
-            isDarkMode
-              ? 'bg-white/5 hover:bg-white/10 border-white/10 text-neutral-400 hover:text-white'
-              : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600 hover:text-slate-900'
-          }`}
-          title="Toggle Theme"
-        >
-          {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-
-        {view !== 'home' && (
-          <button 
-            onClick={() => setView('home')}
-            className={`text-sm font-medium px-4 py-2 rounded-full border shadow-sm backdrop-blur-sm transition-all flex items-center group ${
-              isDarkMode
-                ? 'bg-white/10 hover:bg-white/20 text-neutral-200 hover:text-amber-400 border-white/10'
-                : 'bg-white hover:bg-slate-50 text-slate-600 hover:text-amber-600 border-slate-200'
-            }`}
-          >
-            <ChevronLeft className="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" />
-            Back
-          </button>
-        )}
-      </div>
-    </div>
-  </header>
-);
-
-// 2. Student Portal Component
-const StudentPortal = ({ onSubmit, isDarkMode }) => {
-  const [name, setName] = useState('');
-  const [location, setLocation] = useState('');
-  const [status, setStatus] = useState('idle'); // idle, submitting, success
-
-  const handleSubmit = async (type) => {
-    if (!name.trim() || !location.trim()) {
-      alert("Please enter both your name and current location.");
-      return;
-    }
-    setStatus('submitting');
-    await onSubmit({ name, location, type });
-    setStatus('success');
-    // Reset after 3 seconds
-    setTimeout(() => {
-      setName('');
-      setLocation('');
-      setStatus('idle');
-    }, 3000);
-  };
-
-  if (status === 'success') {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 animate-in fade-in zoom-in duration-500">
-        {/* Success Icon: Gold Accent */}
-        <div className={`w-28 h-28 bg-gradient-to-br from-amber-400 to-yellow-600 rounded-full flex items-center justify-center mb-6 shadow-2xl border-4 ${
-          isDarkMode 
-            ? 'shadow-amber-900/40 border-neutral-800' 
-            : 'shadow-amber-200 border-white'
-        }`}>
-          <ShieldCheck className={`w-14 h-14 ${isDarkMode ? 'text-neutral-900' : 'text-white'}`} />
-        </div>
-        <h2 className={`text-3xl font-bold mb-2 tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Logged Successfully!</h2>
-        <p className={`font-medium ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Drive safe and good luck.</p>
-        <button 
-          onClick={() => setStatus('idle')}
-          className="mt-8 text-red-500 font-bold hover:text-red-400 transition-colors uppercase tracking-wide text-sm"
-        >
-          Submit another log
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`max-w-md mx-auto backdrop-blur-2xl rounded-3xl shadow-2xl border overflow-hidden mt-8 animate-in slide-in-from-bottom-8 duration-700 ${
-      isDarkMode 
-        ? 'bg-neutral-800/60 border-white/10' 
-        : 'bg-white/80 border-slate-200'
-    }`}>
-      <div className={`p-8 border-b ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-slate-50/50 border-slate-100'}`}>
-        <h2 className={`text-2xl font-bold flex items-center ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-          <User className="w-6 h-6 mr-3 text-red-600" />
-          Intern Check-In
-        </h2>
-        <p className={`mt-2 font-medium ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Log your arrival or departure time.</p>
-      </div>
-      
-      <div className="p-8 space-y-6">
-        <div>
-          <label className={`block text-xs font-bold mb-2 uppercase tracking-wider ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Full Name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Alex Smith"
-            className={`w-full px-5 py-4 rounded-2xl border outline-none transition-all font-medium shadow-inner ${
-              isDarkMode 
-                ? 'bg-white/10 border-white/10 focus:bg-white/20 focus:ring-1 focus:ring-red-500 text-white placeholder:text-neutral-500' 
-                : 'bg-slate-100 border-slate-200 focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-900 placeholder:text-slate-400'
-            }`}
-          />
-        </div>
-
-        <div>
-          <label className={`block text-xs font-bold mb-2 uppercase tracking-wider ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Internship Site / Location</label>
-          <div className="relative">
-            <MapPin className={`absolute left-4 top-4 w-5 h-5 ${isDarkMode ? 'text-neutral-500' : 'text-slate-400'}`} />
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. Westside Auto Body"
-              className={`w-full pl-12 pr-5 py-4 rounded-2xl border outline-none transition-all font-medium shadow-inner ${
-                isDarkMode 
-                  ? 'bg-white/10 border-white/10 focus:bg-white/20 focus:ring-1 focus:ring-red-500 text-white placeholder:text-neutral-500' 
-                  : 'bg-slate-100 border-slate-200 focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-900 placeholder:text-slate-400'
-              }`}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 pt-4">
-          <button
-            onClick={() => handleSubmit('Check In')}
-            disabled={status === 'submitting'}
-            // Check In: Red Gradient
-            className={`group flex items-center justify-center w-full py-4 bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 border ${
-              isDarkMode ? 'shadow-red-900/30 border-white/10' : 'shadow-red-200 border-red-600/10'
-            }`}
-          >
-            <LogIn className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform text-white/90" />
-            Check In
-          </button>
-          
-          <button
-            onClick={() => handleSubmit('Check Out')}
-            disabled={status === 'submitting'}
-            // Check Out: Neutral Gradient
-            className={`group flex items-center justify-center w-full py-4 bg-gradient-to-br rounded-2xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 border ${
-              isDarkMode 
-                ? 'from-neutral-700 to-neutral-800 hover:from-neutral-600 hover:to-neutral-700 text-white shadow-black/30 border-white/10' 
-                : 'from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 text-white shadow-slate-200 border-slate-700/10'
-            }`}
-          >
-            <LogOut className={`w-5 h-5 mr-2 group-hover:scale-110 transition-transform ${isDarkMode ? 'text-neutral-300' : 'text-slate-300'}`} />
-            Check Out
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// 3. Admin Login Component
-const AdminLogin = ({ onLogin, isDarkMode }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    try {
-      if (btoa(username) === 'VGhvbXNvbg==' && btoa(password) === 'QnVsbGRvZyEx') {
-        onLogin();
-      } else {
-        setError('Invalid credentials.');
-      }
-    } catch (err) {
-      setError('Error verifying credentials.');
-    }
-  };
-
-  return (
-    <div className="max-w-sm mx-auto mt-16 animate-in zoom-in-95 duration-500">
-      <div className={`backdrop-blur-2xl p-8 rounded-3xl shadow-2xl border ${
-        isDarkMode 
-          ? 'bg-neutral-800/60 border-white/10' 
-          : 'bg-white/80 border-slate-200'
-      }`}>
-        <div className="text-center mb-8">
-          <div className={`w-20 h-20 bg-gradient-to-br rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl border transform rotate-3 hover:rotate-0 transition-transform ${
-            isDarkMode
-              ? 'from-neutral-800 to-neutral-900 border-white/5'
-              : 'from-slate-100 to-slate-200 border-slate-300'
-          }`}>
-            <ShieldCheck className="w-10 h-10 text-red-600" />
-          </div>
-          <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Admin Access</h2>
-          <p className={`text-sm mt-1 ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Instructor authentication required</p>
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div>
-            <label className={`block text-xs font-bold uppercase tracking-widest mb-2 ml-1 ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className={`w-full px-5 py-3 rounded-xl border outline-none transition-all shadow-inner ${
-                isDarkMode 
-                  ? 'bg-white/10 border-white/10 focus:bg-white/20 focus:ring-1 focus:ring-red-500 text-white' 
-                  : 'bg-slate-100 border-slate-200 focus:bg-white focus:ring-2 focus:ring-red-500/20 text-slate-900'
-              }`}
-            />
-          </div>
-          <div>
-            <label className={`block text-xs font-bold uppercase tracking-widest mb-2 ml-1 ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={`w-full px-5 py-3 rounded-xl border outline-none transition-all shadow-inner ${
-                isDarkMode 
-                  ? 'bg-white/10 border-white/10 focus:bg-white/20 focus:ring-1 focus:ring-red-500 text-white' 
-                  : 'bg-slate-100 border-slate-200 focus:bg-white focus:ring-2 focus:ring-red-500/20 text-slate-900'
-              }`}
-            />
-          </div>
-          
-          {error && <p className={`text-sm font-semibold p-3 rounded-lg border text-center ${
-            isDarkMode 
-              ? 'text-red-300 bg-red-900/30 border-red-500/30' 
-              : 'text-red-600 bg-red-50 border-red-100'
-          }`}>{error}</p>}
-
-          <button
-            type="submit"
-            className={`w-full py-4 bg-gradient-to-r text-white rounded-xl font-bold shadow-lg transform active:scale-95 transition-all mt-2 border ${
-              isDarkMode
-                ? 'from-red-700 to-red-900 hover:from-red-600 hover:to-red-800 shadow-red-900/20 border-red-500/20'
-                : 'from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-red-200 border-red-600/10'
-            }`}
-          >
-            Authenticate
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// 4. Dashboard Component
-const Dashboard = ({ logs, isDarkMode }) => {
-  const [filter, setFilter] = useState('');
-  
-  const filteredLogs = useMemo(() => {
-    return logs.filter(log => 
-      log.name.toLowerCase().includes(filter.toLowerCase()) ||
-      log.location.toLowerCase().includes(filter.toLowerCase())
-    );
-  }, [logs, filter]);
-
-  const formatTime = (timestamp) => {
-    if (!timestamp) return 'Pending...';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleString('en-US', {
-      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-    });
-  };
-
-  return (
-    <div className="max-w-6xl mx-auto mt-8 px-4 animate-in fade-in slide-in-from-bottom-8 duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
-        <div>
-          <h2 className={`text-3xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Activity Log</h2>
-          <p className={`font-medium ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Real-time monitoring of intern movement</p>
-        </div>
-        
-        <div className="relative w-full md:w-72 group">
-          <Search className={`absolute left-4 top-3.5 w-5 h-5 transition-colors ${
-            isDarkMode 
-              ? 'text-neutral-400 group-hover:text-red-500' 
-              : 'text-slate-400 group-hover:text-red-600'
-          }`} />
-          <input
-            type="text"
-            placeholder="Search student or site..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className={`w-full pl-12 pr-5 py-3 rounded-2xl backdrop-blur-md border outline-none transition-all shadow-sm ${
-              isDarkMode
-                ? 'bg-white/10 border-white/10 focus:bg-white/20 focus:ring-1 focus:ring-red-500/50 text-white placeholder:text-neutral-500'
-                : 'bg-white border-slate-200 focus:bg-white focus:ring-2 focus:ring-red-500/20 text-slate-900 placeholder:text-slate-400'
-            }`}
-          />
-        </div>
-      </div>
-
-      <div className={`backdrop-blur-xl rounded-3xl shadow-xl border overflow-hidden ${
-        isDarkMode 
-          ? 'bg-neutral-800/60 border-white/10' 
-          : 'bg-white border-slate-200'
-      }`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className={`border-b text-left ${
-                isDarkMode 
-                  ? 'bg-white/5 border-white/10' 
-                  : 'bg-slate-50 border-slate-200'
-              }`}>
-                <th className={`p-5 font-bold text-xs uppercase tracking-wider ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Timestamp</th>
-                <th className={`p-5 font-bold text-xs uppercase tracking-wider ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Student</th>
-                <th className={`p-5 font-bold text-xs uppercase tracking-wider ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Action</th>
-                <th className={`p-5 font-bold text-xs uppercase tracking-wider ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>Site Location</th>
-              </tr>
-            </thead>
-            <tbody className={`divide-y ${isDarkMode ? 'divide-white/5' : 'divide-slate-100'}`}>
-              {filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className={`p-10 text-center font-medium ${isDarkMode ? 'text-neutral-500' : 'text-slate-400'}`}>
-                    No logs found matching your search.
-                  </td>
-                </tr>
-              ) : (
-                filteredLogs.map((log) => (
-                  <tr key={log.id} className={`transition-colors duration-150 ${
-                    isDarkMode ? 'hover:bg-white/5' : 'hover:bg-slate-50'
-                  }`}>
-                    <td className={`p-5 text-sm font-medium whitespace-nowrap ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>
-                      {formatTime(log.timestamp)}
-                    </td>
-                    <td className={`p-5 font-bold text-base ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                      {log.name}
-                    </td>
-                    <td className="p-5">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${
-                        log.type === 'Check In' 
-                          ? (isDarkMode ? 'bg-red-900/30 text-red-200 border-red-800' : 'bg-red-50 text-red-700 border-red-200')
-                          : (isDarkMode ? 'bg-neutral-700 text-neutral-300 border-neutral-600' : 'bg-slate-100 text-slate-600 border-slate-200')
-                      }`}>
-                        {log.type === 'Check In' ? 'Arrived' : 'Departed'}
-                      </span>
-                    </td>
-                    <td className={`p-5 font-medium ${isDarkMode ? 'text-neutral-300' : 'text-slate-600'}`}>
-                      <div className={`flex items-center w-fit px-3 py-1 rounded-lg border ${
-                        isDarkMode 
-                          ? 'bg-black/20 border-white/5' 
-                          : 'bg-slate-50 border-slate-200'
-                      }`}>
-                        <MapPin className={`w-3.5 h-3.5 mr-2 ${isDarkMode ? 'text-neutral-500' : 'text-slate-400'}`} />
-                        {log.location}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Main App Component ---
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [view, setView] = useState('home'); 
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [localHistory, setLocalHistory] = useState([]);
-
-  // 1. Initial Auth (Anonymous) & Load Local History
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        // Load history from local storage
-        const savedHistory = localStorage.getItem('bulldog_history');
-        if (savedHistory) {
-          setLocalHistory(JSON.parse(savedHistory));
-        }
-
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (err) {
-        console.error("Auth failed", err);
-      }
-    };
-    initAuth();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Intern Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        school: {
+                            black: '#121212',
+                            red: '#cc0000',
+                            gold: '#FFD700', // Yellow/Gold
+                            darkRed: '#8b0000',
+                            lightRed: '#ff4d4d'
+                        }
+                    },
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.8s ease-out forwards',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'gradient-x': 'gradientXY 15s ease infinite',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        gradientXY: {
+                            '0%, 100%': { 'background-size': '200% 200%', 'background-position': 'left top' },
+                            '50%': { 'background-size': '200% 200%', 'background-position': 'right bottom' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(136, 136, 136, 0.5); 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(85, 85, 85, 0.8); 
+        }
+        
+        /* Glassmorphism Utilities */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .dark .glass {
+            background: rgba(18, 18, 18, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
 
-  // 2. Fetch Logs (Real-time)
-  useEffect(() => {
-    if (!user) return;
-    const q = query(
-      collection(db, 'artifacts', appId, 'public', 'data', 'intern_logs'),
-      orderBy('timestamp', 'desc')
-    );
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const fetchedLogs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setLogs(fetchedLogs);
-      },
-      (err) => console.error("Snapshot error:", err)
-    );
-    return () => unsubscribe();
-  }, [user]);
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+        .dark .glass-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
 
-  // 3. Handlers
-  const handleStudentSubmit = async ({ name, location, type }) => {
-    if (!user) return;
-    try {
-      // 1. Save to Firebase
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'intern_logs'), {
-        name,
-        location,
-        type,
-        timestamp: serverTimestamp(),
-        userId: user.uid
-      });
+        /* Animated Background */
+        .bg-animated {
+            background: linear-gradient(-45deg, #f3f4f6, #e5e7eb, #fecaca, #f3f4f6);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+        .dark .bg-animated {
+            background: linear-gradient(-45deg, #121212, #2d1b1b, #1a0505, #000000);
+            background-size: 400% 400%;
+        }
 
-      // 2. Save to Local Storage (Keep last 8)
-      const newEntry = {
-        name,
-        location,
-        type,
-        timestamp: new Date().toISOString(), // Use string for local storage
-        id: Date.now() // Simple unique ID for list rendering
-      };
-      
-      const updatedHistory = [newEntry, ...localHistory].slice(0, 8);
-      setLocalHistory(updatedHistory);
-      localStorage.setItem('bulldog_history', JSON.stringify(updatedHistory));
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
 
-    } catch (err) {
-      console.error("Submission failed", err);
-      alert("Failed to submit log. Please try again.");
-    }
-  };
+        /* Loader */
+        .loader {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid #cc0000;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-animated text-gray-800 dark:text-gray-100 transition-colors duration-500 min-h-screen flex flex-col font-sans">
 
-  const handleAdminLogin = () => {
-    setView('dashboard');
-  };
-
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
-
-  const formatLocalTime = (isoString) => {
-    if (!isoString) return '';
-    return new Date(isoString).toLocaleString('en-US', {
-      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center ${
-        isDarkMode ? 'bg-neutral-900' : 'bg-slate-50'
-      }`}>
-        <Activity className="w-10 h-10 text-red-600 animate-spin" />
-      </div>
-    );
-  }
-
-  // --- Render Views ---
-  return (
-    // Main Background
-    <div className={`min-h-screen font-sans pb-20 selection:bg-red-500/30 ${
-      isDarkMode 
-        ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-800 via-neutral-900 to-black text-slate-900 selection:text-white' 
-        : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-50 via-slate-100 to-slate-200 text-slate-900'
-    }`}>
-      <Header setView={setView} view={view} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
-
-      <main className="pt-24 px-4">
-        {view === 'home' && (
-          <div className="flex flex-col items-center justify-center pt-8 px-4 animate-in fade-in slide-in-from-bottom-8 duration-700">
-            <h2 className={`text-5xl md:text-7xl font-black text-transparent bg-clip-text text-center mb-6 tracking-tight drop-shadow-sm ${
-              isDarkMode 
-                ? 'bg-gradient-to-b from-white via-neutral-200 to-neutral-600' 
-                : 'bg-gradient-to-b from-slate-900 via-slate-700 to-slate-500'
-            }`}>
-              BulldogTrack
-            </h2>
-            <p className={`text-center max-w-lg mb-16 text-lg font-medium leading-relaxed ${
-              isDarkMode ? 'text-neutral-400' : 'text-slate-600'
-            }`}>
-              The official digital logbook for automotive interns. <br/>Select your portal below to get started.
-            </p>
-
-            <div className="grid md:grid-cols-2 gap-8 w-full max-w-4xl">
-              {/* Student Card */}
-              <button 
-                onClick={() => setView('student')}
-                className={`group relative overflow-hidden backdrop-blur-xl p-8 rounded-3xl shadow-2xl border transition-all duration-300 text-left flex flex-col h-72 justify-between ${
-                  isDarkMode 
-                    ? 'bg-neutral-800/50 border-white/10 hover:border-red-500/50' 
-                    : 'bg-white/80 border-slate-200 hover:border-red-400 hover:shadow-red-100'
-                }`}
-              >
-                {/* Red Glow Effect */}
-                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-red-600 rounded-full blur-[100px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg border ${
-                  isDarkMode 
-                    ? 'bg-gradient-to-br from-red-600 to-red-800 shadow-red-900/40 border-white/10' 
-                    : 'bg-gradient-to-br from-red-500 to-red-600 shadow-red-200 border-white/20'
-                }`}>
-                  <User className="w-8 h-8 text-white" />
+    <!-- Navbar (Glass) -->
+    <nav class="glass sticky top-0 z-50 border-b-0 shadow-lg">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-school-black to-school-red flex items-center justify-center shadow-lg transform hover:rotate-12 transition-transform duration-300">
+                    <i class="fa-solid fa-wrench text-school-gold text-lg"></i>
                 </div>
-                <div className="relative z-10">
-                  <h3 className={`text-2xl font-bold mb-2 transition-colors ${
-                    isDarkMode 
-                      ? 'text-white group-hover:text-red-400' 
-                      : 'text-slate-800 group-hover:text-red-600'
-                  }`}>Student Interns</h3>
-                  <p className={`font-medium transition-colors ${
-                    isDarkMode 
-                      ? 'text-neutral-400 group-hover:text-neutral-300' 
-                      : 'text-slate-500 group-hover:text-slate-700'
-                  }`}>Check in or out of your internship site. Log your daily hours securely.</p>
-                </div>
-              </button>
+                <h1 class="text-xl font-bold tracking-wide uppercase bg-clip-text text-transparent bg-gradient-to-r from-gray-800 to-school-red dark:from-white dark:to-school-red drop-shadow-sm">
+                    Intern<span class="text-school-red">Track</span>
+                </h1>
+            </div>
+            <button id="themeToggle" class="w-10 h-10 rounded-full glass flex items-center justify-center hover:bg-school-gold/20 hover:scale-110 transition-all duration-300 text-school-gold shadow-sm">
+                <i class="fas fa-sun text-lg" id="themeIcon"></i>
+            </button>
+        </div>
+        <!-- Decorative Red Line -->
+        <div class="h-1 w-full bg-gradient-to-r from-school-black via-school-red to-school-gold"></div>
+    </nav>
 
-              {/* Admin Card */}
-              <button 
-                onClick={() => setView('admin')}
-                className={`group relative overflow-hidden backdrop-blur-xl p-8 rounded-3xl shadow-2xl border transition-all duration-300 text-left flex flex-col h-72 justify-between ${
-                  isDarkMode 
-                    ? 'bg-neutral-800/50 border-white/10 hover:border-neutral-500' 
-                    : 'bg-white/80 border-slate-200 hover:border-slate-400 hover:shadow-slate-200'
-                }`}
-              >
-                 {/* Neutral/White Glow Effect */}
-                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white rounded-full blur-[100px] opacity-5 group-hover:opacity-10 transition-opacity"></div>
+    <!-- Main Content -->
+    <main class="container mx-auto p-4 flex-grow flex flex-col gap-6 max-w-lg animate-fade-in-up">
+        
+        <!-- User Config Section -->
+        <div id="userConfig" class="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+            <div class="absolute top-0 left-0 w-1 h-full bg-school-gold"></div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Student Identification</label>
+            <div class="flex gap-3">
+                <input type="text" id="studentName" placeholder="Enter your full name" 
+                    class="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/30 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red focus:border-transparent transition-all placeholder-gray-400 dark:placeholder-gray-500">
+                <button onclick="saveName()" class="bg-gradient-to-r from-school-red to-school-darkRed text-white px-6 py-2 rounded-xl font-semibold shadow-lg hover:shadow-red-500/30 hover:scale-105 active:scale-95 transition-all duration-300">
+                    Save
+                </button>
+            </div>
+        </div>
 
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg border ${
-                  isDarkMode 
-                    ? 'bg-gradient-to-br from-neutral-800 to-black shadow-black/50 border-white/10' 
-                    : 'bg-gradient-to-br from-slate-700 to-slate-800 shadow-slate-300 border-white/20'
-                }`}>
-                  <FileText className="w-8 h-8 text-white" />
-                </div>
-                <div className="relative z-10">
-                  <h3 className={`text-2xl font-bold mb-2 transition-colors ${
-                    isDarkMode 
-                      ? 'text-white group-hover:text-neutral-300' 
-                      : 'text-slate-800 group-hover:text-slate-600'
-                  }`}>Instructor Admin</h3>
-                  <p className={`font-medium transition-colors ${
-                    isDarkMode 
-                      ? 'text-neutral-400 group-hover:text-neutral-300' 
-                      : 'text-slate-500 group-hover:text-slate-700'
-                  }`}>View logs, track attendance, and manage student records from anywhere.</p>
-                </div>
-              </button>
+        <!-- Status & Actions -->
+        <div class="glass-panel p-6 rounded-2xl text-center relative">
+            <h2 class="text-lg font-bold mb-4 uppercase tracking-wide opacity-80">Attendance Action</h2>
+            
+            <div id="locationStatus" class="mb-6 text-sm text-gray-500 dark:text-gray-400 min-h-[44px] flex items-center justify-center bg-gray-100/50 dark:bg-black/20 rounded-lg p-2 border border-dashed border-gray-300 dark:border-gray-700">
+                <span><i class="fas fa-location-arrow animate-pulse"></i> Waiting for location...</span>
             </div>
 
-            {/* Local History Section */}
-            {localHistory.length > 0 && (
-              <div className="w-full max-w-4xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-                <div className="flex items-center space-x-2 mb-6">
-                  <Activity className={`w-5 h-5 ${isDarkMode ? 'text-red-500' : 'text-red-600'}`} />
-                  <h3 className={`text-xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Recent Activity <span className={`text-sm font-medium ml-2 opacity-60 ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>(This Device)</span>
-                  </h3>
-                </div>
-                
-                <div className={`rounded-3xl p-2 backdrop-blur-xl border shadow-xl overflow-hidden ${
-                  isDarkMode 
-                    ? 'bg-neutral-800/40 border-white/5' 
-                    : 'bg-white/60 border-slate-200'
-                }`}>
-                  <div className="space-y-1">
-                    {localHistory.map((item) => (
-                      <div key={item.id} className={`flex items-center justify-between p-4 rounded-2xl transition-all ${
-                        isDarkMode ? 'hover:bg-white/5' : 'hover:bg-white/80'
-                      }`}>
-                        <div className="flex items-center space-x-4">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border shadow-sm ${
-                            item.type === 'Check In'
-                              ? (isDarkMode ? 'bg-red-900/20 border-red-500/30 text-red-400' : 'bg-red-100 text-red-600 border-red-200')
-                              : (isDarkMode ? 'bg-neutral-700/50 border-neutral-600 text-neutral-400' : 'bg-slate-100 text-slate-500 border-slate-200')
-                          }`}>
-                            {item.type === 'Check In' ? <LogIn className="w-5 h-5" /> : <LogOut className="w-5 h-5" />}
-                          </div>
-                          <div>
-                            <p className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                              {item.type}
-                            </p>
-                            <div className="flex items-center mt-0.5">
-                              <MapPin className={`w-3 h-3 mr-1 ${isDarkMode ? 'text-neutral-500' : 'text-slate-400'}`} />
-                              <p className={`text-xs ${isDarkMode ? 'text-neutral-400' : 'text-slate-500'}`}>
-                                {item.location}
-                              </p>
+            <div class="grid grid-cols-2 gap-5">
+                <!-- Check In Button -->
+                <button onclick="handleAction('Check In')" id="btnCheckIn" disabled
+                    class="group relative overflow-hidden py-8 rounded-2xl bg-gradient-to-br from-school-red to-red-800 text-white shadow-xl hover:shadow-red-600/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-300 transform hover:-translate-y-1 active:scale-95">
+                    <div class="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-500 skew-x-12 -ml-4"></div>
+                    <div class="relative flex flex-col items-center gap-2 z-10">
+                        <i class="fas fa-sign-in-alt text-3xl text-school-gold drop-shadow-md group-hover:scale-110 transition-transform"></i>
+                        <span class="font-bold text-lg tracking-wider">CHECK IN</span>
+                    </div>
+                </button>
+
+                <!-- Check Out Button -->
+                <button onclick="handleAction('Check Out')" id="btnCheckOut" disabled
+                    class="group relative overflow-hidden py-8 rounded-2xl bg-gradient-to-br from-gray-700 to-gray-900 text-white shadow-xl hover:shadow-gray-700/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-300 transform hover:-translate-y-1 active:scale-95 border border-gray-600">
+                    <div class="absolute inset-0 bg-white/10 group-hover:translate-x-full transition-transform duration-500 skew-x-12 -ml-4"></div>
+                    <div class="relative flex flex-col items-center gap-2 z-10">
+                        <i class="fas fa-sign-out-alt text-3xl text-gray-300 drop-shadow-md group-hover:scale-110 transition-transform"></i>
+                        <span class="font-bold text-lg tracking-wider">CHECK OUT</span>
+                    </div>
+                </button>
+            </div>
+            <div class="h-6 mt-4 flex items-center justify-center">
+                <p id="actionMessage" class="text-sm font-semibold"></p>
+            </div>
+        </div>
+
+        <!-- Local History -->
+        <div class="glass-panel p-5 rounded-2xl">
+            <h3 class="font-bold border-b border-gray-200/50 dark:border-gray-700/50 pb-3 mb-3 flex justify-between items-center">
+                <span class="flex items-center"><i class="fas fa-history text-school-gold mr-2"></i> Recent History</span>
+                <span class="text-[10px] uppercase font-bold tracking-wider bg-gray-200/50 dark:bg-gray-700/50 px-2 py-1 rounded text-gray-600 dark:text-gray-300">Local Device</span>
+            </h3>
+            <ul id="localHistoryList" class="space-y-3 text-sm">
+                <!-- Items populated by JS -->
+                <li class="text-gray-400 italic text-center py-4">No history yet.</li>
+            </ul>
+        </div>
+
+        <!-- Admin Toggle -->
+        <div class="text-center mt-2 pb-6">
+            <button onclick="toggleAdminPanel()" class="text-xs text-gray-400 hover:text-school-red hover:underline transition-colors opacity-70 hover:opacity-100">
+                Admin Dashboard Access
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Admin Modal (Glass Overlay) -->
+    <div id="adminPanel" class="fixed inset-0 z-[100] hidden">
+        <!-- Blur Backdrop -->
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="toggleAdminPanel()"></div>
+        
+        <div class="absolute inset-0 overflow-y-auto">
+            <div class="min-h-screen p-4 flex items-center justify-center">
+                <!-- Modal Content -->
+                <div class="relative w-full max-w-4xl glass-panel rounded-2xl shadow-2xl overflow-hidden transform transition-all animate-fade-in-up">
+                    
+                    <!-- Header -->
+                    <div class="p-4 bg-gradient-to-r from-school-black to-school-red flex justify-between items-center shadow-md">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-shield-alt text-school-gold"></i>
+                            <h2 class="text-white font-bold text-lg tracking-wide">Admin Dashboard</h2>
+                        </div>
+                        <button onclick="toggleAdminPanel()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="p-6">
+                        <!-- Password Entry -->
+                        <div id="adminAuth" class="text-center py-12">
+                            <div class="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto flex items-center justify-center mb-4 shadow-inner">
+                                <i class="fas fa-lock text-2xl text-gray-500 dark:text-gray-400"></i>
                             </div>
-                          </div>
+                            <h3 class="text-xl font-bold mb-2">Security Check</h3>
+                            <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">Please enter the administrator password.</p>
+                            
+                            <div class="flex justify-center max-w-xs mx-auto gap-2">
+                                <input type="password" id="adminPassword" class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-black/40 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red" placeholder="Password">
+                                <button onclick="verifyAdmin()" class="bg-school-gold text-school-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-400 shadow-md transition-colors">Login</button>
+                            </div>
                         </div>
-                        <div className="text-right">
-                          <p className={`text-xs font-medium mb-0.5 ${isDarkMode ? 'text-neutral-300' : 'text-slate-600'}`}>
-                            {formatLocalTime(item.timestamp).split(',')[0]}
-                          </p>
-                          <p className={`text-xs ${isDarkMode ? 'text-neutral-500' : 'text-slate-400'}`}>
-                            {formatLocalTime(item.timestamp).split(',')[1]}
-                          </p>
+
+                        <!-- Data Table -->
+                        <div id="adminData" class="hidden">
+                            <div class="flex justify-between items-center mb-4 bg-gray-100/50 dark:bg-black/20 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                                <span class="text-xs text-gray-500 dark:text-gray-400 font-mono"><i class="fab fa-google-drive"></i> Connected to Sheets</span>
+                                <button onclick="fetchAdminData()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2">
+                                    <i class="fas fa-sync"></i> Refresh
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner max-h-[60vh]">
+                                <table class="w-full text-sm text-left text-gray-600 dark:text-gray-300">
+                                    <thead class="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-800 dark:text-gray-400 sticky top-0 shadow-sm z-10">
+                                        <tr>
+                                            <th class="px-4 py-3">Time</th>
+                                            <th class="px-4 py-3">Student</th>
+                                            <th class="px-4 py-3">Action</th>
+                                            <th class="px-4 py-3">Site</th>
+                                            <th class="px-4 py-3 text-center">Map</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminTableBody" class="divide-y divide-gray-200 dark:divide-gray-700 bg-white/50 dark:bg-black/20">
+                                        <tr>
+                                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading data...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                    </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {view === 'student' && (
-          <StudentPortal onSubmit={handleStudentSubmit} isDarkMode={isDarkMode} />
-        )}
-
-        {view === 'admin' && (
-          <AdminLogin onLogin={handleAdminLogin} isDarkMode={isDarkMode} />
-        )}
-
-        {view === 'dashboard' && (
-          <Dashboard logs={logs} isDarkMode={isDarkMode} />
-        )}
-      </main>
+            </div>
+        </div>
     </div>
-  );
-}
+
+    <script>
+        // --- Configuration ---
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz-s7oWMskzcMKCK-vImuQgheY2csjHnoa7D6kn28kDuy2jzIrV3Z8g1sLkVqQXmjUieA/exec';
+        
+        // Internship Sites (Coordinates approximate)
+        const SITES = [
+            { name: "Alliance Diesel", lat: 33.7738, lng: -116.9634 },
+            { name: "Phil's Auto Clinic", lat: 33.7488, lng: -116.9602 },
+            { name: "Levi's Smog", lat: 33.7475, lng: -116.9760 },
+            { name: "Tim Moran Ford", lat: 33.7385, lng: -117.0010 },
+            { name: "Tim Moran Hyundai", lat: 33.7390, lng: -116.9985 },
+            { name: "Tim Moran Chevrolet", lat: 33.7365, lng: -117.0035 },
+            { name: "Hemet High School", lat: 33.7476, lng: -116.9431 }
+        ];
+
+        // Allowed radius in meters
+        const ALLOWED_RADIUS_METERS = 400; 
+
+        // --- State ---
+        let currentUserPos = null;
+        let nearestSite = null;
+        let watchId = null;
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTheme();
+            loadName();
+            renderLocalHistory();
+            startLocationWatch();
+
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+        });
+
+        // --- Theme Logic ---
+        function toggleTheme() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                document.getElementById('themeIcon').classList.replace('fa-moon', 'fa-sun');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                document.getElementById('themeIcon').classList.replace('fa-sun', 'fa-moon');
+            }
+        }
+
+        function loadTheme() {
+            const storedTheme = localStorage.getItem('theme');
+            if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('themeIcon').classList.replace('fa-sun', 'fa-moon');
+            }
+        }
+
+        // --- User Logic ---
+        function saveName() {
+            const name = document.getElementById('studentName').value.trim();
+            if (name) {
+                localStorage.setItem('studentName', name);
+                const btn = document.querySelector('#userConfig button');
+                const originalText = btn.innerText;
+                btn.innerText = "Saved!";
+                btn.classList.add('bg-green-600');
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.classList.remove('bg-green-600');
+                }, 2000);
+                checkButtons();
+            } else {
+                alert("Please enter a name.");
+            }
+        }
+
+        function loadName() {
+            const name = localStorage.getItem('studentName');
+            if (name) {
+                document.getElementById('studentName').value = name;
+            }
+            checkButtons();
+        }
+
+        // --- Geolocation & Distance Logic ---
+        function startLocationWatch() {
+            if (!navigator.geolocation) {
+                document.getElementById('locationStatus').innerHTML = '<span class="text-red-500">Geolocation not supported by this browser.</span>';
+                return;
+            }
+
+            // Clean up existing watch if retrying
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+
+            const options = { 
+                enableHighAccuracy: true, 
+                maximumAge: 0, // Force fresh location
+                timeout: 15000 // 15 seconds before timeout
+            };
+
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    currentUserPos = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    validateLocation();
+                },
+                (error) => {
+                    // Detailed Error Logging
+                    console.error("Geolocation Error Details:", {
+                        code: error.code,
+                        message: error.message
+                    });
+
+                    let msg = "Location error.";
+                    // 1: PERMISSION_DENIED, 2: POSITION_UNAVAILABLE, 3: TIMEOUT
+                    switch(error.code) {
+                        case 1: msg = "Permission denied. Allow location access."; break;
+                        case 2: msg = "Position unavailable. Check GPS."; break;
+                        case 3: msg = "Location request timed out."; break;
+                        default: msg = error.message || "Unknown error.";
+                    }
+
+                    document.getElementById('locationStatus').innerHTML = `
+                        <div class="flex flex-col items-center gap-2">
+                            <span class="text-red-500 font-bold text-sm"><i class="fas fa-exclamation-triangle"></i> ${msg}</span>
+                            <button onclick="retryLocation()" class="text-xs bg-white/50 hover:bg-white/80 px-3 py-1 rounded shadow transition border border-gray-300">
+                                <i class="fas fa-sync"></i> Retry
+                            </button>
+                        </div>`;
+                    disableButtons();
+                },
+                options
+            );
+        }
+
+        function retryLocation() {
+            document.getElementById('locationStatus').innerHTML = '<span class="text-school-gold animate-pulse"><i class="fas fa-spinner fa-spin"></i> Retrying location...</span>';
+            startLocationWatch();
+        }
+
+        function validateLocation() {
+            if (!currentUserPos) return;
+
+            let minDistance = Infinity;
+            let closest = null;
+
+            SITES.forEach(site => {
+                const dist = getDistanceFromLatLonInMeters(currentUserPos.lat, currentUserPos.lng, site.lat, site.lng);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closest = site;
+                }
+            });
+
+            const statusEl = document.getElementById('locationStatus');
+            
+            if (minDistance <= ALLOWED_RADIUS_METERS) {
+                nearestSite = closest;
+                statusEl.innerHTML = `<span class="text-green-600 dark:text-green-400 font-bold flex items-center gap-2"><i class="fas fa-check-circle text-lg"></i> <span>At ${closest.name} <span class="text-xs font-normal opacity-75">(${Math.round(minDistance)}m)</span></span></span>`;
+                checkButtons();
+            } else {
+                nearestSite = null;
+                const closestName = closest ? closest.name : "Unknown";
+                statusEl.innerHTML = `<span class="text-school-red font-bold flex flex-col items-center leading-tight"><span class="flex items-center gap-2"><i class="fas fa-times-circle"></i> Too far from site.</span><span class="text-xs font-normal text-gray-500 dark:text-gray-400 mt-1">Nearest: ${closestName} (${Math.round(minDistance)}m)</span></span>`;
+                disableButtons();
+            }
+        }
+
+        function disableButtons() {
+            document.getElementById('btnCheckIn').disabled = true;
+            document.getElementById('btnCheckOut').disabled = true;
+        }
+
+        function checkButtons() {
+            const hasName = !!document.getElementById('studentName').value.trim();
+            const hasLoc = !!nearestSite;
+            
+            const btnIn = document.getElementById('btnCheckIn');
+            const btnOut = document.getElementById('btnCheckOut');
+
+            if (hasName && hasLoc) {
+                btnIn.disabled = false;
+                btnOut.disabled = false;
+            } else {
+                btnIn.disabled = true;
+                btnOut.disabled = true;
+            }
+        }
+
+        // Haversine Formula
+        function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // metres
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c;
+        }
+
+        // --- Actions ---
+        function handleAction(actionType) {
+            const student = document.getElementById('studentName').value.trim();
+            if (!student || !nearestSite) return;
+
+            const msgEl = document.getElementById('actionMessage');
+            msgEl.innerHTML = `<span class="flex items-center justify-center gap-2 text-school-gold"><span class="loader border-t-school-gold"></span> Processing...</span>`;
+            
+            const timestamp = new Date();
+            const dataPayload = {
+                timestamp: timestamp.toISOString(),
+                student: student,
+                action: actionType,
+                site: nearestSite.name,
+                lat: currentUserPos.lat,
+                lng: currentUserPos.lng
+            };
+
+            // 1. Save Local
+            saveToLocalHistory(dataPayload);
+
+            // 2. Send to Google Sheet
+            // We use 'no-cors' mode because Apps Scripts often don't return proper CORS headers for simple POSTs
+            // This means we won't get a readable response, but the data will send.
+            const formData = new URLSearchParams();
+            formData.append('student', dataPayload.student);
+            formData.append('action', dataPayload.action);
+            formData.append('site', dataPayload.site);
+            formData.append('lat', dataPayload.lat);
+            formData.append('lng', dataPayload.lng);
+            formData.append('timestamp', timestamp.toLocaleString());
+
+            fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', 
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData.toString()
+            })
+            .then(() => {
+                // Success assumed in no-cors
+                msgEl.innerHTML = `<span class="text-green-600 dark:text-green-400 flex items-center justify-center gap-2"><i class="fas fa-check"></i> Success! ${actionType} recorded.</span>`;
+                setTimeout(() => msgEl.innerHTML = '', 3000);
+            })
+            .catch(err => {
+                console.error(err);
+                msgEl.innerHTML = `<span class="text-yellow-600 dark:text-yellow-400 text-xs">Saved locally. Cloud sync pending/failed.</span>`;
+            });
+        }
+
+        // --- Local History ---
+        function saveToLocalHistory(item) {
+            let history = JSON.parse(localStorage.getItem('internHistory') || '[]');
+            history.unshift(item); // Add to top
+            if (history.length > 8) history = history.slice(0, 8); // Keep max 8
+            localStorage.setItem('internHistory', JSON.stringify(history));
+            renderLocalHistory();
+        }
+
+        function renderLocalHistory() {
+            const list = document.getElementById('localHistoryList');
+            const history = JSON.parse(localStorage.getItem('internHistory') || '[]');
+
+            if (history.length === 0) {
+                list.innerHTML = '<li class="text-gray-400 italic text-center py-4">No history found.</li>';
+                return;
+            }
+
+            list.innerHTML = history.map(item => {
+                const date = new Date(item.timestamp);
+                const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const dateStr = date.toLocaleDateString();
+                const isCheckIn = item.action === 'Check In';
+                const icon = isCheckIn ? 'fa-sign-in-alt text-green-500' : 'fa-sign-out-alt text-red-500';
+                const borderClass = isCheckIn ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500';
+                
+                return `
+                <li class="bg-white/40 dark:bg-black/40 backdrop-blur-sm p-3 rounded-lg flex justify-between items-center shadow-sm hover:shadow-md transition-shadow ${borderClass}">
+                    <div>
+                        <div class="font-bold dark:text-gray-200 flex items-center gap-2">
+                            <i class="fas ${icon}"></i> 
+                            ${item.action}
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">${item.site}</div>
+                    </div>
+                    <div class="text-right text-xs text-gray-400 font-mono">
+                        <div>${dateStr}</div>
+                        <div>${timeStr}</div>
+                    </div>
+                </li>
+                `;
+            }).join('');
+        }
+
+        // --- Admin Panel ---
+        function toggleAdminPanel() {
+            const panel = document.getElementById('adminPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        async function verifyAdmin() {
+            const password = document.getElementById('adminPassword').value;
+            // SHA-256 hash of "Bulldog!1"
+            const targetHash = "b3f3b9777995817d727284410170068426006509424603998782335191757820";
+            
+            try {
+                const hash = await sha256(password);
+                if (hash === targetHash) {
+                    document.getElementById('adminAuth').classList.add('hidden');
+                    document.getElementById('adminData').classList.remove('hidden');
+                    fetchAdminData();
+                } else {
+                    const passInput = document.getElementById('adminPassword');
+                    passInput.classList.add('border-red-500', 'ring-2', 'ring-red-500');
+                    setTimeout(() => passInput.classList.remove('border-red-500', 'ring-2', 'ring-red-500'), 2000);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error verifying password. Ensure you are in a Secure Context (HTTPS or Localhost).");
+            }
+        }
+
+        // Helper function to hash the password
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function fetchAdminData() {
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center"><div class="flex flex-col items-center justify-center gap-2"><span class="loader border-t-blue-500"></span><span class="text-sm text-gray-500">Syncing with Google Sheets...</span></div></td></tr>';
+
+            try {
+                const response = await fetch(APPS_SCRIPT_URL);
+                if (!response.ok) throw new Error("Network response was not ok");
+                
+                const data = await response.json(); 
+                
+                let rows = Array.isArray(data) ? data : (data.data || []);
+                
+                if (rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No records found in the sheet.</td></tr>';
+                    return;
+                }
+
+                rows.reverse();
+
+                tbody.innerHTML = rows.map(row => {
+                    const ts = row.timestamp || row[0] || 'N/A';
+                    const name = row.student || row[1] || 'Unknown';
+                    const action = row.action || row[2] || '-';
+                    const site = row.site || row[3] || '-';
+                    const lat = row.lat || row[4] || 0;
+                    const lng = row.lng || row[5] || 0;
+                    
+                    let displayTime = ts;
+                    try { displayTime = new Date(ts).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}); } catch(e){}
+
+                    return `
+                        <tr class="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-gray-700/50">
+                            <td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-gray-500 dark:text-gray-400">${displayTime}</td>
+                            <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">${name}</td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-1 rounded-md text-xs font-bold text-white shadow-sm ${action === 'Check In' ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-red-500 to-red-600'}">
+                                    ${action}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-gray-600 dark:text-gray-300 text-xs">${site}</td>
+                            <td class="px-4 py-3 text-center">
+                                <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" class="text-blue-500 hover:text-blue-600 hover:scale-110 transform transition-all inline-block">
+                                    <i class="fas fa-map-marked-alt text-lg"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error(error);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-4 text-center text-red-500 text-sm p-8 bg-red-50 dark:bg-red-900/20 rounded-lg m-4">
+                            <div class="font-bold mb-1"><i class="fas fa-exclamation-circle"></i> Failed to load data</div>
+                            <div class="text-xs opacity-75">Ensure the Google Apps Script is deployed as "Web App" with access set to "Anyone".</div>
+                        </td>
+                    </tr>`;
+            }
+        }
+    </script>
+</body>
+</html>
