@@ -257,6 +257,13 @@
                                     </button>
                                 </div>
                             </div>
+                            
+                            <!-- Important Note about Sheet Name -->
+                            <div class="mb-4 bg-yellow-100 dark:bg-yellow-900/30 p-3 rounded-lg border border-yellow-200 dark:border-yellow-700/50 text-xs text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
+                                <i class="fas fa-info-circle mt-0.5"></i>
+                                <span><strong>Important:</strong> Ensure your Google Sheet has a tab named exactly "<strong>Logs</strong>" (case-sensitive). If the tab is named "Sheet1", the data sync will fail.</span>
+                            </div>
+
                             <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner max-h-[60vh]">
                                 <table class="w-full text-sm text-left text-gray-600 dark:text-gray-300">
                                     <thead class="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-800 dark:text-gray-400 sticky top-0 shadow-sm z-10">
@@ -516,26 +523,27 @@
                 site: nearestSite.name
             });
 
-            // Send to Google Sheet
-            // FIX: Using no-cors mode with standard text/plain body
-            // This bypasses strict CORS blocks on POST requests, but we cannot read the response.
-            fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors', 
-                headers: {
-                    'Content-Type': 'text/plain',
-                },
-                body: JSON.stringify(payload)
-            })
-            .then(() => {
-                // With no-cors, we get an opaque response. We must assume success if no network error occurred.
-                msgEl.innerHTML = `<span class="text-green-600 dark:text-green-400 flex items-center justify-center gap-2"><i class="fas fa-check"></i> Recorded! (Cloud Sync Initiated)</span>`;
+            // --- DATA LOGGING FIX (navigator.sendBeacon) ---
+            // This is the most reliable "Fire and Forget" method for Apps Scripts that
+            // bypasses strict CORS blocks because it doesn't expect a response.
+            // It automatically sends as text/plain which is what our no-cors workaround needs.
+            const blob = new Blob([JSON.stringify(payload)], { type: 'text/plain;charset=utf-8' });
+            const success = navigator.sendBeacon(APPS_SCRIPT_URL, blob);
+
+            if (success) {
+                msgEl.innerHTML = `<span class="text-green-600 dark:text-green-400 flex items-center justify-center gap-2"><i class="fas fa-check"></i> Recorded! (Syncing...)</span>`;
                 setTimeout(() => msgEl.innerHTML = '', 3000);
-            })
-            .catch(err => {
-                console.error("Fetch error:", err);
-                msgEl.innerHTML = `<span class="text-yellow-600 dark:text-yellow-400 text-xs">Saved locally. Cloud sync failed (check internet).</span>`;
-            });
+            } else {
+                // Fallback to fetch if beacon is blocked (rare)
+                fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(payload)
+                }).then(() => {
+                    msgEl.innerHTML = `<span class="text-green-600 dark:text-green-400 flex items-center justify-center gap-2"><i class="fas fa-check"></i> Recorded! (Syncing...)</span>`;
+                    setTimeout(() => msgEl.innerHTML = '', 3000);
+                });
+            }
         }
 
         // --- Local History ---
@@ -667,6 +675,7 @@
                         <td colspan="5" class="px-4 py-4 text-center text-red-500 text-sm p-8 bg-red-50 dark:bg-red-900/20 rounded-lg m-4">
                             <div class="font-bold mb-1"><i class="fas fa-exclamation-circle"></i> Failed to load data</div>
                             <div class="text-xs opacity-75 mb-2">Possible reasons: Browser security blocks or script permissions.</div>
+                            <div class="text-xs opacity-75 mb-2 text-yellow-600 dark:text-yellow-400"><strong>CHECK:</strong> Is your Sheet tab named "Logs"?</div>
                             <a href="https://docs.google.com/spreadsheets/d/14f4wIwY5hDP1gFZdvy7o5j3ekYR-8zGf0N027N4wBRI/edit" target="_blank" class="inline-block text-blue-600 underline text-xs">View Sheet Directly</a>
                         </td>
                     </tr>`;
