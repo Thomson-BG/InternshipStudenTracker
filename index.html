@@ -249,7 +249,7 @@
                             <div class="flex justify-between items-center mb-4 bg-gray-100/50 dark:bg-black/20 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                                 <span class="text-xs text-gray-500 dark:text-gray-400 font-mono"><i class="fab fa-google-drive"></i> Connected to Sheets</span>
                                 <div class="flex gap-2">
-                                    <a href="https://docs.google.com/spreadsheets/d/14f4wIwY5hDP1gFZdvy7o5j3ekYR-8zGf0N027N4wBRI/edit" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2">
+                                    <a href="https://docs.google.com/spreadsheets/d/1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY/edit" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2">
                                         <i class="fas fa-table"></i> Open Sheet
                                     </a>
                                     <button onclick="fetchAdminData()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2">
@@ -291,7 +291,8 @@
 
     <script>
         // --- Configuration ---
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz-s7oWMskzcMKCK-vImuQgheY2csjHnoa7D6kn28kDuy2jzIrV3Z8g1sLkVqQXmjUieA/exec';
+        // Updated with the URL you provided:
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1aX6z9Irh5AKsyLg4PiFZoNV2BIudLNMvPbbg81A5xsggkEZF2nK797kJcK2mXUXl/exec';
         
         // Internship Sites (Coordinates approximate)
         const SITES = [
@@ -512,7 +513,8 @@
                 location: nearestSite.name,
                 lat: currentUserPos.lat,
                 lng: currentUserPos.lng,
-                timestamp: timestamp.toISOString()
+                timestamp: timestamp.toISOString(),
+                userAgent: navigator.userAgent
             };
 
             // Save Local
@@ -524,10 +526,12 @@
             });
 
             // --- DATA LOGGING FIX (navigator.sendBeacon) ---
-            // This is the most reliable "Fire and Forget" method for Apps Scripts that
+            // This is the most reliable "Fire and Forget" method for Apps Scripts that 
             // bypasses strict CORS blocks because it doesn't expect a response.
             // It automatically sends as text/plain which is what our no-cors workaround needs.
             const blob = new Blob([JSON.stringify(payload)], { type: 'text/plain;charset=utf-8' });
+            
+            // Note: sendBeacon is "best effort". For crucial data, we can also try fetch no-cors
             const success = navigator.sendBeacon(APPS_SCRIPT_URL, blob);
 
             if (success) {
@@ -620,66 +624,54 @@
             }
         }
 
-        async function fetchAdminData() {
+        // --- New Admin Data Fetcher ---
+        function fetchAdminData() {
+            if (APPS_SCRIPT_URL.includes("INSERT")) {
+                alert("Please configure the APPS_SCRIPT_URL in the code first.");
+                return;
+            }
+
             const tbody = document.getElementById('adminTableBody');
-            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center"><div class="flex flex-col items-center justify-center gap-2"><span class="loader border-t-blue-500"></span><span class="text-sm text-gray-500">Syncing with Google Sheets...</span></div></td></tr>';
+            tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center"><div class="inline-block loader border-t-blue-500"></div> Fetching recent logs...</td></tr>`;
 
-            try {
-                // Add unique timestamp to prevent caching and ensure fresh fetch
-                const url = APPS_SCRIPT_URL + '?t=' + new Date().getTime();
-                
-                const response = await fetch(url);
-                if (!response.ok) throw new Error("Network response was not ok");
-                
-                const data = await response.json(); 
-                
-                if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No records found in the sheet.</td></tr>';
-                    return;
-                }
-
-                tbody.innerHTML = data.map(row => {
-                    const ts = row.timestamp || 'N/A';
-                    const name = row.name || 'Unknown';
-                    const action = row.type || '-';
-                    const site = row.location || '-';
+            // We use GET request to fetch data
+            fetch(APPS_SCRIPT_URL)
+                .then(response => response.json())
+                .then(json => {
+                    if (json.status !== 'success') {
+                        throw new Error(json.message || "Failed to load data");
+                    }
                     
-                    const mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site)}`;
-                    
-                    let displayTime = ts;
-                    try { displayTime = new Date(ts).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}); } catch(e){}
+                    if (!json.data || json.data.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No records found.</td></tr>`;
+                        return;
+                    }
 
-                    return `
-                        <tr class="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-gray-700/50">
-                            <td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-gray-500 dark:text-gray-400">${displayTime}</td>
-                            <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">${name}</td>
-                            <td class="px-4 py-3">
-                                <span class="px-2 py-1 rounded-md text-xs font-bold text-white shadow-sm ${action === 'Check In' ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-red-500 to-red-600'}">
-                                    ${action}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-gray-600 dark:text-gray-300 text-xs">${site}</td>
+                    tbody.innerHTML = json.data.map(row => {
+                        const date = new Date(row.timestamp);
+                        const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        const mapLink = `https://www.google.com/maps?q=${row.lat},${row.lng}`;
+                        
+                        // Badge Color
+                        const badgeColor = row.action === 'Check In' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+
+                        return `
+                        <tr class="hover:bg-white/80 dark:hover:bg-black/40 transition-colors">
+                            <td class="px-4 py-3 font-mono text-xs">${dateStr}</td>
+                            <td class="px-4 py-3 font-bold">${row.name}</td>
+                            <td class="px-4 py-3"><span class="${badgeColor} px-2 py-1 rounded text-xs font-bold">${row.action}</span></td>
+                            <td class="px-4 py-3 text-xs">${row.location}</td>
                             <td class="px-4 py-3 text-center">
-                                <a href="${mapLink}" target="_blank" class="text-blue-500 hover:text-blue-600 hover:scale-110 transform transition-all inline-block">
-                                    <i class="fas fa-map-marked-alt text-lg"></i>
-                                </a>
+                                <a href="${mapLink}" target="_blank" class="text-blue-500 hover:text-blue-700"><i class="fas fa-map-marker-alt"></i></a>
                             </td>
                         </tr>
-                    `;
-                }).join('');
-
-            } catch (error) {
-                console.error("Fetch Admin Data Error:", error);
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="px-4 py-4 text-center text-red-500 text-sm p-8 bg-red-50 dark:bg-red-900/20 rounded-lg m-4">
-                            <div class="font-bold mb-1"><i class="fas fa-exclamation-circle"></i> Failed to load data</div>
-                            <div class="text-xs opacity-75 mb-2">Possible reasons: Browser security blocks or script permissions.</div>
-                            <div class="text-xs opacity-75 mb-2 text-yellow-600 dark:text-yellow-400"><strong>CHECK:</strong> Is your Sheet tab named "Logs"?</div>
-                            <a href="https://docs.google.com/spreadsheets/d/14f4wIwY5hDP1gFZdvy7o5j3ekYR-8zGf0N027N4wBRI/edit" target="_blank" class="inline-block text-blue-600 underline text-xs">View Sheet Directly</a>
-                        </td>
-                    </tr>`;
-            }
+                        `;
+                    }).join('');
+                })
+                .catch(error => {
+                    console.error('Admin fetch error:', error);
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Error loading data. Is the Script deployed?</td></tr>`;
+                });
         }
     </script>
 </body>
