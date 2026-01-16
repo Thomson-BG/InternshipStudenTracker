@@ -492,45 +492,45 @@
             msgEl.innerHTML = `<span class="flex items-center justify-center gap-2 text-school-gold"><span class="loader border-t-school-gold"></span> Processing...</span>`;
             
             const timestamp = new Date();
-            const dataPayload = {
+            
+            // Map data to match exact fields expected by Apps Script (data.name, data.location, data.type)
+            const payload = {
+                name: student,
+                type: actionType,
+                location: nearestSite.name,
+                // Sending lat/lng in case you update the script later to use them
+                lat: currentUserPos.lat,
+                lng: currentUserPos.lng,
+                timestamp: timestamp.toISOString()
+            };
+
+            // Save Local
+            saveToLocalHistory({
                 timestamp: timestamp.toISOString(),
                 student: student,
                 action: actionType,
-                site: nearestSite.name,
-                lat: currentUserPos.lat,
-                lng: currentUserPos.lng
-            };
+                site: nearestSite.name
+            });
 
-            // 1. Save Local
-            saveToLocalHistory(dataPayload);
-
-            // 2. Send to Google Sheet
-            // We use 'no-cors' mode because Apps Scripts often don't return proper CORS headers for simple POSTs
-            // This means we won't get a readable response, but the data will send.
-            const formData = new URLSearchParams();
-            formData.append('student', dataPayload.student);
-            formData.append('action', dataPayload.action);
-            formData.append('site', dataPayload.site);
-            formData.append('lat', dataPayload.lat);
-            formData.append('lng', dataPayload.lng);
-            formData.append('timestamp', timestamp.toLocaleString());
-
+            // Send to Google Sheet
+            // Using standard fetch with JSON body since your script uses JSON.parse(e.postData.contents)
+            // No Content-Type header ensures simple request (text/plain) to avoid preflight issues
             fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
-                mode: 'no-cors', 
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: formData.toString()
+                body: JSON.stringify(payload)
             })
-            .then(() => {
-                // Success assumed in no-cors
-                msgEl.innerHTML = `<span class="text-green-600 dark:text-green-400 flex items-center justify-center gap-2"><i class="fas fa-check"></i> Success! ${actionType} recorded.</span>`;
+            .then(async response => {
+                const result = await response.json();
+                if(result.result === 'success') {
+                    msgEl.innerHTML = `<span class="text-green-600 dark:text-green-400 flex items-center justify-center gap-2"><i class="fas fa-check"></i> Success! ${actionType} recorded.</span>`;
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
                 setTimeout(() => msgEl.innerHTML = '', 3000);
             })
             .catch(err => {
                 console.error(err);
-                msgEl.innerHTML = `<span class="text-yellow-600 dark:text-yellow-400 text-xs">Saved locally. Cloud sync pending/failed.</span>`;
+                msgEl.innerHTML = `<span class="text-yellow-600 dark:text-yellow-400 text-xs">Saved locally. Cloud sync pending/error.</span>`;
             });
         }
 
@@ -584,14 +584,19 @@
             panel.classList.toggle('hidden');
         }
 
-        async function verifyAdmin() {
+        function verifyAdmin() {
             const password = document.getElementById('adminPassword').value;
-            // SHA-256 hash of "Bulldog!1"
-            const targetHash = "b3f3b9777995817d727284410170068426006509424603998782335191757820";
+            
+            // Obfuscated verification for "Bulldog!1" 
+            // This ensures it works in all environments (even those without Secure Context for crypto)
+            // Logic: Base64(Reversed("Bulldog!1")) -> "1!godlluB" -> "MTFnb2RsbHVC"
+            const target = "MTFnb2RsbHVC";
             
             try {
-                const hash = await sha256(password);
-                if (hash === targetHash) {
+                // Simple obfuscation to hide password from plain text source view
+                const attempt = btoa(password.split('').reverse().join(''));
+                
+                if (attempt === target) {
                     document.getElementById('adminAuth').classList.add('hidden');
                     document.getElementById('adminData').classList.remove('hidden');
                     fetchAdminData();
@@ -602,16 +607,8 @@
                 }
             } catch (e) {
                 console.error(e);
-                alert("Error verifying password. Ensure you are in a Secure Context (HTTPS or Localhost).");
+                alert("Error verifying password.");
             }
-        }
-
-        // Helper function to hash the password
-        async function sha256(message) {
-            const msgBuffer = new TextEncoder().encode(message);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
         async function fetchAdminData() {
@@ -622,24 +619,22 @@
                 const response = await fetch(APPS_SCRIPT_URL);
                 if (!response.ok) throw new Error("Network response was not ok");
                 
+                // Your script returns array of objects: [{id, timestamp, name, location, type}, ...]
                 const data = await response.json(); 
                 
-                let rows = Array.isArray(data) ? data : (data.data || []);
-                
-                if (rows.length === 0) {
+                if (data.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No records found in the sheet.</td></tr>';
                     return;
                 }
 
-                rows.reverse();
-
-                tbody.innerHTML = rows.map(row => {
-                    const ts = row.timestamp || row[0] || 'N/A';
-                    const name = row.student || row[1] || 'Unknown';
-                    const action = row.action || row[2] || '-';
-                    const site = row.site || row[3] || '-';
-                    const lat = row.lat || row[4] || 0;
-                    const lng = row.lng || row[5] || 0;
+                tbody.innerHTML = data.map(row => {
+                    const ts = row.timestamp || 'N/A';
+                    const name = row.name || 'Unknown';
+                    const action = row.type || '-';
+                    const site = row.location || '-';
+                    
+                    // Coordinates aren't returned by your current script, so we use search
+                    const mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site)}`;
                     
                     let displayTime = ts;
                     try { displayTime = new Date(ts).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}); } catch(e){}
@@ -655,7 +650,7 @@
                             </td>
                             <td class="px-4 py-3 text-gray-600 dark:text-gray-300 text-xs">${site}</td>
                             <td class="px-4 py-3 text-center">
-                                <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" class="text-blue-500 hover:text-blue-600 hover:scale-110 transform transition-all inline-block">
+                                <a href="${mapLink}" target="_blank" class="text-blue-500 hover:text-blue-600 hover:scale-110 transform transition-all inline-block">
                                     <i class="fas fa-map-marked-alt text-lg"></i>
                                 </a>
                             </td>
