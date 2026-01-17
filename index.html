@@ -841,8 +841,13 @@
                      return;
                 }
 
-                // Reverse to show newest first
-                data.slice().reverse().forEach(row => {
+                // Sort data by timestamp descending (Newest at top)
+                data.sort((a, b) => {
+                    return new Date(b.timestamp) - new Date(a.timestamp);
+                });
+
+                // Iterate (no reverse needed now as it is sorted)
+                data.forEach(row => {
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors";
                     
