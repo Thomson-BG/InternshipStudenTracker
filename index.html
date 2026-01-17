@@ -773,58 +773,90 @@
             const tbody = document.getElementById('adminTableBody');
             tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Fetching Sheet Data...</td></tr>';
 
-            // Add cache buster to prevent cached responses
-            const url = `${APPS_SCRIPT_URL}?t=${Date.now()}`;
-
-            fetch(url)
-                .then(res => {
-                    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-                    return res.json();
-                })
-                .then(data => {
-                    tbody.innerHTML = '';
-                    if (data.status === "error") {
-                        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-4 text-center text-red-500">${data.message}</td></tr>`;
-                        return;
+            fetch(APPS_SCRIPT_URL, {
+                method: "GET",
+                redirect: "follow"
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(text => {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error("Raw response:", text);
+                    if (text.includes("<!DOCTYPE html>")) {
+                        throw new Error("Received HTML instead of JSON. (Check Script Deployment/Permissions)");
                     }
-                    
-                    // Assuming data is array of objects
-                    // Reverse to show newest first
-                    data.slice().reverse().forEach(row => {
-                        const tr = document.createElement('tr');
-                        tr.className = "hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors";
-                        
-                        // Parse timestamp if ISO string
-                        let timeDisplay = row.timestamp;
-                        try {
-                            timeDisplay = new Date(row.timestamp).toLocaleString();
-                        } catch(e) {}
+                    throw new Error("Invalid JSON response from server.");
+                }
+            })
+            .then(data => {
+                tbody.innerHTML = '';
+                if (data.status === "error") {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-4 text-center text-red-500">${data.message}</td></tr>`;
+                    return;
+                }
+                
+                // Assuming data is array of objects
+                if (!Array.isArray(data)) {
+                    // Try to handle {data: [...]} format just in case
+                     if (data.data && Array.isArray(data.data)) {
+                         data = data.data;
+                     } else {
+                        throw new Error("Unexpected data format received.");
+                     }
+                }
 
-                        tr.innerHTML = `
-                            <td class="px-4 py-3 whitespace-nowrap">${timeDisplay}</td>
-                            <td class="px-4 py-3 font-medium">${row.name}</td>
-                            <td class="px-4 py-3">
-                                <span class="px-2 py-1 rounded text-xs font-bold ${row.type === 'Check In' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
-                                    ${row.type}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3">${row.location}</td>
-                            <td class="px-4 py-3 text-center">
-                                <a href="https://www.google.com/maps?q=${row.lat},${row.lng}" target="_blank" class="text-blue-500 hover:text-blue-700">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                </a>
-                            </td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
-                })
-                .catch(err => {
-                    console.error("Fetch error details:", err);
-                    tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">
-                        Failed to load data.<br>
-                        <span class="text-xs text-gray-400">Error: ${err.message || 'Unknown error'}. Ensure web app is deployed as "Anyone".</span>
-                    </td></tr>`;
+                if (data.length === 0) {
+                     tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No logs found.</td></tr>`;
+                     return;
+                }
+
+                // Reverse to show newest first
+                data.slice().reverse().forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors";
+                    
+                    let timeDisplay = row.timestamp;
+                    try {
+                        timeDisplay = new Date(row.timestamp).toLocaleString();
+                    } catch(e) {}
+
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 whitespace-nowrap">${timeDisplay}</td>
+                        <td class="px-4 py-3 font-medium">${row.name}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded text-xs font-bold ${row.type === 'Check In' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                                ${row.type}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">${row.location}</td>
+                        <td class="px-4 py-3 text-center">
+                            <a href="https://www.google.com/maps?q=${row.lat},${row.lng}" target="_blank" class="text-blue-500 hover:text-blue-700">
+                                <i class="fas fa-map-marker-alt"></i>
+                            </a>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
                 });
+            })
+            .catch(err => {
+                console.error("Fetch Error:", err);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-red-500">
+                            <div class="flex flex-col items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span class="font-bold">Error Loading Data</span>
+                                <span class="text-xs font-mono bg-red-50 dark:bg-red-900/30 p-2 rounded">${err.message}</span>
+                            </div>
+                        </td>
+                    </tr>`;
+            });
         }
     </script>
 </body>
