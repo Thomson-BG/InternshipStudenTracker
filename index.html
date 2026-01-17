@@ -773,8 +773,14 @@
             const tbody = document.getElementById('adminTableBody');
             tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Fetching Sheet Data...</td></tr>';
 
-            fetch(APPS_SCRIPT_URL)
-                .then(res => res.json())
+            // Add cache buster to prevent cached responses
+            const url = `${APPS_SCRIPT_URL}?t=${Date.now()}`;
+
+            fetch(url)
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+                    return res.json();
+                })
                 .then(data => {
                     tbody.innerHTML = '';
                     if (data.status === "error") {
@@ -813,8 +819,11 @@
                     });
                 })
                 .catch(err => {
-                    console.error(err);
-                    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Failed to load data. Ensure web app is deployed as "Anyone".</td></tr>';
+                    console.error("Fetch error details:", err);
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">
+                        Failed to load data.<br>
+                        <span class="text-xs text-gray-400">Error: ${err.message || 'Unknown error'}. Ensure web app is deployed as "Anyone".</span>
+                    </td></tr>`;
                 });
         }
     </script>
