@@ -144,36 +144,18 @@
         <div id="userConfig" class="glass-panel p-5 rounded-2xl relative overflow-hidden group">
             <div class="absolute top-0 left-0 w-1 h-full bg-school-gold"></div>
             <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Student Identification</label>
-            <div class="flex gap-3">
-                <!-- Name Selection Dropdown -->
-                <div class="relative w-full">
-                    <select id="studentName" 
-                        class="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/30 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red focus:border-transparent transition-all text-gray-800 dark:text-gray-200 appearance-none cursor-pointer">
-                        <option value="" disabled selected>Select your name</option>
-                        <option value="Adrian Delgado Hernandez">Adrian Delgado Hernandez</option>
-                        <option value="Adrian Herrera">Adrian Herrera</option>
-                        <option value="Adrian Rodriguez Valdes">Adrian Rodriguez Valdes</option>
-                        <option value="Azriel Perez">Azriel Perez</option>
-                        <option value="Carlos Salgado">Carlos Salgado</option>
-                        <option value="Diego Ochoa">Diego Ochoa</option>
-                        <option value="Ethan Little">Ethan Little</option>
-                        <option value="James Windham">James Windham</option>
-                        <option value="Jonah Chavez">Jonah Chavez</option>
-                        <option value="Jordan Belvin">Jordan Belvin</option>
-                        <option value="Lenore Ditmore">Lenore Ditmore</option>
-                        <option value="Maximus Robles">Maximus Robles</option>
-                        <option value="Porter Preston">Porter Preston</option>
-                        <option value="Scarlet Grady">Scarlet Grady</option>
-                        <option value="Zacharias Windham">Zacharias Windham</option>
-                    </select>
-                    <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
-                        <i class="fas fa-chevron-down text-xs"></i>
-                    </div>
+            <div class="flex flex-col gap-2">
+                <!-- ID Input -->
+                <input type="tel" id="studentIdInput" 
+                    placeholder="Enter Student ID #" 
+                    maxlength="6"
+                    oninput="validateStudentId()"
+                    class="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/30 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red focus:border-transparent transition-all text-gray-800 dark:text-gray-200 text-center font-mono text-lg tracking-widest shadow-inner placeholder:font-sans placeholder:tracking-normal placeholder:text-gray-400">
+                
+                <!-- Resolved Name Display -->
+                <div id="studentNameDisplay" class="h-6 flex items-center justify-center transition-all duration-300 transform">
+                    <span class="text-sm italic text-gray-400">Please enter your 6-digit ID</span>
                 </div>
-
-                <button onclick="saveName()" class="bg-gradient-to-r from-school-red to-school-darkRed text-white px-6 py-2 rounded-xl font-semibold shadow-lg hover:shadow-red-500/30 hover:scale-105 active:scale-95 transition-all duration-300">
-                    Save
-                </button>
             </div>
         </div>
 
@@ -345,6 +327,25 @@
 
         const ALLOWED_RADIUS_METERS = 400; 
 
+        // Student Database
+        const STUDENT_DB = {
+            "131923": "Jordan Belvin",
+            "168115": "Jonah Chavez",
+            "131523": "Adrian Delgado Hernandez",
+            "160601": "Lenore Ditmore",
+            "132819": "Scarlet Grady",
+            "126607": "Adrian Herrera",
+            "132120": "Ethan Little",
+            "131352": "Diego Ochoa",
+            "159660": "Azriel Perez",
+            "133569": "Porter Preston",
+            "160166": "Maximus Robles",
+            "131356": "Adrian Rodriguez Valdes",
+            "155404": "Carlos Salgado",
+            "132483": "James Windham",
+            "125814": "Zacharias Bramhall"
+        };
+
         // --- Sound System (Web Audio API) ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -384,6 +385,7 @@
         let currentUserPos = null;
         let nearestSite = null;
         let watchId = null;
+        let resolvedStudentName = null;
 
         // --- Core Functions (Defined at top to prevent scope issues) ---
         function toggleAdminPanel() {
@@ -395,7 +397,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             try {
                 loadTheme();
-                loadName();
+                // Removed loadName() - we don't save IDs anymore
                 renderLocalHistory();
                 
                 const toggleBtn = document.getElementById('themeToggle');
@@ -430,33 +432,24 @@
         }
 
         // --- User Logic ---
-        function saveName() {
-            const name = document.getElementById('studentName').value.trim();
-            if (name) {
-                localStorage.setItem('studentName', name);
-                const btn = document.querySelector('#userConfig button');
-                const originalText = btn.innerText;
-                btn.innerText = "Saved!";
-                btn.classList.add('bg-green-600');
-                setTimeout(() => {
-                    btn.innerText = originalText;
-                    btn.classList.remove('bg-green-600');
-                }, 2000);
-                checkButtons();
-            } else {
-                alert("Please select a name.");
-            }
-        }
+        function validateStudentId() {
+            const input = document.getElementById('studentIdInput');
+            const display = document.getElementById('studentNameDisplay');
+            const id = input.value.trim();
+            
+            resolvedStudentName = null; // Reset
 
-        function loadName() {
-            const name = localStorage.getItem('studentName');
-            if (name) {
-                const select = document.getElementById('studentName');
-                // Check if the saved name exists in the current options
-                const optionExists = Array.from(select.options).some(option => option.value === name);
-                if (optionExists) {
-                    select.value = name;
+            if (id.length >= 6) {
+                if (STUDENT_DB[id]) {
+                    resolvedStudentName = STUDENT_DB[id];
+                    display.innerHTML = `<span class="text-green-600 dark:text-green-400 font-bold animate-pulse">Welcome, ${resolvedStudentName}</span>`;
+                } else {
+                    display.innerHTML = `<span class="text-school-red font-bold">ID Not Found</span>`;
                 }
+            } else if (id.length > 0) {
+                 display.innerHTML = `<span class="text-gray-400">Typing...</span>`;
+            } else {
+                display.innerHTML = `<span class="text-sm italic text-gray-400">Please enter your 6-digit ID</span>`;
             }
             checkButtons();
         }
@@ -588,8 +581,8 @@
         }
 
         function checkButtons() {
-            const studentNameEl = document.getElementById('studentName');
-            const hasName = studentNameEl && !!studentNameEl.value.trim();
+            // Check if name is resolved
+            const hasName = !!resolvedStudentName;
             const hasLoc = !!nearestSite;
             
             const btnIn = document.getElementById('btnCheckIn');
@@ -624,8 +617,9 @@
 
         // --- Actions & Spam Prevention ---
         function handleAction(actionType) {
-            const student = document.getElementById('studentName').value.trim();
-            if (!student || !nearestSite) return;
+            // Use the resolved name from global state
+            if (!resolvedStudentName || !nearestSite) return;
+            const student = resolvedStudentName; 
 
             const msgEl = document.getElementById('actionMessage');
 
@@ -679,6 +673,10 @@
             // Send Data
             const blob = new Blob([JSON.stringify(payload)], { type: 'text/plain;charset=utf-8' });
             const success = navigator.sendBeacon(APPS_SCRIPT_URL, blob);
+            
+            // Clear the Input for Security as requested
+            document.getElementById('studentIdInput').value = '';
+            validateStudentId(); // Reset display
 
             if (success) {
                 // Play Success Sound
@@ -756,14 +754,18 @@
 
         // --- Admin & Data Handling ---
         function verifyAdmin() {
-            const pass = document.getElementById('adminPassword').value;
+            const input = document.getElementById('adminPassword');
+            const pass = input.value.trim(); // Removes accidental spaces
+            
             // Simple client-side check for demo purposes (In production, use server-side)
-            if (pass === "HemetInterns2024") {
+            if (pass === "Bulldog!1") {
                 document.getElementById('adminAuth').classList.add('hidden');
                 document.getElementById('adminData').classList.remove('hidden');
                 fetchAdminData();
             } else {
-                alert("Incorrect Password");
+                alert("Incorrect Password. (Hint: Bulldog!1)");
+                input.value = ''; // Clear input on failure
+                input.focus();
             }
         }
 
