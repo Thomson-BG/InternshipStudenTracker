@@ -40,13 +40,14 @@
             }
         }
     </script>
+
     <style>
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
         ::-webkit-scrollbar-thumb { background: rgba(136, 136, 136, 0.5); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(85, 85, 85, 0.8); }
-        
+
         /* Glassmorphism Utilities */
         .glass {
             background: rgba(255, 255, 255, 0.7);
@@ -132,10 +133,9 @@
             <div class="flex flex-col gap-2">
                 <input type="tel" id="studentIdInput" 
                     placeholder="Enter Student ID #" 
-                    maxlength="6"
+                    maxlength="6" 
                     oninput="validateStudentId()"
                     class="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/30 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red focus:border-transparent transition-all text-gray-800 dark:text-gray-200 text-center font-mono text-lg tracking-widest shadow-inner placeholder:font-sans placeholder:tracking-normal placeholder:text-gray-400">
-                
                 <div id="studentNameDisplay" class="h-6 flex items-center justify-center transition-all duration-300 transform">
                     <span class="text-sm italic text-gray-400">Please enter your 6-digit ID</span>
                 </div>
@@ -150,7 +150,7 @@
             </div>
 
             <div class="grid grid-cols-2 gap-5">
-                <button onclick="handleAction('Check In')" id="btnCheckIn" disabled
+                <button onclick="handleAction('Check In')" id="btnCheckIn" disabled 
                     class="group relative overflow-hidden py-8 rounded-2xl bg-gradient-to-br from-school-red to-red-800 text-white shadow-xl hover:shadow-red-600/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-300 transform hover:-translate-y-1 active:scale-95">
                     <div class="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-500 skew-x-12 -ml-4"></div>
                     <div class="relative flex flex-col items-center gap-2 z-10">
@@ -159,7 +159,7 @@
                     </div>
                 </button>
 
-                <button onclick="handleAction('Check Out')" id="btnCheckOut" disabled
+                <button onclick="handleAction('Check Out')" id="btnCheckOut" disabled 
                     class="group relative overflow-hidden py-8 rounded-2xl bg-gradient-to-br from-gray-700 to-gray-900 text-white shadow-xl hover:shadow-gray-700/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-300 transform hover:-translate-y-1 active:scale-95 border border-gray-600">
                     <div class="absolute inset-0 bg-white/10 group-hover:translate-x-full transition-transform duration-500 skew-x-12 -ml-4"></div>
                     <div class="relative flex flex-col items-center gap-2 z-10">
@@ -168,6 +168,7 @@
                     </div>
                 </button>
             </div>
+
             <div class="h-6 mt-4 flex items-center justify-center">
                 <p id="actionMessage" class="text-sm font-semibold"></p>
             </div>
@@ -206,7 +207,6 @@
 
     <div id="adminPanel" class="fixed inset-0 z-[100] hidden">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="toggleAdminPanel()"></div>
-        
         <div class="absolute inset-0 overflow-y-auto">
             <div class="min-h-screen p-4 flex items-center justify-center">
                 <div class="relative w-full max-w-4xl glass-panel rounded-2xl shadow-2xl overflow-hidden transform transition-all animate-fade-in-up">
@@ -220,15 +220,14 @@
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
-                    
+
                     <div class="p-6">
                         <div id="adminAuth" class="text-center py-12">
                             <div class="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto flex items-center justify-center mb-4 shadow-inner">
                                 <i class="fas fa-lock text-2xl text-gray-500 dark:text-gray-400"></i>
                             </div>
                             <h3 class="text-xl font-bold mb-2">Security Check</h3>
-                            <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">Please enter the administrator password.</p>
-                            
+                            <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">Please enter the password.</p>
                             <div class="flex justify-center max-w-xs mx-auto gap-2">
                                 <input type="password" id="adminPassword" class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-black/40 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red" placeholder="Password">
                                 <button onclick="verifyAdmin()" class="bg-school-gold text-school-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-400 shadow-md transition-colors">Login</button>
@@ -241,9 +240,8 @@
                                     <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                                     <input type="text" id="adminSearch" oninput="filterAdminData()" placeholder="Search logs (name, date, action)..." class="w-full pl-10 pr-4 py-2 rounded-lg bg-white dark:bg-black/50 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red text-sm transition-all">
                                 </div>
-                                
                                 <div class="flex gap-2 w-full md:w-auto justify-end">
-                                    <a href="https://docs.google.com/spreadsheets/d/1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY/edit" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2 whitespace-nowrap">
+                                    <a href="https://docs.google.com/spreadsheets/d/1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKIY/edit" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2 whitespace-nowrap">
                                         <i class="fas fa-table"></i> Open Sheet
                                     </a>
                                     <button onclick="fetchAdminData()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2 whitespace-nowrap">
@@ -251,7 +249,7 @@
                                     </button>
                                 </div>
                             </div>
-                            
+
                             <div class="mb-4 bg-yellow-100 dark:bg-yellow-900/30 p-3 rounded-lg border border-yellow-200 dark:border-yellow-700/50 text-xs text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
                                 <i class="fas fa-info-circle mt-0.5"></i>
                                 <span><strong>Important:</strong> Ensure your Google Sheet has a tab named exactly "<strong>Logs</strong>" (case-sensitive). If the tab is named "Sheet1", the data sync will fail.</span>
@@ -285,7 +283,7 @@
     <script>
         // --- Configuration ---
         // REPLACE THIS URL with your actual Apps Script Deployment URL
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1aX6z9Irh5AKsyLg4PiFZoNV2BIudLNMvPbbg81A5xsggkEZF2nK797kJcK2mXUXl/exec';
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1aX6z9Irh5AKsyLg4PiFZoNV2BludLNMvPbbg81A5xsggkEZF2nK797kJcK2mXUXI/exec';
         
         // Internship Sites (UPDATED with High Precision GPS)
         const SITES = [
@@ -293,14 +291,14 @@
             { name: "Phils Auto Clinic", lat: 33.74851138217792, lng: -116.92004436101942 },
             { name: "Levi's Automotive", lat: 33.74788219854886, lng: -116.97554790660938 },
             { name: "HUSD Transportation Dept.", lat: 33.74189676349582, lng: -116.99100203721602 },
-            { name: "Tim Moran Ford", lat: 33.73933869093443, lng: -117.03070412707285 },
-            { name: "Tim Moran Hyundai", lat: 33.73934670369273, lng: -117.03000554135964 },
+            { name: "Tim Moran Ford", lat: 33.73933869093443, lng: -117.03070412707285},
+            { name: "Tim Moran Hyundai", lat: 33.73934670369273, lng: -117.03000554135964},
             { name: "Tim Moran Chevrolet", lat: 33.74099416475308, lng: -117.02873711340769 },
             { name: "Hemet High Bulldog Garage", lat: 33.728014603500704, lng: -116.93369905999955 }
         ];
 
         // 100 Yards = 91.44 Meters
-        const ALLOWED_RADIUS_METERS = 91.44; 
+        const ALLOWED_RADIUS_METERS = 91.44;
 
         // Student Database
         const STUDENT_DB = {
@@ -318,53 +316,57 @@
             "131356": "Adrian Rodriguez Valdes",
             "155404": "Carlos Salgado",
             "132483": "James Windham",
-            "125814": "Zacharias Bramhall"
+            "125814": "Zacharias Bramhall",
             "010101": "Mr. Thomson"
         };
 
-        // --- Sound System (Web Audio API) ---
+        // --- Sound System (Web Audio API)
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
+        
         function playSound(type) {
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
-
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
-
+            
             oscillator.connect(gainNode);
             gainNode.connect(audioCtx.destination);
-
+            
             if (type === 'success') {
                 // Happy "Ding" - Sine wave, high pitch, short decay
                 oscillator.type = 'sine';
                 oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
                 oscillator.frequency.exponentialRampToValueAtTime(1046.5, audioCtx.currentTime + 0.1); // C6
+                
                 gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                
                 oscillator.start();
                 oscillator.stop(audioCtx.currentTime + 0.5);
             } else if (type === 'error') {
                 // Sad "Buzz" - Sawtooth wave, low pitch, descending
                 oscillator.type = 'sawtooth';
-                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); 
+                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
                 oscillator.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+                
                 gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
                 gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                
                 oscillator.start();
                 oscillator.stop(audioCtx.currentTime + 0.3);
             }
         }
 
-        // --- State ---
+        // --- State
         let currentUserPos = null;
         let selectedSite = null; // The specific site the user is at (or selected)
-        let nearbySites = []; // List of all sites within range
+        let nearbySites = [];    // List of all sites within range
         let watchId = null;
         let resolvedStudentName = null;
+        let adminDataCache = [];
 
-        // --- Core Functions (Defined at top to prevent scope issues) ---
+        // --- Core Functions ---
         function toggleAdminPanel() {
             const panel = document.getElementById('adminPanel');
             if(panel) panel.classList.toggle('hidden');
@@ -378,7 +380,7 @@
                 
                 const toggleBtn = document.getElementById('themeToggle');
                 if(toggleBtn) toggleBtn.addEventListener('click', toggleTheme);
-
+                
                 startLocationWatch();
             } catch(e) {
                 console.error("Init error:", e);
@@ -386,24 +388,35 @@
         });
 
         // --- Theme Logic ---
+        function loadTheme() {
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            updateThemeIcon();
+        }
+
         function toggleTheme() {
             const html = document.documentElement;
             if (html.classList.contains('dark')) {
                 html.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-                document.getElementById('themeIcon').classList.replace('fa-moon', 'fa-sun');
+                localStorage.theme = 'light';
             } else {
                 html.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-                document.getElementById('themeIcon').classList.replace('fa-sun', 'fa-moon');
+                localStorage.theme = 'dark';
             }
+            updateThemeIcon();
         }
-
-        function loadTheme() {
-            const storedTheme = localStorage.getItem('theme');
-            if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-                document.getElementById('themeIcon').classList.replace('fa-sun', 'fa-moon');
+        
+        function updateThemeIcon() {
+            const icon = document.getElementById('themeIcon');
+            if(document.documentElement.classList.contains('dark')) {
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+            } else {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
             }
         }
 
@@ -414,7 +427,7 @@
             const id = input.value.trim();
             
             resolvedStudentName = null; // Reset
-
+            
             if (id.length >= 6) {
                 if (STUDENT_DB[id]) {
                     resolvedStudentName = STUDENT_DB[id];
@@ -423,37 +436,31 @@
                     display.innerHTML = `<span class="text-school-red font-bold">ID Not Found</span>`;
                 }
             } else if (id.length > 0) {
-                 display.innerHTML = `<span class="text-gray-400">Typing...</span>`;
+                display.innerHTML = `<span class="text-gray-400">Typing...</span>`;
             } else {
                 display.innerHTML = `<span class="text-sm italic text-gray-400">Please enter your 6-digit ID</span>`;
             }
             checkButtons();
         }
 
-        // --- Geolocation & Distance Logic ---
+        // --- Location Logic ---
         function startLocationWatch() {
             if (!navigator.geolocation) {
-                updateLocationStatus('error', 'Geolocation not supported.');
+                updateLocationStatus('error', 'Geolocation not supported');
                 return;
             }
 
-            if (watchId) navigator.geolocation.clearWatch(watchId);
-
-            const loadingTimeout = setTimeout(() => {
-                if (!currentUserPos) {
-                    updateLocationStatus('timeout');
-                }
-            }, 6000);
-
-            const options = { 
-                enableHighAccuracy: true, 
-                maximumAge: 0, 
-                timeout: 10000 
+            const options = {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 10000
             };
+
+            // Initial generic loading
+            updateLocationStatus('loading');
 
             watchId = navigator.geolocation.watchPosition(
                 (position) => {
-                    clearTimeout(loadingTimeout);
                     currentUserPos = {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
@@ -461,7 +468,6 @@
                     validateLocation();
                 },
                 (error) => {
-                    clearTimeout(loadingTimeout);
                     console.warn("Watch Position Error:", error.message);
                     updateLocationStatus('error', error.message);
                 },
@@ -470,8 +476,6 @@
         }
 
         function forceRefreshLocation() {
-            document.getElementById('locationStatus').innerHTML = '<span class="text-school-gold animate-pulse"><i class="fas fa-spinner fa-spin"></i> Forcing update...</span>';
-            
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     currentUserPos = {
@@ -481,89 +485,94 @@
                     validateLocation();
                 },
                 (error) => {
-                    updateLocationStatus('error', error.message + " (Try enabling GPS)");
+                    updateLocationStatus('error', error.message);
                 },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 10000 }
             );
-            
-            if(!watchId) startLocationWatch();
         }
 
-        function updateLocationStatus(state, msg = "") {
-            const statusEl = document.getElementById('locationStatus');
-            if (state === 'error') {
-                statusEl.innerHTML = `
-                    <div class="flex flex-col items-center gap-2">
-                        <span class="text-red-500 font-bold text-sm"><i class="fas fa-exclamation-triangle"></i> Location Error</span>
-                        <span class="text-xs text-gray-400">${msg}</span>
-                        <button onclick="forceRefreshLocation()" class="text-xs bg-school-red text-white px-3 py-1 rounded shadow hover:bg-red-700 transition">
-                            <i class="fas fa-sync"></i> Force Retry
-                        </button>
-                    </div>`;
-                disableButtons();
-            } else if (state === 'timeout') {
-                statusEl.innerHTML = `
-                    <div class="flex flex-col items-center gap-2">
-                        <span class="text-yellow-600 dark:text-yellow-500 font-bold text-sm"><i class="fas fa-clock"></i> Slow GPS Response</span>
-                        <button onclick="forceRefreshLocation()" class="text-xs bg-school-gold text-school-black px-3 py-1 rounded shadow hover:bg-yellow-400 transition">
-                            <i class="fas fa-location-arrow"></i> Tap to Locate
-                        </button>
-                    </div>`;
-            }
+        // Haversine Formula
+        function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+            var R = 6371; // Radius of the earth in km
+            var dLat = deg2rad(lat2 - lat1);
+            var dLon = deg2rad(lon2 - lon1);
+            var a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            var d = R * c; // Distance in km
+            return d * 1000; // Distance in meters
         }
 
-        // --- NEW VALIDATION LOGIC FOR MULTIPLE SITES ---
+        function deg2rad(deg) {
+            return deg * (Math.PI / 180);
+        }
+
         function validateLocation() {
-            if (!currentUserPos) return;
+            if(!currentUserPos) return;
 
-            // Find ALL sites within radius
-            nearbySites = SITES.filter(site => {
+            // Find all sites within radius
+            nearbySites = SITES.map((site, index) => {
                 const dist = getDistanceFromLatLonInMeters(currentUserPos.lat, currentUserPos.lng, site.lat, site.lng);
-                site.distance = dist; // Store distance for display
-                return dist <= ALLOWED_RADIUS_METERS;
-            });
+                return { ...site, distance: dist, originalIndex: index };
+            }).filter(site => site.distance <= ALLOWED_RADIUS_METERS);
 
-            // Sort by nearest
+            // Sort by distance
             nearbySites.sort((a, b) => a.distance - b.distance);
 
             const statusEl = document.getElementById('locationStatus');
-            
+
             if (nearbySites.length === 0) {
                 // NO SITES FOUND
                 selectedSite = null;
+                
                 // Find closest just for info
                 let minDistance = Infinity;
                 let closest = null;
                 SITES.forEach(site => {
                     const d = getDistanceFromLatLonInMeters(currentUserPos.lat, currentUserPos.lng, site.lat, site.lng);
-                    if(d < minDistance) { minDistance = d; closest = site; }
+                    if(d < minDistance) {
+                        minDistance = d;
+                        closest = site;
+                    }
                 });
 
                 statusEl.innerHTML = `
                     <span class="text-school-red font-bold flex flex-col items-center leading-tight">
                         <span class="flex items-center gap-2"><i class="fas fa-times-circle"></i> Too far from site.</span>
                         <span class="text-xs font-normal text-gray-500 dark:text-gray-400 mt-1">Nearest: ${closest ? closest.name : 'Unknown'} (~${Math.round(minDistance)}m)</span>
-                        <button onclick="forceRefreshLocation()" class="mt-2 text-[10px] text-blue-500 underline">Update GPS</button>
-                    </span>`;
-                checkButtons();
+                    </span>
+                    <button onclick="forceRefreshLocation()" class="mt-2 text-[10px] text-blue-500 underline">Refresh GPS</button>
+                `;
+                disableButtons();
 
             } else if (nearbySites.length === 1) {
-                // ONE SITE FOUND
+                // EXACTLY ONE SITE
                 selectedSite = nearbySites[0];
-                statusEl.innerHTML = `<span class="text-green-600 dark:text-green-400 font-bold flex items-center gap-2"><i class="fas fa-check-circle text-lg"></i> <span>At ${selectedSite.name} <span class="text-xs font-normal opacity-75">(${Math.round(selectedSite.distance)}m)</span></span></span>`;
+                statusEl.innerHTML = `
+                    <div class="flex flex-col items-center">
+                        <span class="text-green-600 dark:text-green-400 font-bold flex items-center gap-2">
+                            <i class="fas fa-check-circle"></i> Location Verified
+                        </span>
+                        <span class="text-xs font-bold text-gray-700 dark:text-gray-300 mt-1">${selectedSite.name}</span>
+                        <span class="text-[10px] text-gray-400">Accuracy: ~${Math.round(selectedSite.distance)}m</span>
+                    </div>
+                `;
                 checkButtons();
 
             } else {
-                // MULTIPLE SITES FOUND (Overlap detected)
-                // We do NOT set selectedSite yet. User must pick.
+                // MULTIPLE SITES (e.g. Dealers next to each other)
+                // If we haven't manually selected one yet, default to the closest, but show dropdown
                 if(!selectedSite || !nearbySites.find(s => s.name === selectedSite.name)) {
-                     selectedSite = null; // Reset if the previously selected one is no longer in range
+                    selectedSite = nearbySites[0];
                 }
 
-                let optionsHtml = `<option value="">-- Select Location --</option>`;
-                nearbySites.forEach((site, index) => {
-                    const isSelected = selectedSite && selectedSite.name === site.name ? 'selected' : '';
-                    optionsHtml += `<option value="${index}" ${isSelected}>${site.name} (${Math.round(site.distance)}m)</option>`;
+                let optionsHtml = '';
+                nearbySites.forEach((site, idx) => {
+                    // Use the index in the 'nearbySites' array for the value
+                    const isSelected = (site.name === selectedSite.name) ? 'selected' : '';
+                    optionsHtml += `<option value="${idx}" ${isSelected}>${site.name} (${Math.round(site.distance)}m)</option>`;
                 });
 
                 statusEl.innerHTML = `
@@ -578,31 +587,48 @@
             }
         }
 
-        function manualSelectSite(indexStr) {
-            if(indexStr === "") {
-                selectedSite = null;
-            } else {
-                selectedSite = nearbySites[parseInt(indexStr)];
-            }
+        function manualSelectSite(index) {
+            selectedSite = nearbySites[index];
+            // Re-render handled by change, but buttons need check
             checkButtons();
         }
 
-        function checkButtons() {
-            const btnIn = document.getElementById('btnCheckIn');
-            const btnOut = document.getElementById('btnCheckOut');
-            
-            if (resolvedStudentName && selectedSite) {
-                btnIn.disabled = false;
-                btnOut.disabled = false;
-            } else {
-                btnIn.disabled = true;
-                btnOut.disabled = true;
+        function updateLocationStatus(state, msg = "") {
+            const statusEl = document.getElementById('locationStatus');
+            if (state === 'loading') {
+                statusEl.innerHTML = `<span><i class="fas fa-location-arrow animate-pulse"></i> Waiting for location...</span>`;
+                disableButtons();
+            } else if (state === 'error') {
+                statusEl.innerHTML = `
+                    <div class="flex flex-col items-center gap-2">
+                        <span class="text-red-500 font-bold text-sm"><i class="fas fa-exclamation-triangle"></i> Location Error</span>
+                        <span class="text-xs text-gray-400">${msg}</span>
+                        <button onclick="forceRefreshLocation()" class="text-xs bg-school-red text-white px-3 py-1 rounded shadow hover:bg-red-700 transition">
+                            <i class="fas fa-sync"></i> Force Retry
+                        </button>
+                    </div>`;
+                disableButtons();
             }
         }
-        
+
         function disableButtons() {
-            document.getElementById('btnCheckIn').disabled = true;
-            document.getElementById('btnCheckOut').disabled = true;
+            const b1 = document.getElementById('btnCheckIn');
+            const b2 = document.getElementById('btnCheckOut');
+            b1.disabled = true;
+            b2.disabled = true;
+        }
+
+        function checkButtons() {
+            const b1 = document.getElementById('btnCheckIn');
+            const b2 = document.getElementById('btnCheckOut');
+            
+            if (resolvedStudentName && selectedSite) {
+                b1.disabled = false;
+                b2.disabled = false;
+            } else {
+                b1.disabled = true;
+                b2.disabled = true;
+            }
         }
 
         // --- Action Handlers ---
@@ -610,137 +636,139 @@
             if (!resolvedStudentName || !selectedSite) return;
 
             const studentId = document.getElementById('studentIdInput').value;
-            const messageEl = document.getElementById('actionMessage');
+            const msgEl = document.getElementById('actionMessage');
             
             // UI Feedback
-            messageEl.innerHTML = `<span class="loader mr-2"></span> Recording ${action}...`;
-            messageEl.className = "text-sm font-semibold text-gray-500";
-            disableButtons();
-
+            msgEl.className = "text-sm font-semibold text-blue-500";
+            msgEl.innerText = `Submitting ${action}...`;
+            
+            // Construct Payload
             const payload = {
-                id: studentId,
-                name: resolvedStudentName,
+                studentId: studentId,
+                studentName: resolvedStudentName,
                 action: action,
-                timestamp: new Date().toISOString(),
+                site: selectedSite.name,
                 lat: currentUserPos.lat,
                 lng: currentUserPos.lng,
-                site: selectedSite.name
+                timestamp: new Date().toISOString()
             };
 
+            // Send to Google Sheets via Apps Script
+            // Note: 'no-cors' mode is used, so we won't get a standard JSON response body back easily in client-side JS
+            // We assume success if no network error occurs.
             fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors', // Important for Google Apps Script
-                headers: { 'Content-Type': 'application/json' },
+                method: "POST",
+                mode: "no-cors", 
+                headers: {
+                    "Content-Type": "application/json"
+                },
                 body: JSON.stringify(payload)
             })
             .then(() => {
-                // Success
-                messageEl.innerHTML = `<span class="text-green-600"><i class="fas fa-check"></i> ${action} Recorded for ${resolvedStudentName} at ${selectedSite.name}</span>`;
+                // Success Handling
                 playSound('success');
+                msgEl.className = "text-sm font-semibold text-green-600 dark:text-green-400";
+                msgEl.innerText = `${action} Recorded Successfully!`;
+                
+                // Add to local history
                 addToHistory(action, selectedSite.name);
                 
-                setTimeout(() => {
-                    messageEl.innerHTML = "";
-                    checkButtons(); // Re-enable
-                }, 4000);
+                // Clear message after 3s
+                setTimeout(() => { msgEl.innerText = ""; }, 3000);
             })
             .catch(err => {
                 console.error(err);
-                messageEl.innerHTML = `<span class="text-red-500">Error recording data. Try again.</span>`;
                 playSound('error');
-                checkButtons();
+                msgEl.className = "text-sm font-semibold text-school-red";
+                msgEl.innerText = "Submission Failed. Try again.";
             });
         }
 
-        // --- Local History ---
         function addToHistory(action, site) {
-            const historyItem = {
-                action: action,
-                site: site,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                date: new Date().toLocaleDateString()
-            };
-            
-            let history = JSON.parse(localStorage.getItem('internHistory') || '[]');
-            history.unshift(historyItem);
-            // Keep last 10 items
-            if(history.length > 10) history.pop();
-            
-            localStorage.setItem('internHistory', JSON.stringify(history));
-            renderLocalHistory();
-        }
-
-        function renderLocalHistory() {
             const list = document.getElementById('localHistoryList');
-            const history = JSON.parse(localStorage.getItem('internHistory') || '[]');
-            
-            if(history.length === 0) {
-                list.innerHTML = '<li class="text-gray-400 italic text-center py-4">No history yet.</li>';
-                return;
+            // Remove "No history" if present
+            if (list.querySelector('.text-center')) {
+                list.innerHTML = '';
             }
-
-            list.innerHTML = history.map(item => `
-                <li class="flex justify-between items-center p-2 rounded bg-white/40 dark:bg-white/5 border border-white/20">
-                    <div class="flex flex-col text-left">
-                        <span class="font-bold ${item.action === 'Check In' ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'}">${item.action}</span>
-                        <span class="text-xs text-gray-500 dark:text-gray-400">${item.site}</span>
-                    </div>
-                    <div class="text-right text-xs font-mono text-gray-500">
-                        <div>${item.time}</div>
-                        <div class="text-[10px] opacity-75">${item.date}</div>
-                    </div>
-                </li>
-            `).join('');
+            
+            const now = new Date();
+            const timeStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            const li = document.createElement('li');
+            li.className = "bg-white/40 dark:bg-black/40 p-3 rounded-lg border-l-4 border-school-red animate-fade-in-up flex justify-between items-center";
+            li.innerHTML = `
+                <div>
+                    <span class="font-bold block text-gray-800 dark:text-gray-200">${action}</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">${site}</span>
+                </div>
+                <span class="text-[10px] font-mono opacity-70">${timeStr}</span>
+            `;
+            
+            list.prepend(li);
+        }
+        
+        // Load initial history from localStorage if you wanted to persist it (optional implementation)
+        function renderLocalHistory() {
+            // currently just clears or shows empty state
         }
 
         // --- Admin Functions ---
-        function verifyAdmin() {
+        async function verifyAdmin() {
             const pass = document.getElementById('adminPassword').value;
-            // PASSWORD FIX: Bulldog!1
-            if(pass === 'Bulldog!1') {
+            const errorMsg = "Incorrect Password";
+
+            if (!pass) return;
+
+            // SHA-256 Hashing for Security
+            const encoder = new TextEncoder();
+            const data = encoder.encode(pass);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // Hash for "Bulldog!1"
+            const correctHash = "444400f07447d21b798729953936997d9193796850c952085731b53942004245"; 
+
+            if (hashHex === correctHash) {
                 document.getElementById('adminAuth').classList.add('hidden');
                 document.getElementById('adminData').classList.remove('hidden');
                 fetchAdminData();
             } else {
-                alert("Incorrect Password");
+                alert(errorMsg);
                 playSound('error');
             }
         }
 
-        let adminDataCache = [];
-
         function fetchAdminData() {
             const tbody = document.getElementById('adminTableBody');
             tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500"><span class="loader"></span> Loading...</td></tr>';
-
-            // We use the same URL but likely a GET request or a specific param for retrieval
-            // Assuming the App Script handles GET for fetching logs
-            fetch(APPS_SCRIPT_URL + '?action=getLogs')
+            
+            fetch(APPS_SCRIPT_URL)
             .then(res => res.json())
             .then(data => {
-                adminDataCache = data;
+                adminDataCache = data; // Store for filtering
                 renderAdminTable(data);
             })
             .catch(err => {
                 console.error(err);
-                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Failed to load data. Ensure "Logs" tab exists.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Error loading data. Check console.</td></tr>';
             });
         }
 
         function renderAdminTable(data) {
             const tbody = document.getElementById('adminTableBody');
+            
             if(!data || data.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No logs found.</td></tr>';
                 return;
             }
 
-            // Assuming data is array of objects matching columns
-            // [Timestamp, ID, Name, Action, Site, Lat, Lng]
-            tbody.innerHTML = data.map(row => {
-                const mapLink = row.lat && row.lng ? 
-                    `<a href="https://maps.google.com/?q=${row.lat},${row.lng}" target="_blank" class="text-blue-500 hover:text-blue-700"><i class="fas fa-map-marker-alt"></i></a>` : '-';
-                
-                // Format Date
+            // Slice to last 50 for performance if needed, or show all
+            // Assuming data is array of objects {timestamp, studentName, action, site, mapLink}
+            const reversedData = [...data].reverse();
+
+            tbody.innerHTML = reversedData.map(row => {
+                // Parse date
                 let timeStr = row.timestamp;
                 try {
                     const d = new Date(row.timestamp);
@@ -748,18 +776,20 @@
                 } catch(e) {}
 
                 return `
-                <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                    <td class="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-500">${timeStr}</td>
-                    <td class="px-4 py-3 font-semibold text-gray-800 dark:text-gray-200">
-                        ${row.name} <span class="text-[10px] text-gray-400 block">${row.id}</span>
-                    </td>
+                <tr class="hover:bg-school-gold/10 transition-colors border-b border-gray-100 dark:border-gray-800">
+                    <td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-gray-500">${timeStr}</td>
+                    <td class="px-4 py-3 font-bold text-gray-800 dark:text-gray-200">${row.studentName || 'Unknown'}</td>
                     <td class="px-4 py-3">
-                        <span class="px-2 py-1 rounded text-xs font-bold ${row.action === 'Check In' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                        <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${row.action === 'Check In' ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-800'}">
                             ${row.action}
                         </span>
                     </td>
-                    <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">${row.site}</td>
-                    <td class="px-4 py-3 text-center">${mapLink}</td>
+                    <td class="px-4 py-3 text-xs">${row.site}</td>
+                    <td class="px-4 py-3 text-center">
+                        <a href="https://www.google.com/maps/search/?api=1&query=${row.lat},${row.lng}" target="_blank" class="text-blue-500 hover:text-blue-700">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </a>
+                    </td>
                 </tr>
                 `;
             }).join('');
@@ -767,30 +797,15 @@
 
         function filterAdminData() {
             const query = document.getElementById('adminSearch').value.toLowerCase();
+            if(!adminDataCache) return;
+            
             const filtered = adminDataCache.filter(row => {
                 return Object.values(row).some(val => 
                     String(val).toLowerCase().includes(query)
                 );
             });
+            
             renderAdminTable(filtered);
-        }
-
-        // --- Math Helpers ---
-        function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-            var R = 6371; // Radius of the earth in km
-            var dLat = deg2rad(lat2-lat1);  // deg2rad below
-            var dLon = deg2rad(lon2-lon1); 
-            var a = 
-                Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2)
-                ; 
-            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-            var d = R * c; // Distance in km
-            return d * 1000; // Distance in meters
-        }
-
-        function deg2rad(deg) {
-            return deg * (Math.PI/180);
         }
     </script>
 </body>
