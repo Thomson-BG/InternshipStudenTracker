@@ -319,6 +319,7 @@
             "155404": "Carlos Salgado",
             "132483": "James Windham",
             "125814": "Zacharias Bramhall"
+            "0101": "Mr. Thomson"
         };
 
         // --- Sound System (Web Audio API) ---
@@ -568,11 +569,11 @@
                 statusEl.innerHTML = `
                     <div class="flex flex-col items-center w-full max-w-xs">
                         <span class="text-yellow-600 dark:text-yellow-500 font-bold text-xs mb-1"><i class="fas fa-exclamation-circle"></i> Multiple locations detected</span>
-                        <select onchange="manualSelectSite(this.value)" class="w-full text-sm p-2 rounded border border-school-gold bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-school-red">
+                        <select onchange="manualSelectSite(this.value)" class="w-full text-sm p-2 rounded border border-school-gold bg-white dark:bg-black/50 dark:border-gray-600 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-school-red">
                             ${optionsHtml}
                         </select>
-                    </div>
-                `;
+                        <p class="text-[10px] text-gray-400 mt-1">Please confirm your specific site.</p>
+                    </div>`;
                 checkButtons();
             }
         }
@@ -581,186 +582,215 @@
             if(indexStr === "") {
                 selectedSite = null;
             } else {
-                const index = parseInt(indexStr);
-                selectedSite = nearbySites[index];
+                selectedSite = nearbySites[parseInt(indexStr)];
             }
             checkButtons();
         }
 
-        function disableButtons() {
-            const btnIn = document.getElementById('btnCheckIn');
-            const btnOut = document.getElementById('btnCheckOut');
-            if(btnIn) btnIn.disabled = true;
-            if(btnOut) btnOut.disabled = true;
-        }
-
         function checkButtons() {
-            // Check if name is resolved
-            const hasName = !!resolvedStudentName;
-            // Check if a SPECIFIC site is selected (either automatically because only 1 found, or manually chosen)
-            const hasLoc = !!selectedSite;
-            
             const btnIn = document.getElementById('btnCheckIn');
             const btnOut = document.getElementById('btnCheckOut');
-
-            if (btnIn && btnOut) {
-                if (hasName && hasLoc) {
-                    btnIn.disabled = false;
-                    btnOut.disabled = false;
-                } else {
-                    btnIn.disabled = true;
-                    btnOut.disabled = true;
-                }
+            
+            if (resolvedStudentName && selectedSite) {
+                btnIn.disabled = false;
+                btnOut.disabled = false;
+            } else {
+                btnIn.disabled = true;
+                btnOut.disabled = true;
             }
         }
-
-        // Haversine Formula (Returns Meters)
-        function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-            var R = 6371000; // Radius of the earth in m
-            var dLat = deg2rad(lat2-lat1);  
-            var dLon = deg2rad(lon2-lon1); 
-            var a = 
-                Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
-            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-            var d = R * c; // Distance in m
-            return d;
+        
+        function disableButtons() {
+            document.getElementById('btnCheckIn').disabled = true;
+            document.getElementById('btnCheckOut').disabled = true;
         }
 
-        function deg2rad(deg) {
-            return deg * (Math.PI/180);
-        }
-
-        // --- Action Handling (Check In/Out) ---
-        function handleAction(actionType) {
+        // --- Action Handlers ---
+        function handleAction(action) {
             if (!resolvedStudentName || !selectedSite) return;
 
-            const btnIn = document.getElementById('btnCheckIn');
-            const btnOut = document.getElementById('btnCheckOut');
-            const msgEl = document.getElementById('actionMessage');
-            const id = document.getElementById('studentIdInput').value;
-
-            // UI Loading State
-            btnIn.disabled = true;
-            btnOut.disabled = true;
-            btnIn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            btnOut.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            msgEl.textContent = "Processing...";
-            msgEl.className = "text-gray-500 animate-pulse";
+            const studentId = document.getElementById('studentIdInput').value;
+            const messageEl = document.getElementById('actionMessage');
+            
+            // UI Feedback
+            messageEl.innerHTML = `<span class="loader mr-2"></span> Recording ${action}...`;
+            messageEl.className = "text-sm font-semibold text-gray-500";
+            disableButtons();
 
             const payload = {
-                studentId: id,
-                studentName: resolvedStudentName,
-                action: actionType,
-                site: selectedSite.name,
-                location: `${selectedSite.lat}, ${selectedSite.lng}`
+                id: studentId,
+                name: resolvedStudentName,
+                action: action,
+                timestamp: new Date().toISOString(),
+                lat: currentUserPos.lat,
+                lng: currentUserPos.lng,
+                site: selectedSite.name
             };
 
-            // Use 'no-cors' mode for Google Apps Script Web App
             fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
-                mode: 'no-cors', 
+                mode: 'no-cors', // Important for Google Apps Script
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
             .then(() => {
                 // Success
+                messageEl.innerHTML = `<span class="text-green-600"><i class="fas fa-check"></i> ${action} Recorded for ${resolvedStudentName} at ${selectedSite.name}</span>`;
                 playSound('success');
-                msgEl.textContent = `Success: ${actionType} at ${selectedSite.name}`;
-                msgEl.className = "text-green-600 font-bold";
+                addToHistory(action, selectedSite.name);
                 
-                // Save to local history
-                addToLocalHistory({
-                    time: new Date().toLocaleTimeString(),
-                    action: actionType,
-                    site: selectedSite.name
-                });
-
                 setTimeout(() => {
-                    resetUI();
-                }, 3000);
+                    messageEl.innerHTML = "";
+                    checkButtons(); // Re-enable
+                }, 4000);
             })
             .catch(err => {
-                playSound('error');
                 console.error(err);
-                msgEl.textContent = "Error: Check connection.";
-                msgEl.className = "text-red-500 font-bold";
-                setTimeout(resetUI, 3000);
+                messageEl.innerHTML = `<span class="text-red-500">Error recording data. Try again.</span>`;
+                playSound('error');
+                checkButtons();
             });
         }
 
-        function resetUI() {
-            document.getElementById('actionMessage').textContent = "";
-            document.getElementById('btnCheckIn').innerHTML = `
-                <div class="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-500 skew-x-12 -ml-4"></div>
-                <div class="relative flex flex-col items-center gap-2 z-10">
-                    <i class="fas fa-sign-in-alt text-3xl text-school-gold drop-shadow-md"></i>
-                    <span class="font-bold text-lg tracking-wider">CHECK IN</span>
-                </div>`;
-            document.getElementById('btnCheckOut').innerHTML = `
-                <div class="absolute inset-0 bg-white/10 group-hover:translate-x-full transition-transform duration-500 skew-x-12 -ml-4"></div>
-                <div class="relative flex flex-col items-center gap-2 z-10">
-                    <i class="fas fa-sign-out-alt text-3xl text-gray-300 drop-shadow-md"></i>
-                    <span class="font-bold text-lg tracking-wider">CHECK OUT</span>
-                </div>`;
-            checkButtons();
-        }
-
-        // --- Local History (LocalStorage) ---
-        function addToLocalHistory(item) {
-            let history = JSON.parse(localStorage.getItem('attendanceHistory') || '[]');
-            history.unshift(item); // Add to top
-            // Keep last 10
-            if (history.length > 10) history.pop();
-            localStorage.setItem('attendanceHistory', JSON.stringify(history));
+        // --- Local History ---
+        function addToHistory(action, site) {
+            const historyItem = {
+                action: action,
+                site: site,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                date: new Date().toLocaleDateString()
+            };
+            
+            let history = JSON.parse(localStorage.getItem('internHistory') || '[]');
+            history.unshift(historyItem);
+            // Keep last 10 items
+            if(history.length > 10) history.pop();
+            
+            localStorage.setItem('internHistory', JSON.stringify(history));
             renderLocalHistory();
         }
 
         function renderLocalHistory() {
             const list = document.getElementById('localHistoryList');
-            const history = JSON.parse(localStorage.getItem('attendanceHistory') || '[]');
+            const history = JSON.parse(localStorage.getItem('internHistory') || '[]');
             
-            if (history.length === 0) {
+            if(history.length === 0) {
                 list.innerHTML = '<li class="text-gray-400 italic text-center py-4">No history yet.</li>';
                 return;
             }
 
             list.innerHTML = history.map(item => `
-                <li class="flex justify-between items-center bg-white/40 dark:bg-black/20 p-2 rounded hover:bg-white/60 transition-colors">
-                    <span class="font-mono text-xs text-gray-500 dark:text-gray-400">${item.time}</span>
-                    <span class="font-bold text-xs ${item.action === 'Check In' ? 'text-green-600' : 'text-red-500'}">${item.action}</span>
-                    <span class="text-xs truncate w-24 text-right">${item.site}</span>
+                <li class="flex justify-between items-center p-2 rounded bg-white/40 dark:bg-white/5 border border-white/20">
+                    <div class="flex flex-col text-left">
+                        <span class="font-bold ${item.action === 'Check In' ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'}">${item.action}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">${item.site}</span>
+                    </div>
+                    <div class="text-right text-xs font-mono text-gray-500">
+                        <div>${item.time}</div>
+                        <div class="text-[10px] opacity-75">${item.date}</div>
+                    </div>
                 </li>
             `).join('');
         }
 
         // --- Admin Functions ---
-        // Placeholder for admin fetch logic - requires authenticated Apps Script setup
         function verifyAdmin() {
             const pass = document.getElementById('adminPassword').value;
-            // Simple client-side check (Not secure for production, but fits single-file constraint)
-            if (pass === 'admin123') { // CHANGE THIS PASSWORD
+            // PASSWORD FIX: Bulldog!1
+            if(pass === 'Bulldog!1') {
                 document.getElementById('adminAuth').classList.add('hidden');
                 document.getElementById('adminData').classList.remove('hidden');
                 fetchAdminData();
             } else {
-                alert('Invalid Password');
+                alert("Incorrect Password");
+                playSound('error');
             }
         }
 
+        let adminDataCache = [];
+
         function fetchAdminData() {
-             const tbody = document.getElementById('adminTableBody');
-             tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Fetching data...</td></tr>';
-             
-             // This requires your Apps Script to have a GET handler returning JSON
-             fetch(APPS_SCRIPT_URL)
-                .then(res => res.json())
-                .then(data => {
-                    renderAdminTable(data);
-                })
-                .catch(err => {
-                    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Error fetching data. Ensure Apps Script "doGet" is deployed.</td></tr>';
-                });
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500"><span class="loader"></span> Loading...</td></tr>';
+
+            // We use the same URL but likely a GET request or a specific param for retrieval
+            // Assuming the App Script handles GET for fetching logs
+            fetch(APPS_SCRIPT_URL + '?action=getLogs')
+            .then(res => res.json())
+            .then(data => {
+                adminDataCache = data;
+                renderAdminTable(data);
+            })
+            .catch(err => {
+                console.error(err);
+                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Failed to load data. Ensure "Logs" tab exists.</td></tr>';
+            });
+        }
+
+        function renderAdminTable(data) {
+            const tbody = document.getElementById('adminTableBody');
+            if(!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No logs found.</td></tr>';
+                return;
+            }
+
+            // Assuming data is array of objects matching columns
+            // [Timestamp, ID, Name, Action, Site, Lat, Lng]
+            tbody.innerHTML = data.map(row => {
+                const mapLink = row.lat && row.lng ? 
+                    `<a href="https://maps.google.com/?q=${row.lat},${row.lng}" target="_blank" class="text-blue-500 hover:text-blue-700"><i class="fas fa-map-marker-alt"></i></a>` : '-';
+                
+                // Format Date
+                let timeStr = row.timestamp;
+                try {
+                    const d = new Date(row.timestamp);
+                    timeStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                } catch(e) {}
+
+                return `
+                <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    <td class="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-500">${timeStr}</td>
+                    <td class="px-4 py-3 font-semibold text-gray-800 dark:text-gray-200">
+                        ${row.name} <span class="text-[10px] text-gray-400 block">${row.id}</span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-1 rounded text-xs font-bold ${row.action === 'Check In' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                            ${row.action}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">${row.site}</td>
+                    <td class="px-4 py-3 text-center">${mapLink}</td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        function filterAdminData() {
+            const query = document.getElementById('adminSearch').value.toLowerCase();
+            const filtered = adminDataCache.filter(row => {
+                return Object.values(row).some(val => 
+                    String(val).toLowerCase().includes(query)
+                );
+            });
+            renderAdminTable(filtered);
+        }
+
+        // --- Math Helpers ---
+        function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+            var R = 6371; // Radius of the earth in km
+            var dLat = deg2rad(lat2-lat1);  // deg2rad below
+            var dLon = deg2rad(lon2-lon1); 
+            var a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2)
+                ; 
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+            var d = R * c; // Distance in km
+            return d * 1000; // Distance in meters
+        }
+
+        function deg2rad(deg) {
+            return deg * (Math.PI/180);
         }
     </script>
 </body>
