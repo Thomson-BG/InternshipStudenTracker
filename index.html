@@ -714,30 +714,36 @@
 
         // --- Admin Functions ---
         async function verifyAdmin() {
-            const pass = document.getElementById('adminPassword').value;
-            const errorMsg = "Incorrect Password";
+    const pass = document.getElementById('adminPassword').value;
+    const errorMsg = "Incorrect Password";
 
-            if (!pass) return;
+    if (!pass) return;
 
-            // SHA-256 Hashing for Security
-            const encoder = new TextEncoder();
-            const data = encoder.encode(pass);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    // 1. Hash the input password
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pass);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    // DEBUG: Log the hash to console so you can copy it if needed
+    console.log("Generated Hash for input:", hashHex);
 
-            // Hash for "Bulldog!1"
-            const correctHash = "444400f07447d21b798729953936997d9193796850c952085731b53942004245"; 
+    // 2. PASTE THE HASH YOU COPIED FROM STEP 1 HERE
+    // Example: "3b... (your copied string)"
+    const correctHash = "79f0da1b920dade97eb4e9e02df79a606c265d69349a600a65c0d4e289feaa44"; 
 
-            if (hashHex === correctHash) {
-                document.getElementById('adminAuth').classList.add('hidden');
-                document.getElementById('adminData').classList.remove('hidden');
-                fetchAdminData();
-            } else {
-                alert(errorMsg);
-                playSound('error');
-            }
-        }
+    if (hashHex === correctHash) {
+        document.getElementById('adminAuth').classList.add('hidden');
+        document.getElementById('adminData').classList.remove('hidden');
+        fetchAdminData();
+    } else {
+        alert(errorMsg);
+        // Helpful alert for setup
+        console.warn("Password mismatch. Expected:", correctHash, "Got:", hashHex);
+        playSound('error');
+    }
+}
 
         function fetchAdminData() {
             const tbody = document.getElementById('adminTableBody');
