@@ -635,6 +635,23 @@
         function handleAction(action) {
             if (!resolvedStudentName || !selectedSite) return;
 
+            // --- NEW: 1 HOUR COOLDOWN CHECK ---
+            const ONE_HOUR = 60 * 60 * 1000; // 60 minutes in milliseconds
+            const lastTime = localStorage.getItem('last_' + action);
+            const now = Date.now();
+
+            if (lastTime && (now - parseInt(lastTime)) < ONE_HOUR) {
+                const minutesLeft = Math.ceil((ONE_HOUR - (now - parseInt(lastTime))) / 60000);
+                const msgEl = document.getElementById('actionMessage');
+                
+                // Show Error Message
+                msgEl.className = "text-sm font-semibold text-school-red animate-pulse";
+                msgEl.innerHTML = `<i class="fas fa-clock"></i> Please wait ${minutesLeft} min to ${action} again.`;
+                playSound('error');
+                return; // STOP execution here
+            }
+            // ----------------------------------
+
             const studentId = document.getElementById('studentIdInput').value;
             const msgEl = document.getElementById('actionMessage');
             
@@ -653,9 +670,6 @@
                 timestamp: new Date().toISOString()
             };
 
-            // Send to Google Sheets via Apps Script
-            // Note: 'no-cors' mode is used, so we won't get a standard JSON response body back easily in client-side JS
-            // We assume success if no network error occurs.
             fetch(APPS_SCRIPT_URL, {
                 method: "POST",
                 mode: "no-cors", 
@@ -670,10 +684,12 @@
                 msgEl.className = "text-sm font-semibold text-green-600 dark:text-green-400";
                 msgEl.innerText = `${action} Recorded Successfully!`;
                 
-                // Add to local history
+                // --- SAVE NEW TIME TO STORAGE ---
+                localStorage.setItem('last_' + action, Date.now());
+                // -------------------------------
+
                 addToHistory(action, selectedSite.name);
                 
-                // Clear message after 3s
                 setTimeout(() => { msgEl.innerText = ""; }, 3000);
             })
             .catch(err => {
