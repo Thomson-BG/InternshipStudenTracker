@@ -235,6 +235,27 @@
                         </div>
 
                         <div id="adminData" class="hidden">
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-blue-500 shadow-sm">
+        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked In</div>
+        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkin">0</div>
+    </div>
+    
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-green-500 shadow-sm">
+        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked Out</div>
+        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkout">0</div>
+    </div>
+
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-yellow-500 shadow-sm">
+        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Still Checked In</div>
+        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-pending">0</div>
+    </div>
+
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-school-red shadow-sm">
+        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">No Activity</div>
+        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-absent">0</div>
+    </div>
+</div>
                             <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-3 bg-gray-100/50 dark:bg-black/20 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                                 <div class="w-full md:w-auto flex-grow relative">
                                     <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
@@ -816,6 +837,56 @@
                 `;
             }).join('');
         }
+        function calculateDailyStats(data) {
+    if (!data) return;
+
+    // 1. Filter for TODAY only
+    const today = new Date().toLocaleDateString();
+    const todaysLogs = data.filter(row => {
+        // Handle potential invalid dates safely
+        try {
+            const rowDate = new Date(row.timestamp).toLocaleDateString();
+            return rowDate === today;
+        } catch (e) { return false; }
+    });
+
+    // 2. Sort logs by time (Oldest -> Newest) to track the sequence of events
+    todaysLogs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    // 3. Track Status
+    const checkedInStudents = new Set();  // Anyone who checked in at least once
+    const checkedOutStudents = new Set(); // Anyone who checked out at least once
+    const activeStudents = new Set();     // Anyone who did ANYTHING today
+    const lastActionMap = {};             // Map: "Student Name" -> "Last Action"
+
+    todaysLogs.forEach(log => {
+        const name = log.studentName;
+        activeStudents.add(name);
+
+        if (log.action === 'Check In') {
+            checkedInStudents.add(name);
+            lastActionMap[name] = 'Check In';
+        } else if (log.action === 'Check Out') {
+            checkedOutStudents.add(name);
+            lastActionMap[name] = 'Check Out';
+        }
+    });
+
+    // 4. Calculate Metrics
+    // "Still Checked In": Their last recorded action for today was 'Check In'
+    const pendingCount = Object.values(lastActionMap).filter(action => action === 'Check In').length;
+
+    // "No Activity": Total Students in DB minus those who were active today
+    // (Note: This uses the size of your STUDENT_DB variable)
+    const totalStudentsInDb = Object.keys(STUDENT_DB).length; 
+    const absentCount = totalStudentsInDb - activeStudents.size;
+
+    // 5. Update the UI
+    document.getElementById('stat-checkin').innerText = checkedInStudents.size;
+    document.getElementById('stat-checkout').innerText = checkedOutStudents.size;
+    document.getElementById('stat-pending').innerText = pendingCount;
+    document.getElementById('stat-absent').innerText = Math.max(0, absentCount); // Prevent negative numbers
+}
 
         function filterAdminData() {
             const query = document.getElementById('adminSearch').value.toLowerCase();
