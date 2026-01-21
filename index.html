@@ -251,10 +251,10 @@
         <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-pending">0</div>
     </div>
 
-    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-school-red shadow-sm">
-        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">No Activity</div>
-        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-absent">0</div>
-    </div>
+   <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-purple-500 shadow-sm">
+    <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Active Today</div>
+    <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-absent">0</div>
+</div>
 </div>
                             <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-3 bg-gray-100/50 dark:bg-black/20 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                                 <div class="w-full md:w-auto flex-grow relative">
@@ -837,20 +837,19 @@
                 `;
             }).join('');
         }
-        function calculateDailyStats(data) {
+      function calculateDailyStats(data) {
     if (!data) return;
 
     // 1. Filter for TODAY only
     const today = new Date().toLocaleDateString();
     const todaysLogs = data.filter(row => {
-        // Handle potential invalid dates safely
         try {
             const rowDate = new Date(row.timestamp).toLocaleDateString();
             return rowDate === today;
         } catch (e) { return false; }
     });
 
-    // 2. Sort logs by time (Oldest -> Newest) to track the sequence of events
+    // 2. Sort logs by time (Oldest -> Newest)
     todaysLogs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
     // 3. Track Status
@@ -876,16 +875,19 @@
     // "Still Checked In": Their last recorded action for today was 'Check In'
     const pendingCount = Object.values(lastActionMap).filter(action => action === 'Check In').length;
 
-    // "No Activity": Total Students in DB minus those who were active today
-    // (Note: This uses the size of your STUDENT_DB variable)
-    const totalStudentsInDb = Object.keys(STUDENT_DB).length; 
-    const absentCount = totalStudentsInDb - activeStudents.size;
-
     // 5. Update the UI
+    // "Checked In Today": Total unique students who performed a check-in
     document.getElementById('stat-checkin').innerText = checkedInStudents.size;
+    
+    // "Checked Out Today": Total unique students who performed a check-out
     document.getElementById('stat-checkout').innerText = checkedOutStudents.size;
+    
+    // "Still Checked In": Students whose last action was check-in
     document.getElementById('stat-pending').innerText = pendingCount;
-    document.getElementById('stat-absent').innerText = Math.max(0, absentCount); // Prevent negative numbers
+    
+    // "Total Active Today": Total unique students who had any activity
+    // This replaces the problematic "No Activity" calculation.
+    document.getElementById('stat-absent').innerText = activeStudents.size;
 }
 
         function filterAdminData() {
