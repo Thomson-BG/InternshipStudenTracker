@@ -782,20 +782,23 @@
     }
 }
 
-        function fetchAdminData() {
-            const tbody = document.getElementById('adminTableBody');
-            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500"><span class="loader"></span> Loading...</td></tr>';
+       function fetchAdminData() {
+    const tbody = document.getElementById('adminTableBody');
+    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500"><span class="loader"></span> Loading...</td></tr>';
+
+    fetch(APPS_SCRIPT_URL)
+        .then(res => res.json())
+        .then(data => {
+            adminDataCache = data;
+            renderAdminTable(data);
             
-            fetch(APPS_SCRIPT_URL)
-            .then(res => res.json())
-            .then(data => {
-                adminDataCache = data; // Store for filtering
-                renderAdminTable(data);
-            })
-            .catch(err => {
-                console.error(err);
-                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Error loading data. Check console.</td></tr>';
-            });
+            // MAKE SURE THIS LINE IS HERE:
+            calculateDailyStats(data); 
+        })
+        .catch(e => {
+            console.error(e);
+            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Error loading data.</td></tr>';
+        });
         }
 
         function renderAdminTable(data) {
@@ -837,7 +840,7 @@
                 `;
             }).join('');
         }
-      function calculateDailyStats(data) {
+    function calculateDailyStats(data) {
     if (!data) return;
 
     // 1. Filter for TODAY only
@@ -853,11 +856,12 @@
     todaysLogs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
     // 3. Track Status
-    const checkedInStudents = new Set();  // Anyone who checked in at least once
-    const checkedOutStudents = new Set(); // Anyone who checked out at least once
-    const activeStudents = new Set();     // Anyone who did ANYTHING today
-    const lastActionMap = {};             // Map: "Student Name" -> "Last Action"
+    const checkedInStudents = new Set();
+    const checkedOutStudents = new Set();
+    const activeStudents = new Set();
+    const lastActionMap = {};
 
+    // --- LOOP START ---
     todaysLogs.forEach(log => {
         const name = log.studentName;
         activeStudents.add(name);
@@ -870,23 +874,16 @@
             lastActionMap[name] = 'Check Out';
         }
     });
+    // --- LOOP END --- (This was missing/misplaced in your file)
 
     // 4. Calculate Metrics
-    // "Still Checked In": Their last recorded action for today was 'Check In'
+    // "Still Checked In": Students whose LAST action today was Check In
     const pendingCount = Object.values(lastActionMap).filter(action => action === 'Check In').length;
 
     // 5. Update the UI
-    // "Checked In Today": Total unique students who performed a check-in
     document.getElementById('stat-checkin').innerText = checkedInStudents.size;
-    
-    // "Checked Out Today": Total unique students who performed a check-out
     document.getElementById('stat-checkout').innerText = checkedOutStudents.size;
-    
-    // "Still Checked In": Students whose last action was check-in
     document.getElementById('stat-pending').innerText = pendingCount;
-    
-    // "Total Active Today": Total unique students who had any activity
-    // This replaces the problematic "No Activity" calculation.
     document.getElementById('stat-absent').innerText = activeStudents.size;
 }
 
