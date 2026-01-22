@@ -30,6 +30,14 @@
                         fadeInUp: {
                             '0%': { opacity: '0', transform: 'translateY(20px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
+                            shimmer: {
+        '0%': { transform: 'translateX(-100%)' },
+        '100%': { transform: 'translateX(100%)' }
+                        },
+                        animation: {
+    // ... existing animations ...
+    shimmer: 'shimmer 2s infinite linear',
+}
                         },
                         gradientXY: {
                             '0%, 100%': { 'background-size': '200% 200%', 'background-position': 'left top' },
@@ -107,7 +115,25 @@
     </style>
 </head>
 <body class="bg-animated text-gray-800 dark:text-gray-100 transition-colors duration-500 min-h-screen flex flex-col font-sans">
+<div id="splash-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-black to-school-darkRed transition-opacity duration-700 ease-out">
+    
+    <div class="relative mb-4">
+        <div class="absolute inset-0 bg-school-gold blur-xl opacity-20 animate-pulse"></div>
+        <div class="relative bg-black/40 p-6 rounded-full border border-school-red/30 shadow-2xl backdrop-blur-sm animate-bounce">
+            <i class="fas fa-graduation-cap text-5xl text-transparent bg-clip-text bg-gradient-to-r from-school-gold to-school-red"></i>
+        </div>
+    </div>
 
+    <h1 class="text-3xl font-black tracking-[0.2em] text-white uppercase mb-2 animate-pulse">
+        Intern <span class="text-school-red">Tracker</span>
+    </h1>
+    
+    <div class="w-48 h-1 bg-gray-800 rounded-full overflow-hidden mt-4">
+        <div class="h-full bg-gradient-to-r from-school-red via-school-gold to-school-red w-full animate-[shimmer_2s_infinite]"></div>
+    </div>
+
+    <p class="text-school-gold/60 text-xs font-mono mt-2 tracking-widest">INITIALIZING SYSTEM...</p>
+</div>
     <nav class="glass sticky top-0 z-50 border-b-0 shadow-lg">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-3">
@@ -307,6 +333,21 @@
     </div>
 
     <script>
+        // SPLASH SCREEN LOGIC
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const splash = document.getElementById('splash-screen');
+        if (splash) {
+            // Start fade out
+            splash.classList.add('opacity-0', 'pointer-events-none');
+            
+            // Optional: Completely remove from DOM after fade completes to save memory
+            setTimeout(() => {
+                splash.remove();
+            }, 800); // Matches the duration in CSS (700ms + buffer)
+        }
+    }, 3500); // How long the splash screen stays visible (2500ms = 2.5s)
+});
         // --- Configuration ---
         // REPLACE THIS URL with your actual Apps Script Deployment URL
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3GBhNTbtaOlSVBL6r9SJqXX1CuTgSNP0DOnp8jxH0zvTofzyZkmK_OWruVqq9Fbs/exec';
