@@ -175,15 +175,45 @@
                 <span><i class="fas fa-location-arrow animate-pulse"></i> Waiting for location...</span>
             </div>
 
-            <div class="grid grid-cols-2 gap-5">
-                <button onclick="handleAction('Check In')" id="btnCheckIn" disabled 
-                    class="group relative overflow-hidden py-8 rounded-2xl bg-gradient-to-br from-school-red to-red-800 text-white shadow-xl hover:shadow-red-600/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-300 transform hover:-translate-y-1 active:scale-95">
-                    <div class="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-500 skew-x-12 -ml-4"></div>
-                    <div class="relative flex flex-col items-center gap-2 z-10">
-                        <i class="fas fa-sign-in-alt text-3xl text-school-gold drop-shadow-md group-hover:scale-110 transition-transform"></i>
-                        <span class="font-bold text-lg tracking-wider">CHECK IN</span>
-                    </div>
-                </button>
+       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-green-500 shadow-sm">
+        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked In</div>
+        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkin">0</div>
+        <div class="text-[10px] text-gray-400">Unique students today</div>
+    </div>
+
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-blue-500 shadow-sm">
+        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked Out</div>
+        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkout">0</div>
+        <div class="text-[10px] text-gray-400">Unique students today</div>
+    </div>
+
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-yellow-500 shadow-sm relative z-20">
+        <div class="flex justify-between items-start">
+            <div>
+                <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Still Checked In</div>
+                <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-pending">0</div>
+            </div>
+            <button onclick="togglePendingList()" 
+                    class="text-xs bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded hover:bg-yellow-200 transition cursor-pointer">
+                <i class="fas fa-eye"></i> View
+            </button>
+        </div>
+        
+        <div id="pendingListDropdown" class="hidden absolute top-[calc(100%+10px)] left-0 w-full bg-white dark:bg-gray-800 shadow-xl rounded-xl border border-gray-200 dark:border-gray-700 p-3 z-50">
+            <h4 class="text-[10px] uppercase font-bold text-gray-400 mb-2 border-b border-gray-100 dark:border-gray-700 pb-1">Current Active</h4>
+            <div id="pendingListPlaceholder" class="text-xs text-gray-400 italic text-center py-2">No active students</div>
+            <ul id="pendingList" class="text-xs text-gray-600 dark:text-gray-300 space-y-2 max-h-32 overflow-y-auto">
+                </ul>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-red-500 shadow-sm">
+        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Absent / Inactive</div>
+        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-absent">15</div>
+        <div class="text-[10px] text-gray-400">Out of 15 Total Interns</div>
+    </div>
 
                 <button onclick="handleAction('Check Out')" id="btnCheckOut" disabled 
                     class="group relative overflow-hidden py-8 rounded-2xl bg-gradient-to-br from-gray-700 to-gray-900 text-white shadow-xl hover:shadow-gray-700/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-300 transform hover:-translate-y-1 active:scale-95 border border-gray-600">
@@ -898,13 +928,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }).join('');
         }
-    function calculateDailyStats(data) {
+   // Function to toggle the dropdown visibility
+function togglePendingList() {
+    const list = document.getElementById('pendingListDropdown');
+    list.classList.toggle('hidden');
+}
+
+function calculateDailyStats(data) {
+    // CONSTANT: Total Number of Interns
+    const TOTAL_INTERNS = 15;
+
     if (!data) return;
 
     // 1. Filter for TODAY only
     const today = new Date().toLocaleDateString();
     const todaysLogs = data.filter(row => {
         try {
+            // Handle both Timestamp string and Date object formats
             const rowDate = new Date(row.timestamp).toLocaleDateString();
             return rowDate === today;
         } catch (e) {
@@ -912,57 +952,62 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 2. Sort logs by time (Oldest -> Newest) to replay the day's events
+    // 2. Sort logs Oldest -> Newest to replay the day properly
     todaysLogs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-    // 3. Track Unique Stats
+    // 3. Variables for Counting
     const uniqueCheckIns = new Set();
     const uniqueCheckOuts = new Set();
-    const activeStudents = new Set();
-    const currentStatusMap = {}; // Tracks the current state of each student
+    const studentLastStatus = {}; // Maps name -> last status ('Check In' or 'Check Out')
 
-    // --- LOOP START ---
+    // 4. Process Logs
     todaysLogs.forEach(log => {
         const name = log.studentName;
-        activeStudents.add(name); // Counts unique students seen today
 
         if (log.action === 'Check In') {
-            uniqueCheckIns.add(name);     // Add to unique count
-            currentStatusMap[name] = 'Check In'; // Mark status
+            uniqueCheckIns.add(name);
+            studentLastStatus[name] = 'Check In';
         } else if (log.action === 'Check Out') {
-            uniqueCheckOuts.add(name);    // Add to unique count
-            currentStatusMap[name] = 'Check Out'; // Mark status
+            uniqueCheckOuts.add(name);
+            studentLastStatus[name] = 'Check Out';
         }
     });
 
-    // 4. Determine who is explicitly "Still Checked In"
-    // We look for students whose LAST action was 'Check In'
-    const pendingStudents = Object.keys(currentStatusMap).filter(name => currentStatusMap[name] === 'Check In');
+    // 5. Determine "Still Checked In" (Active)
+    // Filter the map for anyone whose LAST status was 'Check In'
+    const activeNames = Object.keys(studentLastStatus).filter(name => studentLastStatus[name] === 'Check In');
 
-    // 5. Update the Stats Numbers
+    // 6. Calculate Absent (Total 15 - Unique Students seen today)
+    // "Absent" usually means they haven't checked in AT ALL today.
+    const absentCount = Math.max(0, TOTAL_INTERNS - uniqueCheckIns.size);
+
+    // 7. Update the UI Text
     document.getElementById('stat-checkin').innerText = uniqueCheckIns.size;
     document.getElementById('stat-checkout').innerText = uniqueCheckOuts.size;
-    document.getElementById('stat-pending').innerText = pendingStudents.length;
-    document.getElementById('stat-absent').innerText = activeStudents.size; // Total Unique Active
+    document.getElementById('stat-pending').innerText = activeNames.length;
+    document.getElementById('stat-absent').innerText = absentCount;
 
-    // 6. Update the "View" List (New Feature)
-    const listEl = document.getElementById('pendingList');
+    // 8. Populate the "Still Checked In" Dropdown List
+    const listContainer = document.getElementById('pendingList');
     const placeholder = document.getElementById('pendingListPlaceholder');
 
-    if (listEl) {
-        listEl.innerHTML = ''; // Clear previous
+    if (listContainer) {
+        listContainer.innerHTML = ''; // Clear old list
         
-        if (pendingStudents.length > 0) {
-            if(placeholder) placeholder.classList.add('hidden');
+        if (activeNames.length > 0) {
+            if(placeholder) placeholder.classList.add('hidden'); // Hide "No active" text
             
-            pendingStudents.forEach(name => {
+            activeNames.forEach(name => {
                 const li = document.createElement('li');
-                li.className = "flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-1";
-                li.innerHTML = `<i class="fas fa-user-clock text-yellow-500"></i> <span class="font-medium">${name}</span>`;
-                listEl.appendChild(li);
+                li.className = "flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-1 last:border-0";
+                li.innerHTML = `
+                    <span class="font-medium">${name}</span>
+                    <span class="text-[10px] bg-green-100 text-green-700 px-1 rounded">Active</span>
+                `;
+                listContainer.appendChild(li);
             });
         } else {
-            if(placeholder) placeholder.classList.remove('hidden');
+            if(placeholder) placeholder.classList.remove('hidden'); // Show "No active" text
         }
     }
 }
