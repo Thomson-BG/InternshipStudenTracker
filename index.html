@@ -860,18 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }).join('');
         }
-/* --- ADD THIS FUNCTION (Fixes the "View" button) --- */
-function togglePendingList() {
-    const list = document.getElementById('pendingListDropdown');
-    if (list) {
-        list.classList.toggle('hidden');
-    }
-}
-
-/* --- REPLACEMENT FUNCTION (Fixes the crash) --- */
-function calculateDailyStats(data) {
-    const TOTAL_INTERNS = 15; // Set your total intern count here
-
+    function calculateDailyStats(data) {
     if (!data) return;
 
     // 1. Filter for TODAY only
@@ -883,52 +872,51 @@ function calculateDailyStats(data) {
         } catch (e) { return false; }
     });
 
-    // 2. Sort logs (Oldest -> Newest)
+    // 2. Sort logs by time (Oldest -> Newest)
     todaysLogs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-    // 3. Track Unique Counts
-    const uniqueCheckIns = new Set();
-    const uniqueCheckOuts = new Set();
-    const studentStatusMap = {}; 
+    // 3. Track Status
+    const checkedInStudents = new Set();
+    const checkedOutStudents = new Set();
+    const activeStudents = new Set();
+    const lastActionMap = {};
 
+    // --- LOOP START ---
     todaysLogs.forEach(log => {
         const name = log.studentName;
+        activeStudents.add(name);
+
         if (log.action === 'Check In') {
-            uniqueCheckIns.add(name);
-            studentStatusMap[name] = 'In';
+            checkedInStudents.add(name);
+            lastActionMap[name] = 'Check In';
         } else if (log.action === 'Check Out') {
-            uniqueCheckOuts.add(name);
-            studentStatusMap[name] = 'Out';
+            checkedOutStudents.add(name);
+            lastActionMap[name] = 'Check Out';
         }
     });
+    // --- LOOP END --- (This was missing/misplaced in your file)
 
-    // 4. Calculate Stats
-    const activeStudents = Object.keys(studentStatusMap).filter(name => studentStatusMap[name] === 'In');
-    const absentCount = Math.max(0, TOTAL_INTERNS - uniqueCheckIns.size);
+    // 4. Calculate Metrics
+    // "Still Checked In": Students whose LAST action today was Check In
+    const pendingCount = Object.values(lastActionMap).filter(action => action === 'Check In').length;
 
-    // 5. Update Dashboard Numbers
-    document.getElementById('stat-checkin').innerText = uniqueCheckIns.size;
-    document.getElementById('stat-checkout').innerText = uniqueCheckOuts.size;
-    document.getElementById('stat-pending').innerText = activeStudents.length;
-    document.getElementById('stat-absent').innerText = absentCount;
+    // 5. Update the UI
+    document.getElementById('stat-checkin').innerText = checkedInStudents.size;
+    document.getElementById('stat-checkout').innerText = checkedOutStudents.size;
+    document.getElementById('stat-pending').innerText = pendingCount;
+    document.getElementById('stat-absent').innerText = activeStudents.size;
+}
 
-    // 6. Update Dropdown List
-    const listEl = document.getElementById('pendingList');
-    const placeholder = document.getElementById('pendingListPlaceholder');
-
-    if (listEl) {
-        listEl.innerHTML = ''; 
-        if (activeStudents.length > 0) {
-            if(placeholder) placeholder.classList.add('hidden');
-            activeStudents.forEach(name => {
-                const li = document.createElement('li');
-                li.className = "flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-1 last:border-0";
-                li.innerHTML = `<span class="font-medium truncate pr-2">${name}</span><span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">On Site</span>`;
-                listEl.appendChild(li);
+        function filterAdminData() {
+            const query = document.getElementById('adminSearch').value.toLowerCase();
+            if(!adminDataCache) return;
+            
+            const filtered = adminDataCache.filter(row => {
+                return Object.values(row).some(val => 
+                    String(val).toLowerCase().includes(query)
+                );
             });
-        } else {
-            if(placeholder) placeholder.classList.remove('hidden');
-        }   
+            
             renderAdminTable(filtered);
         }
     </script>
