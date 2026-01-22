@@ -870,7 +870,7 @@ function togglePendingList() {
 
 /* --- REPLACEMENT FUNCTION (Fixes the crash) --- */
 function calculateDailyStats(data) {
-    const TOTAL_INTERNS = 15; // <--- FIXED: No spaces in the name
+    const TOTAL_INTERNS = 15; // Set your total intern count here
 
     if (!data) return;
 
@@ -883,7 +883,7 @@ function calculateDailyStats(data) {
         } catch (e) { return false; }
     });
 
-    // 2. Sort logs
+    // 2. Sort logs (Oldest -> Newest)
     todaysLogs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
     // 3. Track Unique Counts
@@ -907,10 +907,10 @@ function calculateDailyStats(data) {
     const absentCount = Math.max(0, TOTAL_INTERNS - uniqueCheckIns.size);
 
     // 5. Update Dashboard Numbers
-    if(document.getElementById('stat-checkin')) document.getElementById('stat-checkin').innerText = uniqueCheckIns.size;
-    if(document.getElementById('stat-checkout')) document.getElementById('stat-checkout').innerText = uniqueCheckOuts.size;
-    if(document.getElementById('stat-pending')) document.getElementById('stat-pending').innerText = activeStudents.length;
-    if(document.getElementById('stat-absent')) document.getElementById('stat-absent').innerText = absentCount;
+    document.getElementById('stat-checkin').innerText = uniqueCheckIns.size;
+    document.getElementById('stat-checkout').innerText = uniqueCheckOuts.size;
+    document.getElementById('stat-pending').innerText = activeStudents.length;
+    document.getElementById('stat-absent').innerText = absentCount;
 
     // 6. Update Dropdown List
     const listEl = document.getElementById('pendingList');
@@ -928,6 +928,8 @@ function calculateDailyStats(data) {
             });
         } else {
             if(placeholder) placeholder.classList.remove('hidden');
+        }   
+            renderAdminTable(filtered);
         }
     </script>
 </body>
