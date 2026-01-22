@@ -266,44 +266,70 @@
                         </div>
 
                         <div id="adminData" class="hidden">
-                       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 relative z-10">
-    
-    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-blue-500 shadow-sm transition-transform hover:scale-[1.02]">
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-blue-500 shadow-sm">
         <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked In</div>
         <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkin">0</div>
-        <div class="text-[10px] text-gray-400 mt-1">Unique students today</div>
     </div>
-
-    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-green-500 shadow-sm transition-transform hover:scale-[1.02]">
+    
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-green-500 shadow-sm">
         <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked Out</div>
         <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkout">0</div>
-        <div class="text-[10px] text-gray-400 mt-1">Unique students today</div>
     </div>
 
-    <div class="relative group bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-yellow-500 shadow-sm transition-transform hover:scale-[1.02]">
-        <div class="flex justify-between items-start">
-            <div>
-                <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Still Checked In</div>
-                <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-pending">0</div>
+    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-yellow-500 shadow-sm">
+        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Still Checked In</div>
+        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-pending">0</div>
+    </div>
+
+   <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-purple-500 shadow-sm">
+    <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Active Today</div>
+    <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-absent">0</div>
+</div>
+</div>
+                            <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-3 bg-gray-100/50 dark:bg-black/20 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                                <div class="w-full md:w-auto flex-grow relative">
+                                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                    <input type="text" id="adminSearch" oninput="filterAdminData()" placeholder="Search logs (name, date, action)..." class="w-full pl-10 pr-4 py-2 rounded-lg bg-white dark:bg-black/50 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red text-sm transition-all">
+                                </div>
+                                <div class="flex gap-2 w-full md:w-auto justify-end">
+                                    <a href="https://docs.google.com/spreadsheets/d/1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY/edit?gid=0#gid=0" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2 whitespace-nowrap">
+                                        <i class="fas fa-table"></i> Open Sheet
+                                    </a>
+                                    <button onclick="fetchAdminData()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2 whitespace-nowrap">
+                                        <i class="fas fa-sync"></i> Refresh
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mb-4 bg-yellow-100 dark:bg-yellow-900/30 p-3 rounded-lg border border-yellow-200 dark:border-yellow-700/50 text-xs text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
+                                <i class="fas fa-info-circle mt-0.5"></i>
+                                <span><strong>Important:</strong> Ensure your Google Sheet has a tab named exactly "<strong>Logs</strong>" (case-sensitive). If the tab is named "Sheet1", the data sync will fail.</span>
+                            </div>
+
+                            <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner max-h-[60vh]">
+                                <table class="w-full text-sm text-left text-gray-600 dark:text-gray-300">
+                                    <thead class="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-800 dark:text-gray-400 sticky top-0 shadow-sm z-10">
+                                        <tr>
+                                            <th class="px-4 py-3">Time</th>
+                                            <th class="px-4 py-3">Student</th>
+                                            <th class="px-4 py-3">Action</th>
+                                            <th class="px-4 py-3">Site</th>
+                                            <th class="px-4 py-3 text-center">Map</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminTableBody" class="divide-y divide-gray-200 dark:divide-gray-700 bg-white/50 dark:bg-black/20">
+                                        <tr>
+                                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading data...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <button onclick="togglePendingList()" class="text-[10px] bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded hover:bg-yellow-200 transition cursor-pointer border border-yellow-200 dark:border-yellow-700">
-                <i class="fas fa-eye"></i> VIEW
-            </button>
         </div>
-        <div class="text-[10px] text-gray-400 mt-1">Currently on site</div>
-
-        <div id="pendingListDropdown" class="hidden absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-gray-800 shadow-xl rounded-xl border border-gray-200 dark:border-gray-700 p-3 z-50">
-            <h4 class="text-[10px] uppercase font-bold text-gray-400 mb-2 border-b border-gray-100 dark:border-gray-700 pb-1">Current Active List</h4>
-            <div id="pendingListPlaceholder" class="text-xs text-gray-400 italic text-center py-2">No active students</div>
-            <ul id="pendingList" class="text-xs text-gray-600 dark:text-gray-300 space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-                </ul>
-        </div>
-    </div>
-
-    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-purple-500 shadow-sm transition-transform hover:scale-[1.02]">
-        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Absent / Inactive</div>
-        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-absent">15</div>
-        <div class="text-[10px] text-gray-400 mt-1">Out of 15 Total Interns</div>
     </div>
 
     <script>
