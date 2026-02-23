@@ -1,6 +1,6 @@
-# Bulldog Garage Intern Tracker
+# Bulldog Garage Intern Tracker (InternshipStudentTracker)
 
-A full-stack web application for tracking interns at Bulldog Garage.
+A full-stack web application for tracking interns at Bulldog Garage, allowing students to check in/out and tracking their points.
 
 ## Project Structure
 
