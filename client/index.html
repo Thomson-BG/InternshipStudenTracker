@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulldog Garage Intern Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+        }
+        form {
+            background: white;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 5px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+        }
+        button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .interns {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .intern-card {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>Bulldog Garage Intern Tracker</h1>
+    
+    <form id="intern-form">
+        <label for="name">Name:
+            <input type="text" id="name" name="name" required>
+        </label>
+        <label for="email">Email:
+            <input type="email" id="email" name="email" required>
+        </label>
+        <label for="position">Position:
+            <input type="text" id="position" name="position" required>
+        </label>
+        <label for="startDate">Start Date:
+            <input type="date" id="startDate" name="startDate" required>
+        </label>
+        <label for="endDate">End Date:
+            <input type="date" id="endDate" name="endDate">
+        </label>
+        <label for="department">Department:
+            <select id="department" name="department" required>
+                <option value="">Select Department</option>
+                <option value="Engineering">Engineering</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Sales">Sales</option>
+                <option value="HR">Human Resources</option>
+            </select>
+        </label>
+        <button type="submit">Add Intern</button>
+    </form>
+
+    <div id="interns" class="interns"></div>
+
+    <script>
+        // Fetch and display interns when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchInterns();
+
+            // Form submit handler
+            document.getElementById('intern-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const formData = {
+                    name: document.getElementById('name').value,
+                    email: document.getElementById('email').value,
+                    position: document.getElementById('position').value,
+                    startDate: document.getElementById('startDate').value,
+                    endDate: document.getElementById('endDate').value,
+                    department: document.getElementById('department').value
+                };
+
+                try {
+                    const response = await fetch('http://localhost:3000/api/interns', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to add intern');
+                    }
+
+                    document.getElementById('intern-form').reset();
+                    fetchInterns();
+                } catch (error) {
+                    console.error('Error adding intern:', error);
+                    alert('Failed to add intern. See console for details.');
+                }
+            });
+        });
+
+        // Function to fetch interns from the API
+        async function fetchInterns() {
+            try {
+                const response = await fetch('http://localhost:3000/api/interns');
+                const interns = await response.json();
+                
+                const internsContainer = document.getElementById('interns');
+                internsContainer.innerHTML = '';
+
+                interns.forEach(intern => {
+                    const card = document.createElement('div');
+                    card.className = 'intern-card';
+                    card.innerHTML = `
+                        <h3>${intern.name}</h3>
+                        <p><strong>Points:</strong> ${intern.points || 0}</p>
+                        <p><strong>Email:</strong> ${intern.email}</p>
+                        <p><strong>Position:</strong> ${intern.position}</p>
+                        <p><strong>Department:</strong> ${intern.department}</p>
+                        <p><strong>Start Date:</strong> ${new Date(intern.startDate).toLocaleDateString()}</p>
+                        ${intern.endDate ? `<p><strong>End Date:</strong> ${new Date(intern.endDate).toLocaleDateString()}</p>` : ''}
+                        <div style="margin-top: 10px;">
+                            <button onclick="attendance('${intern._id}', 'in')" style="background-color: #28a745; margin-right: 5px;">Check In</button>
+                            <button onclick="attendance('${intern._id}', 'out')" style="background-color: #dc3545;">Check Out</button>
+                        </div>
+                    `;
+                    internsContainer.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error fetching interns:', error);
+                document.getElementById('interns').innerHTML = '<p>Failed to load interns. See console for details.</p>';
+            }
+        }
+
+        async function attendance(id, type) {
+            try {
+                const response = await fetch(`http://localhost:3000/api/interns/${id}/attendance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert(data.message);
+                    fetchInterns(); // Refresh the list to show updated points
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                console.error('Attendance error:', error);
+                alert('An error occurred. See console.');
+            }
+        }
+    </script>
+</body>
+</html>
