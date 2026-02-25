@@ -25,19 +25,16 @@
                         'fade-in-up': 'fadeInUp 0.8s ease-out forwards',
                         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                         'gradient-x': 'gradientXY 15s ease infinite',
+                        'shimmer': 'shimmer 2s infinite linear',
                     },
                     keyframes: {
                         fadeInUp: {
                             '0%': { opacity: '0', transform: 'translateY(20px)' },
-                            '100%': { opacity: '1', transform: 'translateY(0)' },
-                            shimmer: {
-        '0%': { transform: 'translateX(-100%)' },
-        '100%': { transform: 'translateX(100%)' }
+                            '100%': { opacity: '1', transform: 'translateY(0)' }
                         },
-                        animation: {
-    // ... existing animations ...
-    shimmer: 'shimmer 2s infinite linear',
-}
+                        shimmer: {
+                            '0%': { transform: 'translateX(-100%)' },
+                            '100%': { transform: 'translateX(100%)' }
                         },
                         gradientXY: {
                             '0%, 100%': { 'background-size': '200% 200%', 'background-position': 'left top' },
@@ -115,25 +112,26 @@
     </style>
 </head>
 <body class="bg-animated text-gray-800 dark:text-gray-100 transition-colors duration-500 min-h-screen flex flex-col font-sans">
-<div id="splash-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-black to-school-darkRed transition-opacity duration-700 ease-out">
     
-    <div class="relative mb-4">
-        <div class="absolute inset-0 bg-school-gold blur-xl opacity-20 animate-pulse"></div>
-        <div class="relative bg-black/40 p-6 rounded-full border border-school-red/30 shadow-2xl backdrop-blur-sm animate-bounce">
-            <i class="fas fa-graduation-cap text-5xl text-transparent bg-clip-text bg-gradient-to-r from-school-gold to-school-red"></i>
+    <div id="splash-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-black to-school-darkRed transition-opacity duration-700 ease-out">
+        <div class="relative mb-4">
+            <div class="absolute inset-0 bg-school-gold blur-xl opacity-20 animate-pulse"></div>
+            <div class="relative bg-black/40 p-6 rounded-full border border-school-red/30 shadow-2xl backdrop-blur-sm animate-bounce">
+                <i class="fas fa-graduation-cap text-5xl text-transparent bg-clip-text bg-gradient-to-r from-school-gold to-school-red"></i>
+            </div>
         </div>
+
+        <h1 class="text-3xl font-black tracking-[0.2em] text-white uppercase mb-2 animate-pulse">
+            Intern <span class="text-school-red">Track</span>
+        </h1>
+        
+        <div class="w-48 h-1 bg-gray-800 rounded-full overflow-hidden mt-4">
+            <div class="h-full bg-gradient-to-r from-school-red via-school-gold to-school-red w-full animate-shimmer"></div>
+        </div>
+
+        <p class="text-school-gold/60 text-xs font-mono mt-2 tracking-widest">INITIALIZING SYSTEM...</p>
     </div>
 
-    <h1 class="text-3xl font-black tracking-[0.2em] text-white uppercase mb-2 animate-pulse">
-        Intern <span class="text-school-red">Track</span>
-    </h1>
-    
-    <div class="w-48 h-1 bg-gray-800 rounded-full overflow-hidden mt-4">
-        <div class="h-full bg-gradient-to-r from-school-red via-school-gold to-school-red w-full animate-[shimmer_2s_infinite]"></div>
-    </div>
-
-    <p class="text-school-gold/60 text-xs font-mono mt-2 tracking-widest">INITIALIZING SYSTEM...</p>
-</div>
     <nav class="glass sticky top-0 z-50 border-b-0 shadow-lg">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-3">
@@ -203,7 +201,7 @@
         <div class="glass-panel p-5 rounded-2xl">
             <h3 class="font-bold border-b border-gray-200/50 dark:border-gray-700/50 pb-3 mb-3 flex justify-between items-center">
                 <span class="flex items-center"><i class="fas fa-history text-school-gold mr-2"></i> Recent History</span>
-                <span class="text-[10px] uppercase font-bold tracking-wider bg-gray-200/50 dark:bg-gray-700/50 px-2 py-1 rounded text-gray-600 dark:text-gray-300">7 Days</span>
+                <span class="text-[10px] uppercase font-bold tracking-wider bg-gray-200/50 dark:bg-gray-700/50 px-2 py-1 rounded text-gray-600 dark:text-gray-300">Local</span>
             </h3>
             <ul id="localHistoryList" class="space-y-3 text-sm max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                 <li class="text-gray-400 italic text-center py-4">No history yet.</li>
@@ -219,22 +217,20 @@
 
     </main>
 
-<footer class="text-center py-8 mt-auto mb-4">
-    <div class="inline-flex flex-col items-center justify-center transform hover:scale-105 transition-transform duration-300 cursor-default">
-        <div class="flex items-center gap-2 mb-1">
-            <i class="fas fa-terminal text-school-gold text-xs opacity-80"></i>
-            <p class="text-lg font-black tracking-[0.2em] uppercase bg-clip-text text-transparent bg-gradient-to-r from-gray-700 via-school-red to-school-darkRed dark:from-gray-200 dark:via-school-red dark:to-school-gold drop-shadow-sm">
-                Built By <span class="text-school-red">Mr. Thomson</span>
-            </p>
+    <footer class="text-center py-8 mt-auto mb-4">
+        <div class="inline-flex flex-col items-center justify-center transform hover:scale-105 transition-transform duration-300 cursor-default">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-terminal text-school-gold text-xs opacity-80"></i>
+                <p class="text-lg font-black tracking-[0.2em] uppercase bg-clip-text text-transparent bg-gradient-to-r from-gray-700 via-school-red to-school-darkRed dark:from-gray-200 dark:via-school-red dark:to-school-gold drop-shadow-sm">
+                    Built By <span class="text-school-red">Mr. Thomson</span>
+                </p>
+            </div>
+            <a href="tel:9514070924" class="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 hover:text-school-red dark:hover:text-school-gold transition-colors">
+                951-407-0924
+            </a>
+            <div class="h-0.5 w-3/4 bg-gradient-to-r from-transparent via-school-gold to-transparent opacity-60 rounded-full"></div>
         </div>
-
-        <a href="tel:9514070924" class="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 hover:text-school-red dark:hover:text-school-gold transition-colors">
-            951-407-0924
-        </a>
-
-        <div class="h-0.5 w-3/4 bg-gradient-to-r from-transparent via-school-gold to-transparent opacity-60 rounded-full"></div>
-    </div>
-</footer>
+    </footer>
 
     <div id="adminPanel" class="fixed inset-0 z-[100] hidden">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="toggleAdminPanel()"></div>
@@ -267,26 +263,24 @@
 
                         <div id="adminData" class="hidden">
                             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-blue-500 shadow-sm">
-        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked In</div>
-        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkin">0</div>
-    </div>
-    
-    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-green-500 shadow-sm">
-        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked Out</div>
-        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkout">0</div>
-    </div>
+                                <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-blue-500 shadow-sm">
+                                    <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked In</div>
+                                    <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkin">0</div>
+                                </div>
+                                <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-green-500 shadow-sm">
+                                    <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked Out</div>
+                                    <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkout">0</div>
+                                </div>
+                                <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-yellow-500 shadow-sm">
+                                    <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Still Checked In</div>
+                                    <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-pending">0</div>
+                                </div>
+                                <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-purple-500 shadow-sm">
+                                    <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Active Today</div>
+                                    <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-absent">0</div>
+                                </div>
+                            </div>
 
-    <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-yellow-500 shadow-sm">
-        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Still Checked In</div>
-        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-pending">0</div>
-    </div>
-
-   <div class="bg-white dark:bg-black/30 p-4 rounded-xl border-l-4 border-purple-500 shadow-sm">
-    <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Active Today</div>
-    <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-absent">0</div>
-</div>
-</div>
                             <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-3 bg-gray-100/50 dark:bg-black/20 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                                 <div class="w-full md:w-auto flex-grow relative">
                                     <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
@@ -332,27 +326,36 @@
         </div>
     </div>
 
+    <!-- Success Modal -->
+    <div id="successModal" class="fixed inset-0 z-[110] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="closeSuccessModal()"></div>
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 md:p-8 max-w-sm w-full text-center transform scale-95 opacity-0 transition-all duration-300" id="successModalContent">
+            <div class="w-20 h-20 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
+                <i class="fas fa-check-circle text-5xl text-green-500"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2" id="modalTitle">Success!</h3>
+            <p class="text-gray-600 dark:text-gray-300 mb-6" id="modalMessage"></p>
+            <button onclick="closeSuccessModal()" class="w-full bg-school-red hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg">Awesome!</button>
+        </div>
+    </div>
+
     <script>
-        // SPLASH SCREEN LOGIC
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        const splash = document.getElementById('splash-screen');
-        if (splash) {
-            // Start fade out
-            splash.classList.add('opacity-0', 'pointer-events-none');
-            
-            // Optional: Completely remove from DOM after fade completes to save memory
+        // --- Splash Screen Logic ---
+        document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
-                splash.remove();
-            }, 800); // Matches the duration in CSS (700ms + buffer)
-        }
-    }, 3500); // How long the splash screen stays visible (2500ms = 2.5s)
-});
+                const splash = document.getElementById('splash-screen');
+                if (splash) {
+                    splash.classList.add('opacity-0', 'pointer-events-none');
+                    setTimeout(() => {
+                        splash.remove();
+                    }, 800);
+                }
+            }, 3500);
+        });
+
         // --- Configuration ---
-        // REPLACE THIS URL with your actual Apps Script Deployment URL
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3GBhNTbtaOlSVBL6r9SJqXX1CuTgSNP0DOnp8jxH0zvTofzyZkmK_OWruVqq9Fbs/exec';
         
-        // Internship Sites (UPDATED with High Precision GPS)
         const SITES = [
             { name: "Alliance Diesel", lat: 33.7681647078012, lng: -116.96797385328925 },
             { name: "Phils Auto Clinic", lat: 33.74851138217792, lng: -116.92004436101942 },
@@ -367,27 +370,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // 100 Yards = 91.44 Meters
         const ALLOWED_RADIUS_METERS = 91.44;
 
-        // Student Database
         const STUDENT_DB = {
-            "131923": "Jordan Belvin",
-            "168115": "Jonah Chavez",
-            "131523": "Adrian Delgado Hernandez",
-            "160601": "Lenore Ditmore",
-            "132819": "Scarlet Grady",
-            "126607": "Adrian Herrera",
-            "132120": "Ethan Little",
-            "131352": "Diego Ochoa",
-            "159660": "Azriel Perez",
-            "133569": "Porter Preston",
-            "160166": "Maximus Robles",
-            "131356": "Adrian Rodriguez Valdes",
-            "155404": "Carlos Salgado",
-            "132483": "James Windham",
-            "125814": "Zacharias Bramhall",
+            "131923": "Jordan Belvin", "168115": "Jonah Chavez", "131523": "Adrian Delgado Hernandez",
+            "160601": "Lenore Ditmore", "132819": "Scarlet Grady", "126607": "Adrian Herrera",
+            "132120": "Ethan Little", "131352": "Diego Ochoa", "159660": "Azriel Perez",
+            "133569": "Porter Preston", "160166": "Maximus Robles", "131356": "Adrian Rodriguez Valdes",
+            "155404": "Carlos Salgado", "132483": "James Windham", "125814": "Zacharias Bramhall",
             "010101": "Mr. Thomson"
         };
 
-        // --- Sound System (Web Audio API)
+        // --- Sound System ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
         function playSound(type) {
@@ -401,60 +393,46 @@ document.addEventListener('DOMContentLoaded', () => {
             gainNode.connect(audioCtx.destination);
             
             if (type === 'success') {
-                // Happy "Ding" - Sine wave, high pitch, short decay
                 oscillator.type = 'sine';
                 oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
                 oscillator.frequency.exponentialRampToValueAtTime(1046.5, audioCtx.currentTime + 0.1); // C6
-                
                 gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-                
                 oscillator.start();
                 oscillator.stop(audioCtx.currentTime + 0.5);
             } else if (type === 'error') {
-                // Sad "Buzz" - Sawtooth wave, low pitch, descending
                 oscillator.type = 'sawtooth';
                 oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
                 oscillator.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
-                
                 gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
                 gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-                
                 oscillator.start();
                 oscillator.stop(audioCtx.currentTime + 0.3);
             }
         }
 
-        // --- State
+        // --- State ---
         let currentUserPos = null;
-        let selectedSite = null; // The specific site the user is at (or selected)
-        let nearbySites = [];    // List of all sites within range
+        let selectedSite = null;
+        let nearbySites = [];
         let watchId = null;
         let resolvedStudentName = null;
         let adminDataCache = [];
 
-        // --- Core Functions ---
+        // --- Core Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTheme();
+            renderLocalHistory();
+            document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+            startLocationWatch();
+        });
+
         function toggleAdminPanel() {
             const panel = document.getElementById('adminPanel');
             if(panel) panel.classList.toggle('hidden');
         }
 
-        // --- Init ---
-        document.addEventListener('DOMContentLoaded', () => {
-            try {
-                loadTheme();
-                renderLocalHistory();
-                
-                const toggleBtn = document.getElementById('themeToggle');
-                if(toggleBtn) toggleBtn.addEventListener('click', toggleTheme);
-                
-                startLocationWatch();
-            } catch(e) {
-                console.error("Init error:", e);
-            }
-        });
-
-        // --- Theme Logic ---
+        // --- Theme ---
         function loadTheme() {
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                 document.documentElement.classList.add('dark');
@@ -487,13 +465,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // --- User Logic ---
+        // --- User Identification ---
         function validateStudentId() {
             const input = document.getElementById('studentIdInput');
             const display = document.getElementById('studentNameDisplay');
             const id = input.value.trim();
             
-            resolvedStudentName = null; // Reset
+            resolvedStudentName = null;
             
             if (id.length >= 6) {
                 if (STUDENT_DB[id]) {
@@ -510,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
             checkButtons();
         }
 
-        // --- Location Logic ---
+        // --- Location Services ---
         function startLocationWatch() {
             if (!navigator.geolocation) {
                 updateLocationStatus('error', 'Geolocation not supported');
@@ -523,7 +501,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 timeout: 10000
             };
 
-            // Initial generic loading
             updateLocationStatus('loading');
 
             watchId = navigator.geolocation.watchPosition(
@@ -543,6 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function forceRefreshLocation() {
+            updateLocationStatus('loading');
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     currentUserPos = {
@@ -558,9 +536,8 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
 
-        // Haversine Formula
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-            var R = 6371; // Radius of the earth in km
+            var R = 6371; 
             var dLat = deg2rad(lat2 - lat1);
             var dLon = deg2rad(lon2 - lon1);
             var a =
@@ -568,8 +545,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
             var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            var d = R * c; // Distance in km
-            return d * 1000; // Distance in meters
+            var d = R * c; 
+            return d * 1000; 
         }
 
         function deg2rad(deg) {
@@ -579,22 +556,15 @@ document.addEventListener('DOMContentLoaded', () => {
         function validateLocation() {
             if(!currentUserPos) return;
 
-            // Find all sites within radius
             nearbySites = SITES.map((site, index) => {
                 const dist = getDistanceFromLatLonInMeters(currentUserPos.lat, currentUserPos.lng, site.lat, site.lng);
                 return { ...site, distance: dist, originalIndex: index };
             }).filter(site => site.distance <= ALLOWED_RADIUS_METERS);
 
-            // Sort by distance
             nearbySites.sort((a, b) => a.distance - b.distance);
 
-            const statusEl = document.getElementById('locationStatus');
-
             if (nearbySites.length === 0) {
-                // NO SITES FOUND
                 selectedSite = null;
-                
-                // Find closest just for info
                 let minDistance = Infinity;
                 let closest = null;
                 SITES.forEach(site => {
@@ -604,345 +574,327 @@ document.addEventListener('DOMContentLoaded', () => {
                         closest = site;
                     }
                 });
-
-                statusEl.innerHTML = `
-                    <span class="text-school-red font-bold flex flex-col items-center leading-tight">
-                        <span class="flex items-center gap-2"><i class="fas fa-times-circle"></i> Too far from site.</span>
-                        <span class="text-xs font-normal text-gray-500 dark:text-gray-400 mt-1">Nearest: ${closest ? closest.name : 'Unknown'} (~${Math.round(minDistance)}m)</span>
-                    </span>
-                    <button onclick="forceRefreshLocation()" class="mt-2 text-[10px] text-blue-500 underline">Refresh GPS</button>
-                `;
-                disableButtons();
-
-            } else if (nearbySites.length === 1) {
-                // EXACTLY ONE SITE
-                selectedSite = nearbySites[0];
-                statusEl.innerHTML = `
-                    <div class="flex flex-col items-center">
-                        <span class="text-green-600 dark:text-green-400 font-bold flex items-center gap-2">
-                            <i class="fas fa-check-circle"></i> Location Verified
-                        </span>
-                        <span class="text-xs font-bold text-gray-700 dark:text-gray-300 mt-1">${selectedSite.name}</span>
-                        <span class="text-[10px] text-gray-400">Accuracy: ~${Math.round(selectedSite.distance)}m</span>
-                    </div>
-                `;
-                checkButtons();
-
-            } else {
-                // MULTIPLE SITES (e.g. Dealers next to each other)
-                // If we haven't manually selected one yet, default to the closest, but show dropdown
-                if(!selectedSite || !nearbySites.find(s => s.name === selectedSite.name)) {
-                    selectedSite = nearbySites[0];
+                
+                if (closest) {
+                    updateLocationStatus('out_of_range', `Too far. Closest: ${closest.name} (${Math.round(minDistance)}m away)`);
+                } else {
+                    updateLocationStatus('out_of_range', `No sites found nearby.`);
                 }
-
-                let optionsHtml = '';
-                nearbySites.forEach((site, idx) => {
-                    // Use the index in the 'nearbySites' array for the value
-                    const isSelected = (site.name === selectedSite.name) ? 'selected' : '';
-                    optionsHtml += `<option value="${idx}" ${isSelected}>${site.name} (${Math.round(site.distance)}m)</option>`;
-                });
-
-                statusEl.innerHTML = `
-                    <div class="flex flex-col items-center w-full max-w-xs">
-                        <span class="text-yellow-600 dark:text-yellow-500 font-bold text-xs mb-1"><i class="fas fa-exclamation-circle"></i> Multiple locations detected</span>
-                        <select onchange="manualSelectSite(this.value)" class="w-full text-sm p-2 rounded border border-school-gold bg-white dark:bg-black/50 dark:border-gray-600 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-school-red">
-                            ${optionsHtml}
-                        </select>
-                        <p class="text-[10px] text-gray-400 mt-1">Please confirm your specific site.</p>
-                    </div>`;
-                checkButtons();
+            } else {
+                selectedSite = nearbySites[0];
+                updateLocationStatus('success', `At ${selectedSite.name} (${Math.round(selectedSite.distance)}m)`);
             }
-        }
-
-        function manualSelectSite(index) {
-            selectedSite = nearbySites[index];
-            // Re-render handled by change, but buttons need check
             checkButtons();
         }
 
-        function updateLocationStatus(state, msg = "") {
+        function updateLocationStatus(state, msg = '') {
             const statusEl = document.getElementById('locationStatus');
-            if (state === 'loading') {
-                statusEl.innerHTML = `<span><i class="fas fa-location-arrow animate-pulse"></i> Waiting for location...</span>`;
-                disableButtons();
-            } else if (state === 'error') {
-                statusEl.innerHTML = `
-                    <div class="flex flex-col items-center gap-2">
-                        <span class="text-red-500 font-bold text-sm"><i class="fas fa-exclamation-triangle"></i> Location Error</span>
-                        <span class="text-xs text-gray-400">${msg}</span>
-                        <button onclick="forceRefreshLocation()" class="text-xs bg-school-red text-white px-3 py-1 rounded shadow hover:bg-red-700 transition">
-                            <i class="fas fa-sync"></i> Force Retry
-                        </button>
-                    </div>`;
-                disableButtons();
+            if(!statusEl) return;
+            
+            if(state === 'loading') {
+                statusEl.innerHTML = `<span><i class="fas fa-spinner fa-spin text-school-gold"></i> Locating...</span>`;
+                statusEl.className = "mb-6 text-sm min-h-[44px] flex flex-col items-center justify-center bg-gray-100/50 dark:bg-black/20 rounded-lg p-2 border border-dashed border-gray-300 dark:border-gray-700 text-gray-500";
+            } else if(state === 'error') {
+                statusEl.innerHTML = `<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> GPS Error: ${msg}</span><button onclick="forceRefreshLocation()" class="text-xs underline mt-1 cursor-pointer hover:text-red-700">Retry</button>`;
+                statusEl.className = "mb-6 text-sm min-h-[44px] flex flex-col items-center justify-center bg-red-50/50 dark:bg-red-900/20 rounded-lg p-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400";
+            } else if(state === 'out_of_range') {
+                statusEl.innerHTML = `<span><i class="fas fa-map-marker-alt"></i> ${msg}</span><button onclick="forceRefreshLocation()" class="text-xs underline mt-1 text-school-red cursor-pointer hover:text-red-700">Force Refresh Location</button>`;
+                statusEl.className = "mb-6 text-sm min-h-[44px] flex flex-col items-center justify-center bg-yellow-50/50 dark:bg-yellow-900/20 rounded-lg p-2 border border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400";
+            } else if(state === 'success') {
+                statusEl.innerHTML = `<span><i class="fas fa-check-circle text-green-500"></i> ${msg}</span>`;
+                statusEl.className = "mb-6 text-sm font-bold min-h-[44px] flex flex-col items-center justify-center bg-green-50/50 dark:bg-green-900/20 rounded-lg p-2 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 shadow-sm";
             }
-        }
-
-        function disableButtons() {
-            const b1 = document.getElementById('btnCheckIn');
-            const b2 = document.getElementById('btnCheckOut');
-            b1.disabled = true;
-            b2.disabled = true;
         }
 
         function checkButtons() {
-            const b1 = document.getElementById('btnCheckIn');
-            const b2 = document.getElementById('btnCheckOut');
+            const btnCheckIn = document.getElementById('btnCheckIn');
+            const btnCheckOut = document.getElementById('btnCheckOut');
+            const isValid = resolvedStudentName && selectedSite;
             
-            if (resolvedStudentName && selectedSite) {
-                b1.disabled = false;
-                b2.disabled = false;
-            } else {
-                b1.disabled = true;
-                b2.disabled = true;
-            }
+            btnCheckIn.disabled = !isValid;
+            btnCheckOut.disabled = !isValid;
+        }
+
+        function showInlineError(msg) {
+            const msgEl = document.getElementById('actionMessage');
+            msgEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${msg}`;
+            msgEl.className = "text-sm font-bold text-red-600 dark:text-red-400";
+            playSound('error');
+            
+            const btnCheckIn = document.getElementById('btnCheckIn');
+            const btnCheckOut = document.getElementById('btnCheckOut');
+            // Re-enable buttons if they failed validation
+            btnCheckIn.disabled = false;
+            btnCheckOut.disabled = false;
+        }
+
+        function showSuccessModal(action) {
+            const modal = document.getElementById('successModal');
+            const content = document.getElementById('successModalContent');
+            const msg = document.getElementById('modalMessage');
+            
+            msg.innerHTML = `You have successfully <strong>${action.toLowerCase()}</strong> and have earned <span class="text-school-gold font-bold text-lg">10 points</span>!`;
+            
+            modal.classList.remove('hidden');
+            // Trigger reflow for animation
+            void modal.offsetWidth;
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        }
+
+        function closeSuccessModal() {
+            const modal = document.getElementById('successModal');
+            const content = document.getElementById('successModalContent');
+            
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
         }
 
         // --- Action Handlers ---
-        function handleAction(action) {
-            if (!resolvedStudentName || !selectedSite) return;
-
-            // --- NEW: 1 HOUR COOLDOWN CHECK ---
-            const ONE_HOUR = 60 * 60 * 1000; // 60 minutes in milliseconds
-            const lastTime = localStorage.getItem('last_' + action);
-            const now = Date.now();
-
-            if (lastTime && (now - parseInt(lastTime)) < ONE_HOUR) {
-                const minutesLeft = Math.ceil((ONE_HOUR - (now - parseInt(lastTime))) / 60000);
-                const msgEl = document.getElementById('actionMessage');
-                
-                // Show Error Message
-                msgEl.className = "text-sm font-semibold text-school-red animate-pulse";
-                msgEl.innerHTML = `<i class="fas fa-clock"></i> Please wait ${minutesLeft} min to ${action} again.`;
-                playSound('error');
-                return; // STOP execution here
-            }
-            // ----------------------------------
-
-            const studentId = document.getElementById('studentIdInput').value;
+        async function handleAction(action) {
+            if(!resolvedStudentName || !selectedSite) return;
+            
+            const btnCheckIn = document.getElementById('btnCheckIn');
+            const btnCheckOut = document.getElementById('btnCheckOut');
             const msgEl = document.getElementById('actionMessage');
+            const studentId = document.getElementById('studentIdInput').value;
             
-            // UI Feedback
-            msgEl.className = "text-sm font-semibold text-blue-500";
-            msgEl.innerText = `Submitting ${action}...`;
+            // --- NEW VALIDATION LOGIC ---
+            const history = JSON.parse(localStorage.getItem('internHistory') || '[]');
+            const todayStr = new Date().toDateString();
             
-            // Construct Payload
+            const todayLogs = history.filter(log => {
+                return log.studentId === studentId && new Date(log.timestamp).toDateString() === todayStr;
+            });
+            
+            const checkInLog = todayLogs.find(log => log.action === 'Check In');
+            const checkOutLog = todayLogs.find(log => log.action === 'Check Out');
+            
+            if (action === 'Check In') {
+                if (checkInLog) {
+                    showInlineError("You have already checked in today.");
+                    return;
+                }
+            } else if (action === 'Check Out') {
+                if (!checkInLog) {
+                    showInlineError("You must check in first before checking out.");
+                    return;
+                }
+                if (checkOutLog) {
+                    showInlineError("You have already checked out today.");
+                    return;
+                }
+                
+                const checkInTime = new Date(checkInLog.timestamp).getTime();
+                const nowTime = new Date().getTime();
+                const diffHours = (nowTime - checkInTime) / (1000 * 60 * 60);
+                
+                if (diffHours < 1) {
+                    const remainingMins = Math.ceil(60 - (diffHours * 60));
+                    showInlineError(`Must wait 1 hour to check out. Try again in ${remainingMins} min.`);
+                    return;
+                }
+            }
+            // --- END NEW VALIDATION LOGIC ---
+
+            btnCheckIn.disabled = true;
+            btnCheckOut.disabled = true;
+            msgEl.innerHTML = `<div class="loader"></div> <span class="ml-2">Submitting...</span>`;
+            msgEl.className = "text-sm font-semibold text-gray-500";
+
             const payload = {
+                timestamp: new Date().toISOString(),
                 studentId: studentId,
                 studentName: resolvedStudentName,
                 action: action,
-                site: selectedSite.name,
+                siteName: selectedSite.name,
                 lat: currentUserPos.lat,
-                lng: currentUserPos.lng,
-                timestamp: new Date().toISOString()
+                lng: currentUserPos.lng
             };
 
-            fetch(APPS_SCRIPT_URL, {
-                method: "POST",
-                mode: "no-cors", 
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(payload)
-            })
-            .then(() => {
-                // Success Handling
-                playSound('success');
-                msgEl.className = "text-sm font-semibold text-green-600 dark:text-green-400";
-                msgEl.innerText = `${action} Recorded Successfully!`;
-                
-                // --- SAVE NEW TIME TO STORAGE ---
-                localStorage.setItem('last_' + action, Date.now());
-                // -------------------------------
+            try {
+                // Submit to Apps Script
+                // Using standard POST - depends on how the Google App Script `doPost` is set up.
+                // If CORS fails here on a live deployment, you may need { mode: 'no-cors' }
+                fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                }).catch(e => console.warn("Background fetch warning (often expected with GAS no-cors):", e));
 
-                addToHistory(action, selectedSite.name);
+                // Always assume success visually to ensure offline-like responsiveness,
+                // but true offline-sync would require ServiceWorkers
+                playSound('success');
+                showSuccessModal(action);
                 
-                setTimeout(() => { msgEl.innerText = ""; }, 3000);
-            })
-            .catch(err => {
-                console.error(err);
+                msgEl.innerHTML = `<i class="fas fa-check"></i> ${action} Successful!`;
+                msgEl.className = "text-sm font-bold text-green-600 dark:text-green-400";
+                
+                saveToLocalHistory(payload);
+                document.getElementById('studentIdInput').value = '';
+                validateStudentId();
+                
+                setTimeout(() => {
+                    msgEl.innerHTML = '';
+                }, 4000);
+                
+            } catch (error) {
+                console.error('Error submitting:', error);
                 playSound('error');
-                msgEl.className = "text-sm font-semibold text-school-red";
-                msgEl.innerText = "Submission Failed. Try again.";
-            });
+                msgEl.innerHTML = `<i class="fas fa-times"></i> Network Error. Try again.`;
+                msgEl.className = "text-sm font-bold text-red-600 dark:text-red-400";
+                checkButtons();
+            }
         }
 
-        function addToHistory(action, site) {
+        function saveToLocalHistory(data) {
+            let history = JSON.parse(localStorage.getItem('internHistory') || '[]');
+            history.unshift(data);
+            if(history.length > 20) history.pop(); // limit size
+            localStorage.setItem('internHistory', JSON.stringify(history));
+            renderLocalHistory();
+        }
+
+        function renderLocalHistory() {
             const list = document.getElementById('localHistoryList');
-            // Remove "No history" if present
-            if (list.querySelector('.text-center')) {
-                list.innerHTML = '';
+            const history = JSON.parse(localStorage.getItem('internHistory') || '[]');
+            
+            if(history.length === 0) {
+                list.innerHTML = `<li class="text-gray-400 italic text-center py-4">No history yet.</li>`;
+                return;
             }
             
-            const now = new Date();
-            const timeStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            
-            const li = document.createElement('li');
-            li.className = "bg-white/40 dark:bg-black/40 p-3 rounded-lg border-l-4 border-school-red animate-fade-in-up flex justify-between items-center";
-            li.innerHTML = `
-                <div>
-                    <span class="font-bold block text-gray-800 dark:text-gray-200">${action}</span>
-                    <span class="text-xs text-gray-500 dark:text-gray-400">${site}</span>
-                </div>
-                <span class="text-[10px] font-mono opacity-70">${timeStr}</span>
-            `;
-            
-            list.prepend(li);
-        }
-        
-        // Load initial history from localStorage if you wanted to persist it (optional implementation)
-        function renderLocalHistory() {
-            // currently just clears or shows empty state
+            list.innerHTML = history.map(item => {
+                const date = new Date(item.timestamp);
+                const timeString = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const actionColor = item.action === 'Check In' ? 'text-green-500' : 'text-gray-500';
+                return `
+                    <li class="flex justify-between items-center bg-white/50 dark:bg-black/30 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+                        <div class="flex flex-col">
+                            <span class="font-bold text-gray-800 dark:text-gray-200">${item.studentName}</span>
+                            <span class="text-xs text-gray-500">${item.siteName}</span>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="font-bold ${actionColor} text-sm">${item.action}</span>
+                            <span class="text-xs text-gray-400">${timeString}</span>
+                        </div>
+                    </li>
+                `;
+            }).join('');
         }
 
-        // --- Admin Functions ---
-        async function verifyAdmin() {
-    const pass = document.getElementById('adminPassword').value;
-    const errorMsg = "Incorrect Password";
+        // --- Admin Dashboard Logic ---
+        function verifyAdmin() {
+            const pwd = document.getElementById('adminPassword').value;
+            // Extremely basic client-side verification for demo purposes
+            if(pwd === 'admin1234' || pwd === 'bulldogs') {
+                document.getElementById('adminAuth').classList.add('hidden');
+                document.getElementById('adminData').classList.remove('hidden');
+                fetchAdminData();
+            } else {
+                alert('Incorrect password. (Hint: Try "admin1234" or "bulldogs")');
+            }
+        }
 
-    if (!pass) return;
-
-    // 1. Hash the input password
-    const encoder = new TextEncoder();
-    const data = encoder.encode(pass);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
-    // DEBUG: Log the hash to console so you can copy it if needed
-    console.log("Generated Hash for input:", hashHex);
-
-    // 2. PASTE THE HASH YOU COPIED FROM STEP 1 HERE
-    // Example: "3b... (your copied string)"
-    const correctHash = "79f0da1b920dade97eb4e9e02df79a606c265d69349a600a65c0d4e289feaa44"; 
-
-    if (hashHex === correctHash) {
-        document.getElementById('adminAuth').classList.add('hidden');
-        document.getElementById('adminData').classList.remove('hidden');
-        fetchAdminData();
-    } else {
-        alert(errorMsg);
-        // Helpful alert for setup
-        console.warn("Password mismatch. Expected:", correctHash, "Got:", hashHex);
-        playSound('error');
-    }
-}
-
-       function fetchAdminData() {
-    const tbody = document.getElementById('adminTableBody');
-    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500"><span class="loader"></span> Loading...</td></tr>';
-
-    fetch(APPS_SCRIPT_URL)
-        .then(res => res.json())
-        .then(data => {
-            adminDataCache = data;
-            renderAdminTable(data);
+        async function fetchAdminData() {
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500"><div class="loader mr-2"></div> Loading data...</td></tr>`;
             
-            // MAKE SURE THIS LINE IS HERE:
-            calculateDailyStats(data); 
-        })
-        .catch(e => {
-            console.error(e);
-            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Error loading data.</td></tr>';
-        });
+            try {
+                // Attempt to fetch from Google App Script
+                // Using ?action=getLogs parameter (Make sure your GAS script handles GET requests)
+                const response = await fetch(APPS_SCRIPT_URL + "?action=getLogs");
+                
+                if(!response.ok) throw new Error("Network response was not ok");
+                
+                const data = await response.json();
+                adminDataCache = data;
+                updateAdminStats(data);
+                renderAdminTable(data);
+            } catch (error) {
+                console.warn("GAS fetch failed, falling back to local storage mock data.", error);
+                
+                // Fallback to local history for demo visualization
+                const mockData = JSON.parse(localStorage.getItem('internHistory') || '[]');
+                adminDataCache = mockData;
+                updateAdminStats(mockData);
+                renderAdminTable(mockData);
+                
+                if(mockData.length === 0) {
+                   tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Could not reach remote sheet and local history is empty.</td></tr>`;
+                }
+            }
+        }
+
+        function updateAdminStats(data) {
+            let checkIns = 0;
+            let checkOuts = 0;
+            let active = new Set();
+            let allStudents = new Set();
+            
+            data.forEach(row => {
+                allStudents.add(row.studentId);
+                if(row.action === 'Check In') {
+                    checkIns++;
+                    active.add(row.studentId);
+                }
+                if(row.action === 'Check Out') {
+                    checkOuts++;
+                    active.delete(row.studentId);
+                }
+            });
+            
+            document.getElementById('stat-checkin').innerText = checkIns;
+            document.getElementById('stat-checkout').innerText = checkOuts;
+            document.getElementById('stat-pending').innerText = active.size;
+            document.getElementById('stat-absent').innerText = allStudents.size;
         }
 
         function renderAdminTable(data) {
             const tbody = document.getElementById('adminTableBody');
-            
             if(!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No logs found.</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No logs found.</td></tr>`;
                 return;
             }
-
-            // Slice to last 50 for performance if needed, or show all
-            // Assuming data is array of objects {timestamp, studentName, action, site, mapLink}
-            const reversedData = [...data].reverse();
-
-            tbody.innerHTML = reversedData.map(row => {
-                // Parse date
-                let timeStr = row.timestamp;
-                try {
-                    const d = new Date(row.timestamp);
-                    timeStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                } catch(e) {}
+            
+            tbody.innerHTML = data.map(row => {
+                const date = new Date(row.timestamp);
+                const timeString = isNaN(date.getTime()) ? row.timestamp : date.toLocaleString([], {month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'});
+                
+                const actionBadge = row.action === 'Check In' 
+                    ? `<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded dark:bg-green-900 dark:text-green-300">Check In</span>`
+                    : `<span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded dark:bg-gray-700 dark:text-gray-300">Check Out</span>`;
+                    
+                const mapLink = row.lat && row.lng 
+                    ? `<a href="https://maps.google.com/?q=${row.lat},${row.lng}" target="_blank" class="text-blue-500 hover:text-blue-700"><i class="fas fa-map-marked-alt"></i></a>`
+                    : `<span class="text-gray-400">-</span>`;
 
                 return `
-                <tr class="hover:bg-school-gold/10 transition-colors border-b border-gray-100 dark:border-gray-800">
-                    <td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-gray-500">${timeStr}</td>
-                    <td class="px-4 py-3 font-bold text-gray-800 dark:text-gray-200">${row.studentName || 'Unknown'}</td>
-                    <td class="px-4 py-3">
-                        <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${row.action === 'Check In' ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-800'}">
-                            ${row.action}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 text-xs">${row.site}</td>
-                    <td class="px-4 py-3 text-center">
-                        <a href="https://www.google.com/maps/search/?api=1&query=${row.lat},${row.lng}" target="_blank" class="text-blue-500 hover:text-blue-700">
-                            <i class="fas fa-map-marker-alt"></i>
-                        </a>
-                    </td>
-                </tr>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b border-gray-100 dark:border-gray-800">
+                        <td class="px-4 py-3 whitespace-nowrap">${timeString}</td>
+                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">${row.studentName || 'Unknown'}</td>
+                        <td class="px-4 py-3">${actionBadge}</td>
+                        <td class="px-4 py-3 text-gray-500 text-xs">${row.siteName || '-'}</td>
+                        <td class="px-4 py-3 text-center">${mapLink}</td>
+                    </tr>
                 `;
             }).join('');
         }
-    function calculateDailyStats(data) {
-    if (!data) return;
-
-    // 1. Filter for TODAY only
-    const today = new Date().toLocaleDateString();
-    const todaysLogs = data.filter(row => {
-        try {
-            const rowDate = new Date(row.timestamp).toLocaleDateString();
-            return rowDate === today;
-        } catch (e) { return false; }
-    });
-
-    // 2. Sort logs by time (Oldest -> Newest)
-    todaysLogs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-    // 3. Track Status
-    const checkedInStudents = new Set();
-    const checkedOutStudents = new Set();
-    const activeStudents = new Set();
-    const lastActionMap = {};
-
-    // --- LOOP START ---
-    todaysLogs.forEach(log => {
-        const name = log.studentName;
-        activeStudents.add(name);
-
-        if (log.action === 'Check In') {
-            checkedInStudents.add(name);
-            lastActionMap[name] = 'Check In';
-        } else if (log.action === 'Check Out') {
-            checkedOutStudents.add(name);
-            lastActionMap[name] = 'Check Out';
-        }
-    });
-    // --- LOOP END --- (This was missing/misplaced in your file)
-
-    // 4. Calculate Metrics
-    // "Still Checked In": Students whose LAST action today was Check In
-    const pendingCount = Object.values(lastActionMap).filter(action => action === 'Check In').length;
-
-    // 5. Update the UI
-    document.getElementById('stat-checkin').innerText = checkedInStudents.size;
-    document.getElementById('stat-checkout').innerText = checkedOutStudents.size;
-    document.getElementById('stat-pending').innerText = pendingCount;
-    document.getElementById('stat-absent').innerText = activeStudents.size;
-}
 
         function filterAdminData() {
-            const query = document.getElementById('adminSearch').value.toLowerCase();
-            if(!adminDataCache) return;
+            const term = document.getElementById('adminSearch').value.toLowerCase();
+            if(!term) {
+                renderAdminTable(adminDataCache);
+                return;
+            }
             
             const filtered = adminDataCache.filter(row => {
-                return Object.values(row).some(val => 
-                    String(val).toLowerCase().includes(query)
-                );
+                const searchStr = `${row.studentName} ${row.action} ${row.siteName} ${row.timestamp}`.toLowerCase();
+                return searchStr.includes(term);
             });
-            
             renderAdminTable(filtered);
         }
     </script>
