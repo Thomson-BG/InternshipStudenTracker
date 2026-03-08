@@ -1,18 +1,11 @@
 {
-  "name": "bulldog-garage-intern-tracker",
-  "version": "1.0.0",
-  "description": "A full-stack web application for tracking interns at Bulldog Garage.",
-  "main": "server/index.js",
+  "name": "auto-intern-tracker",
+  "version": "2.0.0",
+  "description": "Auto Intern Tracker frontend with Google Apps Script + Google Sheets backend.",
+  "main": "index.html",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "nodemon server/index.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "mongoose": "^7.0.3"
-  },
-  "devDependencies": {
-    "nodemon": "^2.0.22"
+    "start": "python3 -m http.server 4173",
+    "dev": "python3 -m http.server 4173"
   },
   "engines": {
     "node": ">=14.0.0"
