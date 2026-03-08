@@ -186,6 +186,10 @@ function bindEvents() {
     await openReport("cohort", { downloadPdfAfterOpen: true });
   });
   dom.closeDetailDrawerButton.addEventListener("click", closeDetailDrawer);
+  const drawerOverlay = document.getElementById("drawerOverlay");
+  if (drawerOverlay) {
+    drawerOverlay.addEventListener("click", closeDetailDrawer);
+  }
   dom.reportPrintButton.addEventListener("click", () => openBrowserPrint());
   dom.reportPdfButton.addEventListener("click", async () => {
     try {
@@ -213,6 +217,12 @@ function bindEvents() {
 function applyTheme() {
   dom.body.classList.toggle("theme-light", state.theme === "light");
   dom.themeIndicator.textContent = state.theme === "light" ? "Light" : "Dark";
+  const sunIcon = document.getElementById("themeIconSun");
+  const moonIcon = document.getElementById("themeIconMoon");
+  if (sunIcon && moonIcon) {
+    sunIcon.classList.toggle("is-hidden", state.theme === "light");
+    moonIcon.classList.toggle("is-hidden", state.theme !== "light");
+  }
 }
 
 function toggleTheme() {
@@ -229,6 +239,12 @@ function setView(view) {
   dom.navButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.viewButton === view);
   });
+
+  // Scroll content to top on view switch
+  const appContent = document.querySelector(".app-content");
+  if (appContent) {
+    appContent.scrollTop = 0;
+  }
 
   if (view === "clock") {
     dom.topbarSummary.textContent = "Use Student Clock for attendance. My Progress stays private to the active student.";
@@ -537,7 +553,7 @@ function renderLocationSummary(label, copy, tone = "info") {
 
 function updateLocationBanner(message, tone = "info", siteOptions = null) {
   dom.locationStatusBanner.dataset.tone = tone;
-  dom.locationStatusBanner.innerHTML = `<div>${message}</div>`;
+  dom.locationStatusBanner.textContent = message;
   if (siteOptions && siteOptions.length > 1) {
     dom.siteSelectWrap.classList.add("is-visible");
     dom.siteSelect.innerHTML = siteOptions.map((site, index) => `
@@ -985,6 +1001,8 @@ function filterAdminExceptions() {
 async function openStudentDetail(studentId) {
   state.admin.selectedStudent = { studentId };
   dom.detailDrawer.classList.add("is-open");
+  const overlay = document.getElementById("drawerOverlay");
+  if (overlay) overlay.classList.add("is-active");
   dom.detailDrawerTitle.textContent = "Loading student detail...";
   dom.detailDrawerContent.innerHTML = "<div class=\"empty-copy\">Fetching detailed student analytics and report actions.</div>";
 
@@ -1044,6 +1062,8 @@ function detailDrawerMarkup(detail) {
 
 function closeDetailDrawer() {
   dom.detailDrawer.classList.remove("is-open");
+  const overlay = document.getElementById("drawerOverlay");
+  if (overlay) overlay.classList.remove("is-active");
 }
 
 function renderHeatmap(container, legend, series, valueKey) {

@@ -66,15 +66,15 @@ export const STUDENT_DB = {
 };
 
 export const CHART_COLORS = {
-  brand: "#e14d61",
-  brandSoft: "rgba(225, 77, 97, 0.22)",
-  accent: "#d8b35d",
-  accentSoft: "rgba(216, 179, 93, 0.22)",
-  success: "#42c48d",
-  info: "#6ca9ff",
-  infoSoft: "rgba(108, 169, 255, 0.20)",
-  warning: "#f0b64f",
-  danger: "#ff7474",
-  grid: "rgba(255, 255, 255, 0.08)",
-  text: "#b6bfd8"
+  brand: "#FF3B30",
+  brandSoft: "rgba(255, 59, 48, 0.20)",
+  accent: "#FF9F0A",
+  accentSoft: "rgba(255, 159, 10, 0.20)",
+  success: "#30D158",
+  info: "#64D2FF",
+  infoSoft: "rgba(100, 210, 255, 0.20)",
+  warning: "#FF9F0A",
+  danger: "#FF453A",
+  grid: "rgba(255, 255, 255, 0.06)",
+  text: "rgba(235, 235, 245, 0.6)"
 };

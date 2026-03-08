@@ -2,283 +2,240 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Intern Track v2</title>
-  <meta name="description" content="Intern Track v2 for student check-in, progress dashboards, and admin analytics.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Intern Track</title>
+  <meta name="description" content="Intern Track — student attendance, progress dashboards, and admin analytics.">
   <link rel="stylesheet" href="assets/styles/main.css">
   <link rel="stylesheet" href="assets/styles/print.css" media="print">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 </head>
 <body>
-  <div class="backdrop-grid"></div>
 
   <div class="app-shell">
-    <aside class="sidebar">
-      <section class="brand">
-        <div class="brand-kicker">Hemet High Auto Internship</div>
-        <h1 class="brand-title">Intern <span>Track</span></h1>
-        <div class="brand-copy">Clock in. Track points. Understand progress. Run admin analytics without leaving the app.</div>
-      </section>
+    <!-- ========== HEADER ========== -->
+    <header class="app-header">
+      <div class="header-left">
+        <h1 class="header-brand">Intern<span>Track</span></h1>
+      </div>
+      <div class="header-right">
+        <button id="themeToggle" class="header-icon-btn" type="button" aria-label="Toggle theme">
+          <svg id="themeIconSun" class="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg id="themeIconMoon" class="theme-icon is-hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </header>
 
-      <section class="surface">
-        <div class="card-header">
-          <div>
-            <div class="card-label">Navigation</div>
-            <h2 class="card-title">Workspaces</h2>
-          </div>
-          <div id="themeIndicator" class="theme-indicator">Dark</div>
-        </div>
-        <div class="nav-stack">
-          <button class="nav-button is-active" data-view-button="clock">Student Clock</button>
-          <button class="nav-button" data-view-button="progress">My Progress</button>
-          <button class="nav-button" data-view-button="admin">Admin Dashboard</button>
-        </div>
-      </section>
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="app-content">
 
-      <section class="surface">
-        <div class="card-header">
-          <div>
-            <div class="card-label">Live Status</div>
-            <h2 class="card-title">Student Session</h2>
-          </div>
-          <div id="studentSessionBadge" class="status-badge" data-tone="info">No student loaded</div>
-        </div>
-        <div class="summary-grid">
-          <div class="summary-card">
-            <div class="stat-label">Current Student</div>
-            <div id="sidebarStudentName" class="metric-value">-</div>
-            <div id="sidebarStudentMeta" class="metric-copy">Enter a 6-digit ID to load progress.</div>
-          </div>
-          <div class="summary-card">
-            <div class="stat-label">Location Status</div>
-            <div id="sidebarLocationStatus" class="metric-value">Searching</div>
-            <div id="sidebarLocationMeta" class="metric-copy">Waiting for device GPS.</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="surface">
-        <div class="card-header">
-          <div>
-            <div class="card-label">Rules</div>
-            <h2 class="card-title">Attendance + Scoring</h2>
-          </div>
-        </div>
-        <div class="status-strip">
-          <div class="inline-badge" data-tone="success">+10 Check In</div>
-          <div class="inline-badge" data-tone="info">+10 Check Out</div>
-          <div class="inline-badge" data-tone="warning">Max 20 / day</div>
-          <div class="inline-badge" data-tone="danger">60 min minimum before checkout</div>
-        </div>
-      </section>
-
-      <section class="surface">
-        <div class="card-header">
-          <div>
-            <div class="card-label">Recent Activity</div>
-            <h2 class="card-title">Local Device History</h2>
-          </div>
-        </div>
-        <div id="localHistoryList" class="action-stack empty-copy">No local submissions yet.</div>
-      </section>
-    </aside>
-
-    <main class="workspace">
-      <header class="topbar">
-        <div>
-          <div class="eyebrow">Operations Console</div>
-          <div id="topbarSummary" class="brand-copy">Use Student Clock for attendance. My Progress stays private to the active student.</div>
-        </div>
-        <div class="topbar-actions">
-          <button id="themeToggle" class="icon-button" type="button" aria-label="Toggle theme">Theme</button>
-          <a class="button is-secondary" href="https://docs.google.com/spreadsheets/d/1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY/edit?usp=sharing" target="_blank" rel="noreferrer">Open Google Sheet</a>
-        </div>
-      </header>
-
+      <!-- ===== CLOCK VIEW ===== -->
       <section id="clockView" class="view is-active">
-        <div class="view-header">
-          <div>
-            <div class="eyebrow">Student Clock</div>
-            <h2 class="view-title">Fast attendance with live location verification</h2>
-            <p class="view-subtitle">Students check in or out in one place, then immediately see whether they are on track for the week, month, and overall internship performance.</p>
-          </div>
-          <div id="clockStatusBadge" class="status-badge" data-tone="info">Waiting for student</div>
+        <div class="view-header-compact">
+          <div class="section-label">Student Clock</div>
+          <div id="clockStatusBadge" class="status-pill" data-tone="info">Waiting</div>
         </div>
 
-        <section class="surface is-hero">
-          <div class="hero-grid">
-            <div>
-              <div class="card-label">Today</div>
-              <h3 id="todayHeadline" class="view-title" style="font-size:2.4rem; margin-top:10px;">Ready to verify attendance</h3>
-              <p id="todayCopy" class="view-subtitle">Enter a student ID and confirm location to unlock check-in and check-out.</p>
-              <div class="button-row">
-                <div id="nextActionBadge" class="inline-badge" data-tone="info">Next action: Check In</div>
-                <div id="selectedSiteBadge" class="inline-badge" data-tone="warning">Site pending</div>
-              </div>
+        <!-- Session info card -->
+        <div class="glass-card session-card">
+          <div class="session-info">
+            <div class="session-student">
+              <div class="stat-label">Student</div>
+              <div id="sidebarStudentName" class="session-name">-</div>
+              <div id="sidebarStudentMeta" class="session-meta">Enter a 6-digit ID to begin</div>
             </div>
-            <div class="summary-grid">
-              <div class="summary-card">
-                <div class="stat-label">Today's Points</div>
-                <div id="todayPointsStat" class="metric-value">0 pts</div>
-                <div class="metric-copy">Scoring updates after accepted actions.</div>
-              </div>
-              <div class="summary-card">
-                <div class="stat-label">Today's Hours</div>
-                <div id="todayHoursStat" class="metric-value">0 hrs</div>
-                <div class="metric-copy">Hours count only when a valid check-out completes a shift.</div>
-              </div>
+            <div class="session-location">
+              <div class="stat-label">Location</div>
+              <div id="sidebarLocationStatus" class="session-name">Searching</div>
+              <div id="sidebarLocationMeta" class="session-meta">Waiting for GPS</div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <div class="clock-grid">
-          <section class="surface span-5">
-            <div class="card-header">
-              <div>
-                <div class="card-label">Student Identity</div>
-                <h3 class="card-title">Lookup</h3>
-              </div>
+        <!-- Today hero -->
+        <div class="glass-card hero-card">
+          <div class="hero-content">
+            <h2 id="todayHeadline" class="hero-title">Ready to verify attendance</h2>
+            <p id="todayCopy" class="hero-subtitle">Enter a student ID and confirm location to unlock check-in / check-out.</p>
+            <div class="badge-row">
+              <div id="nextActionBadge" class="status-pill" data-tone="info">Next: Check In</div>
+              <div id="selectedSiteBadge" class="status-pill" data-tone="warning">Site pending</div>
             </div>
-            <div class="lookup-grid">
-              <div>
-                <label class="card-label" for="studentIdInput">6-digit student ID</label>
-                <input id="studentIdInput" class="input mono" type="tel" inputmode="numeric" maxlength="6" placeholder="Enter student ID">
-              </div>
-              <div>
-                <label class="card-label">Resolved student</label>
-                <div id="studentNamePanel" class="summary-card">
-                  <div id="studentNameValue" class="metric-value">-</div>
-                  <div id="studentNameCopy" class="metric-copy">No student loaded.</div>
-                </div>
-              </div>
+          </div>
+          <div class="hero-stats">
+            <div class="stat-bubble">
+              <div class="stat-label">Points</div>
+              <div id="todayPointsStat" class="stat-value">0</div>
             </div>
-            <div class="note-banner" style="margin-top:16px;">
-              <div>
-                Students only see their own data. Percentile and benchmark values are anonymous.
-              </div>
+            <div class="stat-bubble">
+              <div class="stat-label">Hours</div>
+              <div id="todayHoursStat" class="stat-value">0</div>
             </div>
-          </section>
+          </div>
+        </div>
 
-          <section class="surface span-7">
-            <div class="card-header">
-              <div>
-                <div class="card-label">Attendance Action</div>
-                <h3 class="card-title">Clock In / Clock Out</h3>
-              </div>
-              <button id="clearStudentButton" class="button is-ghost" type="button">Done / Reset</button>
-            </div>
-            <div id="locationStatusBanner" class="note-banner">
-              <div>
-                Waiting for device GPS.
-              </div>
-            </div>
-            <div id="siteSelectWrap" class="site-select-wrap" style="margin-top:16px;">
-              <label class="card-label" for="siteSelect">Multiple sites detected</label>
-              <select id="siteSelect" class="filter-select"></select>
-            </div>
-            <div class="student-actions" style="margin-top:18px;">
-              <button id="checkInButton" class="action-button" data-action="check-in" type="button" disabled>
-                <div class="card-label">Accepted action</div>
+        <!-- Student lookup -->
+        <div class="glass-card">
+          <div class="card-head">
+            <div class="section-label">Student ID</div>
+          </div>
+          <div class="input-group">
+            <input id="studentIdInput" class="ios-input" type="tel" inputmode="numeric" maxlength="6" placeholder="6-digit student ID" autocomplete="off">
+          </div>
+          <div class="resolved-student">
+            <div id="studentNameValue" class="resolved-name">-</div>
+            <div id="studentNameCopy" class="resolved-meta">No student loaded.</div>
+          </div>
+        </div>
+
+        <!-- Location & Actions -->
+        <div class="glass-card">
+          <div class="card-head">
+            <div class="section-label">Attendance Action</div>
+            <button id="clearStudentButton" class="link-button" type="button">Reset</button>
+          </div>
+          <div id="locationStatusBanner" class="info-banner">
+            Waiting for device GPS.
+          </div>
+          <div id="siteSelectWrap" class="site-select-wrap">
+            <label class="stat-label" for="siteSelect">Multiple sites detected</label>
+            <select id="siteSelect" class="ios-select"></select>
+          </div>
+          <div class="action-buttons">
+            <button id="checkInButton" class="action-btn checkin" data-action="check-in" type="button" disabled>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <div class="action-btn-text">
                 <strong>Check In</strong>
-                <div class="metric-copy">Records presence, starts today's shift, adds 10 points.</div>
-              </button>
-              <button id="checkOutButton" class="action-button" data-action="check-out" type="button" disabled>
-                <div class="card-label">Accepted action</div>
-                <strong>Check Out</strong>
-                <div class="metric-copy">Completes the shift after 60 minutes and adds another 10 points.</div>
-              </button>
-            </div>
-            <div id="clockMessage" class="metric-copy" style="margin-top:16px; min-height:24px;"></div>
-          </section>
-
-          <section class="surface span-12">
-            <div class="card-header">
-              <div>
-                <div class="card-label">Quick Snapshot</div>
-                <h3 class="card-title">Current student performance</h3>
+                <span>Start shift, earn 10 pts</span>
               </div>
-              <button id="jumpToProgressButton" class="button is-secondary" type="button">Open My Progress</button>
-            </div>
-            <div id="clockQuickStats" class="metric-grid">
-              <div class="metric-card"><div class="stat-label">Overall Points</div><div class="metric-value">0 pts</div><div class="metric-copy">Load a student to see live totals.</div></div>
-              <div class="metric-card"><div class="stat-label">Overall Hours</div><div class="metric-value">0 hrs</div><div class="metric-copy">Derived from completed valid shifts.</div></div>
-              <div class="metric-card"><div class="stat-label">Points vs Top</div><div class="metric-value">0%</div><div class="metric-copy">Top student defines the 100% benchmark.</div></div>
-              <div class="metric-card"><div class="stat-label">Hours vs Top</div><div class="metric-value">0%</div><div class="metric-copy">Top logged hours define the 100% benchmark.</div></div>
-            </div>
-          </section>
+            </button>
+            <button id="checkOutButton" class="action-btn checkout" data-action="check-out" type="button" disabled>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <div class="action-btn-text">
+                <strong>Check Out</strong>
+                <span>End shift after 60 min, +10 pts</span>
+              </div>
+            </button>
+          </div>
+          <div id="clockMessage" class="feedback-message"></div>
         </div>
+
+        <!-- Quick stats -->
+        <div class="glass-card">
+          <div class="card-head">
+            <div class="section-label">Performance Snapshot</div>
+            <button id="jumpToProgressButton" class="link-button" type="button">Full Progress</button>
+          </div>
+          <div id="clockQuickStats" class="stats-grid">
+            <div class="stat-card"><div class="stat-label">Overall Pts</div><div class="metric-value">0</div></div>
+            <div class="stat-card"><div class="stat-label">Overall Hrs</div><div class="metric-value">0</div></div>
+            <div class="stat-card"><div class="stat-label">Pts vs Top</div><div class="metric-value">0%</div></div>
+            <div class="stat-card"><div class="stat-label">Hrs vs Top</div><div class="metric-value">0%</div></div>
+          </div>
+        </div>
+
+        <!-- Rules (collapsible) -->
+        <details class="glass-card collapsible">
+          <summary class="collapsible-header">
+            <div class="section-label">Scoring Rules</div>
+            <svg class="chevron-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="collapsible-body">
+            <div class="rules-strip">
+              <div class="status-pill" data-tone="success">+10 Check In</div>
+              <div class="status-pill" data-tone="info">+10 Check Out</div>
+              <div class="status-pill" data-tone="warning">Max 20 / day</div>
+              <div class="status-pill" data-tone="danger">60 min minimum</div>
+            </div>
+            <p class="help-text">Students only see their own data. Percentile and benchmark values are anonymous.</p>
+          </div>
+        </details>
+
+        <!-- Local history (collapsible) -->
+        <details class="glass-card collapsible">
+          <summary class="collapsible-header">
+            <div class="section-label">Local Device History</div>
+            <svg class="chevron-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div id="localHistoryList" class="collapsible-body history-list">No local submissions yet.</div>
+        </details>
       </section>
 
+      <!-- ===== PROGRESS VIEW ===== -->
       <section id="progressView" class="view">
-        <div class="view-header">
-          <div>
-            <div class="eyebrow">My Progress</div>
-            <h2 class="view-title">Private weekly, monthly, and overall analytics</h2>
-            <p class="view-subtitle">Points, hours, percentile, benchmark percentages, and recent shifts are all tied to the active student session.</p>
-          </div>
-          <div class="progress-pill-row">
-            <button class="segment-button" data-range-button="week" type="button">Week</button>
-            <button class="segment-button" data-range-button="month" type="button">Month</button>
-            <button class="segment-button is-active" data-range-button="overall" type="button">Overall</button>
+        <div class="view-header-compact">
+          <div class="section-label">My Progress</div>
+          <div class="segment-control">
+            <button class="segment-btn" data-range-button="week" type="button">Week</button>
+            <button class="segment-btn" data-range-button="month" type="button">Month</button>
+            <button class="segment-btn is-active" data-range-button="overall" type="button">Overall</button>
           </div>
         </div>
 
-        <div id="progressEmptyState" class="surface empty-state is-centered">
-          <div class="eyebrow">Student required</div>
-          <h3 class="empty-title">Load a student to unlock progress analytics</h3>
-          <div class="empty-copy">The native My Progress panel replaces the old separate points tracker and keeps student standings private.</div>
-          <button class="button is-brand" data-view-button="clock" type="button">Go to Student Clock</button>
+        <div id="progressEmptyState" class="glass-card empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <h3 class="empty-title">Load a student to view progress</h3>
+          <p class="empty-subtitle">Use the Student Clock tab to enter an ID first.</p>
+          <button class="ios-button primary" data-view-button="clock" type="button">Go to Clock</button>
         </div>
 
-        <div id="progressContent" class="progress-grid is-hidden">
-          <section class="surface span-12">
-            <div class="card-header">
+        <div id="progressContent" class="progress-layout is-hidden">
+          <!-- Student overview -->
+          <div class="glass-card">
+            <div class="card-head">
               <div>
-                <div class="card-label">Student Overview</div>
+                <div class="section-label">Student Overview</div>
                 <h3 id="progressStudentName" class="card-title">-</h3>
               </div>
-              <div id="progressPercentileBadge" class="inline-badge" data-tone="info">Top 100%</div>
+              <div id="progressPercentileBadge" class="status-pill" data-tone="info">Top 100%</div>
             </div>
-            <div id="progressSummaryCards" class="summary-grid"></div>
-          </section>
+            <div id="progressSummaryCards" class="stats-grid"></div>
+          </div>
 
-          <section class="surface span-12">
-            <div class="card-header">
-              <div>
-                <div class="card-label">Normalized Standing</div>
-                <h3 class="card-title">Benchmark gauges</h3>
-              </div>
-              <div id="progressRangeBadge" class="inline-badge" data-tone="info">Overall</div>
+          <!-- Gauges -->
+          <div class="glass-card">
+            <div class="card-head">
+              <div class="section-label">Benchmark Gauges</div>
+              <div id="progressRangeBadge" class="status-pill" data-tone="info">Overall</div>
             </div>
             <div id="gaugeGrid" class="gauge-grid"></div>
-          </section>
+          </div>
 
-          <section class="chart-card span-4 is-short">
-            <div class="card-header"><div><div class="card-label">Week</div><h3 class="card-title">Weekly points</h3></div></div>
-            <canvas id="studentWeeklyPointsChart"></canvas>
-          </section>
-          <section class="chart-card span-4 is-short">
-            <div class="card-header"><div><div class="card-label">Week</div><h3 class="card-title">Weekly hours</h3></div></div>
-            <canvas id="studentWeeklyHoursChart"></canvas>
-          </section>
-          <section class="chart-card span-4 is-short">
-            <div class="card-header"><div><div class="card-label">Current range</div><h3 class="card-title">Recent shift intensity</h3></div></div>
+          <!-- Charts -->
+          <div class="chart-row">
+            <div class="glass-card chart-card">
+              <div class="section-label">Weekly Points</div>
+              <canvas id="studentWeeklyPointsChart"></canvas>
+            </div>
+            <div class="glass-card chart-card">
+              <div class="section-label">Weekly Hours</div>
+              <canvas id="studentWeeklyHoursChart"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-card chart-card">
+            <div class="section-label">Shift Heatmap</div>
             <div id="studentHeatmapLegend" class="heatmap-legend"></div>
             <div id="studentHeatmap" class="heatmap"></div>
-          </section>
-          <section class="chart-card span-12">
-            <div class="card-header"><div><div class="card-label">Current range</div><h3 class="card-title">Cumulative points and hours</h3></div></div>
-            <canvas id="studentCumulativeChart"></canvas>
-          </section>
+          </div>
 
-          <section class="surface span-7">
-            <div class="card-header">
-              <div><div class="card-label">Recent Shifts</div><h3 class="card-title">Verified hours and points</h3></div>
-            </div>
-            <div class="data-table-wrap">
-              <table class="data-table">
+          <div class="glass-card chart-card">
+            <div class="section-label">Cumulative Points & Hours</div>
+            <canvas id="studentCumulativeChart"></canvas>
+          </div>
+
+          <!-- Recent shifts table -->
+          <div class="glass-card">
+            <div class="section-label">Recent Shifts</div>
+            <div class="table-scroll">
+              <table class="ios-table">
                 <thead>
                   <tr>
                     <th>Date</th>
@@ -291,128 +248,134 @@
                 <tbody id="recentShiftsTableBody"></tbody>
               </table>
             </div>
-          </section>
+          </div>
 
-          <section class="surface span-5">
-            <div class="card-header">
-              <div><div class="card-label">Open / Exception Review</div><h3 class="card-title">Days needing attention</h3></div>
-            </div>
-            <div id="studentExceptionsList" class="action-stack empty-copy"></div>
-          </section>
+          <!-- Exceptions -->
+          <div class="glass-card">
+            <div class="section-label">Days Needing Attention</div>
+            <div id="studentExceptionsList" class="exception-list"></div>
+          </div>
         </div>
       </section>
 
+      <!-- ===== ADMIN VIEW ===== -->
       <section id="adminView" class="view">
-        <div class="view-header">
-          <div>
-            <div class="eyebrow">Admin Dashboard</div>
-            <h2 class="view-title">Cohort analytics, reports, and operational oversight</h2>
-            <p class="view-subtitle">Use the dashboard to track points, hours, attendance exceptions, leaderboards, trend lines, and printable progress reports.</p>
-          </div>
-          <div class="status-strip">
-            <div id="adminAuthBadge" class="status-badge" data-tone="warning">Not signed in</div>
+        <div class="view-header-compact">
+          <div class="section-label">Admin Dashboard</div>
+          <div id="adminAuthBadge" class="status-pill" data-tone="warning">Not signed in</div>
+        </div>
+
+        <!-- Login state -->
+        <div id="adminLoginState" class="glass-card login-card">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <h3 class="login-title">Admin Sign-In</h3>
+          <p class="login-subtitle">Analytics and reports require authentication.</p>
+          <div class="login-form">
+            <input id="adminPasswordInput" class="ios-input" type="password" placeholder="Enter admin password">
+            <button id="adminLoginButton" class="ios-button primary" type="button">Unlock</button>
           </div>
         </div>
 
-        <div id="adminLoginState" class="surface login-state">
-          <div class="eyebrow">Protected</div>
-          <h3 class="login-title">Admin sign-in</h3>
-          <div class="brand-copy">Analytics and reports require an active admin session.</div>
-          <div class="inline-row" style="width:min(460px,100%);">
-            <input id="adminPasswordInput" class="password-input" type="password" placeholder="Enter admin password">
-            <button id="adminLoginButton" class="button is-brand" type="button">Unlock dashboard</button>
-          </div>
-        </div>
-
-        <div id="adminContent" class="admin-grid is-hidden">
-          <section class="surface span-12">
-            <div class="card-header">
-              <div>
-                <div class="card-label">Filters</div>
-                <h3 class="card-title">Range, site, search, and exports</h3>
-              </div>
-              <div class="button-row">
-                <button id="adminRefreshButton" class="button is-secondary" type="button">Refresh</button>
-                <button id="adminPrintCohortButton" class="button is-secondary" type="button">Print Cohort Report</button>
-                <button id="adminPdfCohortButton" class="button is-accent" type="button">Download Cohort PDF</button>
-                <button id="adminCsvButton" class="button is-ghost" type="button">Export CSV</button>
-                <button id="adminLogoutButton" class="button is-ghost" type="button">Sign Out</button>
-              </div>
+        <!-- Admin content -->
+        <div id="adminContent" class="admin-layout is-hidden">
+          <!-- Filters -->
+          <div class="glass-card">
+            <div class="card-head">
+              <div class="section-label">Filters & Tools</div>
+              <button id="adminLogoutButton" class="link-button danger" type="button">Sign Out</button>
             </div>
-            <div class="admin-filter-grid">
-              <div class="filter-block">
-                <label class="card-label" for="adminRangeSelect">Range</label>
-                <select id="adminRangeSelect" class="filter-select">
+            <div class="filter-grid">
+              <div class="filter-item">
+                <label class="stat-label" for="adminRangeSelect">Range</label>
+                <select id="adminRangeSelect" class="ios-select">
                   <option value="week">This Week</option>
                   <option value="month">This Month</option>
                   <option value="overall" selected>Overall</option>
                 </select>
               </div>
-              <div class="filter-block">
-                <label class="card-label" for="adminSiteSelect">Site</label>
-                <select id="adminSiteSelect" class="filter-select">
+              <div class="filter-item">
+                <label class="stat-label" for="adminSiteSelect">Site</label>
+                <select id="adminSiteSelect" class="ios-select">
                   <option value="all">All Sites</option>
                 </select>
               </div>
-              <div class="filter-block">
-                <label class="card-label" for="adminStatusSelect">Student status</label>
-                <select id="adminStatusSelect" class="filter-select">
+              <div class="filter-item">
+                <label class="stat-label" for="adminStatusSelect">Status</label>
+                <select id="adminStatusSelect" class="ios-select">
                   <option value="all">All</option>
                   <option value="complete">Complete</option>
                   <option value="open">Open</option>
                   <option value="exception">Exception</option>
                 </select>
               </div>
-              <div class="filter-block">
-                <label class="card-label" for="adminSearchInput">Search student</label>
-                <input id="adminSearchInput" class="input search-input" type="search" placeholder="Search by name or ID">
+              <div class="filter-item">
+                <label class="stat-label" for="adminSearchInput">Search</label>
+                <input id="adminSearchInput" class="ios-input" type="search" placeholder="Name or ID">
               </div>
             </div>
-          </section>
-
-          <section class="surface span-12">
-            <div class="card-header">
-              <div><div class="card-label">KPI Strip</div><h3 class="card-title">Cohort health</h3></div>
+            <div class="admin-actions-row">
+              <button id="adminRefreshButton" class="ios-button secondary" type="button">Refresh</button>
+              <button id="adminPrintCohortButton" class="ios-button secondary" type="button">Print</button>
+              <button id="adminPdfCohortButton" class="ios-button accent" type="button">PDF</button>
+              <button id="adminCsvButton" class="ios-button secondary" type="button">CSV</button>
+              <a class="ios-button secondary" href="https://docs.google.com/spreadsheets/d/1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY/edit?usp=sharing" target="_blank" rel="noreferrer">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Google Sheet
+              </a>
             </div>
-            <div id="adminKpiGrid" class="metric-grid"></div>
-          </section>
+          </div>
 
-          <section class="chart-card span-6">
-            <div class="card-header"><div><div class="card-label">Trend</div><h3 class="card-title">Points over time</h3></div></div>
-            <canvas id="adminPointsTrendChart"></canvas>
-          </section>
-          <section class="chart-card span-6">
-            <div class="card-header"><div><div class="card-label">Trend</div><h3 class="card-title">Hours over time</h3></div></div>
-            <canvas id="adminHoursTrendChart"></canvas>
-          </section>
-          <section class="chart-card span-5">
-            <div class="card-header"><div><div class="card-label">Leaderboard</div><h3 class="card-title">Top students</h3></div></div>
-            <canvas id="adminLeaderboardChart"></canvas>
-          </section>
-          <section class="chart-card span-4">
-            <div class="card-header"><div><div class="card-label">Relationship</div><h3 class="card-title">Points vs hours</h3></div></div>
-            <canvas id="adminScatterChart"></canvas>
-          </section>
-          <section class="chart-card span-3">
-            <div class="card-header"><div><div class="card-label">Exceptions</div><h3 class="card-title">Status mix</h3></div></div>
-            <canvas id="adminExceptionChart"></canvas>
-          </section>
-          <section class="chart-card span-8">
-            <div class="card-header"><div><div class="card-label">Sites</div><h3 class="card-title">Points and hours by location</h3></div></div>
-            <canvas id="adminSiteBreakdownChart"></canvas>
-          </section>
-          <section class="chart-card span-4 is-short">
-            <div class="card-header"><div><div class="card-label">Attendance heatmap</div><h3 class="card-title">Active student days</h3></div></div>
+          <!-- KPIs -->
+          <div class="glass-card">
+            <div class="section-label">Cohort Health</div>
+            <div id="adminKpiGrid" class="stats-grid"></div>
+          </div>
+
+          <!-- Charts -->
+          <div class="chart-row">
+            <div class="glass-card chart-card">
+              <div class="section-label">Points Trend</div>
+              <canvas id="adminPointsTrendChart"></canvas>
+            </div>
+            <div class="glass-card chart-card">
+              <div class="section-label">Hours Trend</div>
+              <canvas id="adminHoursTrendChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-row">
+            <div class="glass-card chart-card">
+              <div class="section-label">Leaderboard</div>
+              <canvas id="adminLeaderboardChart"></canvas>
+            </div>
+            <div class="glass-card chart-card chart-card-sm">
+              <div class="section-label">Points vs Hours</div>
+              <canvas id="adminScatterChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-row">
+            <div class="glass-card chart-card chart-card-sm">
+              <div class="section-label">Status Mix</div>
+              <canvas id="adminExceptionChart"></canvas>
+            </div>
+            <div class="glass-card chart-card">
+              <div class="section-label">Sites Breakdown</div>
+              <canvas id="adminSiteBreakdownChart"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-card chart-card">
+            <div class="section-label">Attendance Heatmap</div>
             <div id="adminHeatmapLegend" class="heatmap-legend"></div>
             <div id="adminHeatmap" class="heatmap"></div>
-          </section>
+          </div>
 
-          <section class="surface span-8">
-            <div class="card-header">
-              <div><div class="card-label">Student analysis</div><h3 class="card-title">Points, hours, rank, and last activity</h3></div>
-            </div>
-            <div class="data-table-wrap">
-              <table class="data-table">
+          <!-- Student analysis table -->
+          <div class="glass-card">
+            <div class="section-label">Student Analysis</div>
+            <div class="table-scroll">
+              <table class="ios-table">
                 <thead>
                   <tr>
                     <th>Student</th>
@@ -428,54 +391,77 @@
                 <tbody id="adminStudentsTableBody"></tbody>
               </table>
             </div>
-          </section>
+          </div>
 
-          <section class="surface span-4">
-            <div class="card-header">
-              <div><div class="card-label">Oversight</div><h3 class="card-title">Exceptions and audit trail</h3></div>
-            </div>
-            <div id="adminExceptionList" class="action-stack"></div>
-            <div class="note-banner" style="margin-top:18px;">
-              <div>
-                Audit trail records blocked duplicate attempts, cooldown issues, and admin sign-ins.
-              </div>
-            </div>
-            <div id="auditTrailList" class="action-stack" style="margin-top:18px;"></div>
-          </section>
+          <!-- Exceptions + Audit -->
+          <div class="glass-card">
+            <div class="section-label">Exceptions & Audit Trail</div>
+            <div id="adminExceptionList" class="exception-list"></div>
+            <div class="info-banner" style="margin-top:12px;">Audit trail: blocked duplicates, cooldowns, admin sign-ins.</div>
+            <div id="auditTrailList" class="exception-list" style="margin-top:12px;"></div>
+          </div>
         </div>
       </section>
+
     </main>
+
+    <!-- ========== BOTTOM TAB BAR ========== -->
+    <nav class="tab-bar">
+      <button class="tab-item is-active" data-view-button="clock" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Clock</span>
+      </button>
+      <button class="tab-item" data-view-button="progress" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>Progress</span>
+      </button>
+      <button class="tab-item" data-view-button="admin" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Admin</span>
+      </button>
+    </nav>
   </div>
 
+  <!-- ========== DETAIL DRAWER ========== -->
   <aside id="studentDetailDrawer" class="detail-drawer">
+    <div class="drawer-handle"></div>
     <div class="drawer-header">
       <div>
-        <div class="card-label">Student Detail</div>
+        <div class="section-label">Student Detail</div>
         <h3 id="detailDrawerTitle" class="drawer-title">Select a student</h3>
       </div>
-      <button id="closeDetailDrawerButton" class="button is-ghost" type="button">Close</button>
+      <button id="closeDetailDrawerButton" class="link-button" type="button">Close</button>
     </div>
-    <div id="detailDrawerContent" class="drawer-grid empty-copy">Choose a student from the analysis table to open detailed metrics and reporting tools.</div>
+    <div id="detailDrawerContent" class="drawer-content">Choose a student from the analysis table to open detailed metrics.</div>
   </aside>
+  <div id="drawerOverlay" class="drawer-overlay"></div>
 
-  <div id="reportModal" class="modal">
-    <div class="modal-card">
-      <div id="reportToolbar" class="card-header">
+  <!-- ========== REPORT MODAL ========== -->
+  <div id="reportModal" class="modal-overlay">
+    <div class="modal-sheet">
+      <div class="drawer-handle"></div>
+      <div class="modal-header">
         <div>
-          <div class="card-label">Report Center</div>
+          <div class="section-label">Report Center</div>
           <h3 id="reportTitleText" class="card-title">Preview</h3>
         </div>
-        <div class="report-actions">
-          <button id="reportPrintButton" class="button is-secondary" type="button">Print</button>
-          <button id="reportPdfButton" class="button is-accent" type="button">Download PDF</button>
-          <button id="reportCloseButton" class="button is-ghost" type="button">Close</button>
+        <div class="modal-actions">
+          <button id="reportPrintButton" class="ios-button secondary" type="button">Print</button>
+          <button id="reportPdfButton" class="ios-button accent" type="button">PDF</button>
+          <button id="reportCloseButton" class="link-button" type="button">Close</button>
         </div>
       </div>
       <div id="reportStage" class="report-stage"></div>
     </div>
   </div>
 
+  <!-- ========== TOAST NOTIFICATIONS ========== -->
   <div id="toastRack" class="toast-rack"></div>
+
+  <!-- Keep hidden theme indicator for JS compatibility -->
+  <div id="themeIndicator" class="is-hidden">Dark</div>
+  <div id="topbarSummary" class="is-hidden"></div>
+  <div id="studentSessionBadge" class="is-hidden" data-tone="info">No student loaded</div>
 
   <script type="module" src="assets/js/app.js"></script>
 </body>
