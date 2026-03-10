@@ -4,13 +4,20 @@
   "description": "Auto Intern Tracker frontend with Google Apps Script + Google Sheets backend.",
   "main": "index.html",
   "scripts": {
-    "start": "python3 -m http.server 4173",
-    "dev": "python3 -m http.server 4173",
-    "test": "npx playwright test"
+    "start": "vite preview --host 127.0.0.1 --port 4173",
+    "dev": "vite --host 127.0.0.1 --port 4173",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "test": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_SMOKE_LABEL=local playwright test tests/smoke.spec.js",
+    "test:full": "playwright test tests/full_regression.spec.js",
+    "smoke": "playwright test tests/smoke.spec.js",
+    "smoke:local": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_SMOKE_LABEL=local playwright test tests/smoke.spec.js",
+    "smoke:live": "PLAYWRIGHT_BASE_URL=https://internship-studen-tracker.vercel.app PLAYWRIGHT_SMOKE_LABEL=production playwright test tests/smoke.spec.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.42.0",
-    "playwright": "^1.42.0"
+    "playwright": "^1.42.0",
+    "vite": "^7.1.5"
   },
   "engines": {
     "node": ">=14.0.0"

@@ -2,6 +2,7 @@ import {
   ADMIN_SESSION_KEY,
   LOCAL_HISTORY_KEY,
   STUDENT_LOOKUP_DEBOUNCE_MS,
+  ROSTER_FALLBACK,
   SITES,
   ALLOWED_RADIUS_METERS,
   THEME_KEY
@@ -120,7 +121,7 @@ async function init() {
     const response = await fetchRoster();
     state.roster = response.data || {};
   } catch (error) {
-    console.error("Failed to fetch roster, using fallback:", error);
+    console.warn("Roster endpoint unavailable, using fallback roster.", error);
     state.roster = ROSTER_FALLBACK;
   } finally {
     state.rosterLoading = false;
