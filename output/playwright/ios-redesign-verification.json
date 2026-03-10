@@ -1,0 +1,21 @@
+{
+  "verification": {
+    "defaultLightMode": true,
+    "headerText": "",
+    "clockTitle": "Clock In",
+    "weekTitle": "My Week",
+    "primaryLabel": "Check Out",
+    "progressStatCount": 2,
+    "historyRows": 7,
+    "progressVisibleCanvases": 0,
+    "hasRangeButtons": 0,
+    "progressGoogleSheetLinks": 0,
+    "adminGoogleSheetButtons": [
+      "Open Google Sheet",
+      "Google Sheet"
+    ],
+    "horizontalOverflow": false,
+    "adminVisible": true
+  },
+  "consoleMessages": []
+}

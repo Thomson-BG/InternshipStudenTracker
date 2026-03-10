@@ -51,13 +51,22 @@ function baseOptions() {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    animation: {
+      duration: 220
+    },
+    interaction: {
+      mode: "index",
+      intersect: false
+    },
     plugins: {
       legend: {
+        position: "top",
         labels: {
           color: CHART_COLORS.text,
           usePointStyle: true,
           boxWidth: 8,
-          boxHeight: 8
+          boxHeight: 8,
+          padding: 14
         }
       },
       tooltip: {
@@ -71,11 +80,18 @@ function baseOptions() {
     scales: {
       x: {
         grid: { color: CHART_COLORS.grid },
-        ticks: { color: CHART_COLORS.text }
+        ticks: {
+          color: CHART_COLORS.text,
+          maxTicksLimit: 6
+        }
       },
       y: {
         grid: { color: CHART_COLORS.grid },
-        ticks: { color: CHART_COLORS.text }
+        ticks: {
+          color: CHART_COLORS.text,
+          maxTicksLimit: 5
+        },
+        beginAtZero: true
       }
     }
   };
@@ -87,36 +103,67 @@ export function renderStudentCharts(dashboard) {
   const weeklyHours = dashboard.charts.weeklyHours || [];
   const cumulative = dashboard.charts.cumulative || [];
 
-  upsertChart("studentWeeklyPointsChart", {
+  destroyChart("studentWeeklyPointsChart");
+  destroyChart("studentWeeklyHoursChart");
+
+  upsertChart("studentWeeklyActivityChart", {
     type: "bar",
     data: {
       labels: weeklyPoints.map((row) => row.label),
-      datasets: [{
-        label: "Points",
-        data: weeklyPoints.map((row) => row.value),
-        backgroundColor: CHART_COLORS.brandSoft,
-        borderColor: CHART_COLORS.brand,
-        borderWidth: 1.5,
-        borderRadius: 10
-      }]
+      datasets: [
+        {
+          label: "Points",
+          data: weeklyPoints.map((row) => row.value),
+          backgroundColor: CHART_COLORS.brandSoft,
+          borderColor: CHART_COLORS.brand,
+          borderWidth: 1.5,
+          borderRadius: 10,
+          maxBarThickness: 22
+        },
+        {
+          type: "line",
+          label: "Hours",
+          data: weeklyHours.map((row) => row.value),
+          borderColor: CHART_COLORS.accent,
+          backgroundColor: CHART_COLORS.accentSoft,
+          fill: false,
+          tension: 0.35,
+          pointRadius: 3,
+          pointHoverRadius: 4,
+          yAxisID: "y1"
+        }
+      ]
     },
-    options: baseOptions()
-  });
-
-  upsertChart("studentWeeklyHoursChart", {
-    type: "bar",
-    data: {
-      labels: weeklyHours.map((row) => row.label),
-      datasets: [{
-        label: "Hours",
-        data: weeklyHours.map((row) => row.value),
-        backgroundColor: CHART_COLORS.accentSoft,
-        borderColor: CHART_COLORS.accent,
-        borderWidth: 1.5,
-        borderRadius: 10
-      }]
+    options: {
+      ...baseOptions(),
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 7
+          }
+        },
+        y: {
+          position: "left",
+          grid: { color: CHART_COLORS.grid },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 4
+          },
+          beginAtZero: true
+        },
+        y1: {
+          position: "right",
+          grid: { drawOnChartArea: false },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 4
+          },
+          beginAtZero: true
+        }
+      }
     },
-    options: baseOptions()
   });
 
   upsertChart("studentCumulativeChart", {
@@ -150,17 +197,28 @@ export function renderStudentCharts(dashboard) {
       scales: {
         x: {
           grid: { color: CHART_COLORS.grid },
-          ticks: { color: CHART_COLORS.text }
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 6
+          }
         },
         y: {
           position: "left",
           grid: { color: CHART_COLORS.grid },
-          ticks: { color: CHART_COLORS.text }
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
         },
         y1: {
           position: "right",
           grid: { drawOnChartArea: false },
-          ticks: { color: CHART_COLORS.text }
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
         }
       }
     }
@@ -171,38 +229,65 @@ export function renderAdminCharts(dashboard) {
   if (!dashboard || !dashboard.charts) return;
   const charts = dashboard.charts;
 
-  upsertChart("adminPointsTrendChart", {
+  destroyChart("adminPointsTrendChart");
+  destroyChart("adminHoursTrendChart");
+
+  upsertChart("adminOverviewTrendChart", {
     type: "line",
     data: {
       labels: charts.pointsTrend.map((row) => row.label),
-      datasets: [{
-        label: "Points",
-        data: charts.pointsTrend.map((row) => row.value),
-        borderColor: CHART_COLORS.brand,
-        backgroundColor: CHART_COLORS.brandSoft,
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3
-      }]
+      datasets: [
+        {
+          label: "Points",
+          data: charts.pointsTrend.map((row) => row.value),
+          borderColor: CHART_COLORS.brand,
+          backgroundColor: CHART_COLORS.brandSoft,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3
+        },
+        {
+          label: "Hours",
+          data: charts.hoursTrend.map((row) => row.value),
+          borderColor: CHART_COLORS.accent,
+          backgroundColor: CHART_COLORS.accentSoft,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 3,
+          yAxisID: "y1"
+        }
+      ]
     },
-    options: baseOptions()
-  });
-
-  upsertChart("adminHoursTrendChart", {
-    type: "line",
-    data: {
-      labels: charts.hoursTrend.map((row) => row.label),
-      datasets: [{
-        label: "Hours",
-        data: charts.hoursTrend.map((row) => row.value),
-        borderColor: CHART_COLORS.accent,
-        backgroundColor: CHART_COLORS.accentSoft,
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3
-      }]
+    options: {
+      ...baseOptions(),
+      scales: {
+        x: {
+          grid: { color: CHART_COLORS.grid },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 6
+          }
+        },
+        y: {
+          position: "left",
+          grid: { color: CHART_COLORS.grid },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
+        },
+        y1: {
+          position: "right",
+          grid: { drawOnChartArea: false },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
+        }
+      }
     },
-    options: baseOptions()
   });
 
   upsertChart("adminLeaderboardChart", {
@@ -230,7 +315,23 @@ export function renderAdminCharts(dashboard) {
     },
     options: {
       ...baseOptions(),
-      indexAxis: "y"
+      indexAxis: "y",
+      scales: {
+        x: {
+          grid: { color: CHART_COLORS.grid },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
+        },
+        y: {
+          grid: { display: false },
+          ticks: {
+            color: CHART_COLORS.text
+          }
+        }
+      }
     }
   });
 

@@ -49,12 +49,12 @@ export async function adminAuth(password) {
   });
 }
 
-export async function fetchStudentDashboard(studentId, range) {
-  return requestJson(API_ENDPOINTS.studentDashboard(studentId, range));
+export async function fetchStudentDashboard(studentId, range = "week", options = {}) {
+  return requestJson(API_ENDPOINTS.studentDashboard(studentId, range), options);
 }
 
-export async function fetchAdminDashboard({ token, range, site }) {
-  return requestJson(API_ENDPOINTS.adminDashboard(token, range, site));
+export async function fetchAdminDashboard({ token, range, site }, options = {}) {
+  return requestJson(API_ENDPOINTS.adminDashboard(token, range, site), options);
 }
 
 export async function fetchReportData({ token, type, range, site, studentId }) {
@@ -67,4 +67,8 @@ export async function fetchLogs(token) {
 
 export async function fetchPoints(token) {
   return requestJson(API_ENDPOINTS.points(token));
+}
+
+export async function fetchRoster() {
+  return requestJson(API_ENDPOINTS.getRoster());
 }

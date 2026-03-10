@@ -7,6 +7,52 @@ const STUDENT_ID = '160601'; // Lenore Ditmore
 
 // Helper: load app and wait for it to be stable
 async function loadApp(page) {
+  // Mock roster fetch to avoid external dependencies
+  await page.route('**/macros/s/**?mode=get_roster', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        data: {
+          '160601': 'Lenore Ditmore',
+          '131923': 'Jordan Belvin'
+        }
+      })
+    });
+  });
+
+  // Mock student dashboard fetch
+  await page.route('**/macros/s/**?mode=student_dashboard*', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        data: {
+          student: { studentId: '160601', studentName: 'Lenore Ditmore' },
+          today: { status: 'NOT_STARTED', nextAction: 'Check In' },
+          week: { totalPoints: 10, totalHours: 0 },
+          summaries: { week: { totalPoints: 10, totalHours: 0 } },
+          recentShifts: []
+        }
+      })
+    });
+  });
+
+  // Mock admin auth
+  await page.route('**/macros/s/**?mode=admin_auth', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        token: 'test-token',
+        expiresAt: new Date(Date.now() + 3600000).toISOString()
+      })
+    });
+  });
+
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(600);
 }
@@ -87,77 +133,52 @@ test('4. Primary action button appears after student loads', async ({ page }) =>
 });
 
 // ────────────────────────────────────────────────
-// 5. CHECKOUT NOT BLOCKED BY GPS (mocked CHECKED_IN)
+// 5. CHECKOUT REQUIRES GPS (standardized policy)
 // ────────────────────────────────────────────────
-test('5. Checkout button enabled for CHECKED_IN student (no GPS block)', async ({ page }) => {
-  // Verify the checkout fix via direct state injection
-  // (Google Apps Script is cross-origin and not interceptable via route in headless Chromium)
+test('5. Checkout button requires GPS verification', async ({ page }) => {
   await loadApp(page);
   await loadStudent(page);
 
-  // Directly set student state to CHECKED_IN via JavaScript and re-render
-  const couldSetState = await page.evaluate(() => {
-    try {
-      // Find the exported state and force CHECKED_IN status
-      if (typeof window.__internState !== 'undefined') {
-        window.__internState.student.dashboard = {
-          today: {
-            status: 'CHECKED_IN',
-            site: 'Moss Bros - Colton',
-            checkInTime: '08:00 AM',
-            checkOutTime: null,
-            hoursWorked: null,
-            nextEligibleCheckoutAt: null
-          },
-          week: { totalPoints: 50, totalHours: 20, shifts: [] },
-          month: { totalPoints: 200, totalHours: 80 },
-          overall: { totalPoints: 500, totalHours: 200 }
-        };
-        return true;
-      }
-      return false;
-    } catch (e) {
-      return false;
+  // Mock a CHECKED_IN state
+  await page.evaluate(() => {
+    if (typeof window.__internState !== 'undefined') {
+      window.__internState.student.dashboard = {
+        today: {
+          status: 'CHECKED_IN',
+          site: 'Alliance Diesel',
+          checkInTime: '08:00 AM'
+        },
+        week: { totalPoints: 10, totalHours: 0 }
+      };
+      // Mock NO GPS
+      window.__internState.student.currentPos = null;
+      window.__internState.student.selectedSite = null;
+      
+      if (typeof window.__internRender === 'function') window.__internRender();
     }
   });
 
-  if (couldSetState) {
-    // Trigger re-render if possible
-    await page.evaluate(() => {
-      if (typeof window.__internRender === 'function') window.__internRender();
-    });
-    await page.waitForTimeout(300);
-    console.log('State injected, checking button...');
-  }
+  await page.waitForTimeout(300);
 
-  // Verify the LOGIC: the checkout button should NOT check GPS
-  // Test by inspecting the actual code to confirm the fix
-  const hasCheckoutFix = await page.evaluate(() => {
-    // Check if the primaryActionButton is rendered correctly
-    const btn = document.getElementById('primaryActionButton');
-    const label = document.getElementById('primaryActionLabel');
-    return {
-      buttonExists: !!btn,
-      labelExists: !!label,
-      currentLabel: label ? label.textContent : null
-    };
+  // Button should be disabled if no GPS
+  const actionBtn = page.locator('#primaryActionButton');
+  const isDisabled = await actionBtn.isDisabled();
+  console.log('Action button disabled without GPS:', isDisabled);
+  expect(isDisabled).toBe(true);
+
+  // Now mock GPS
+  await page.evaluate(() => {
+    window.__internState.student.name = 'Lenore Ditmore'; // Ensure name is set
+    window.__internState.student.loading = false; // Ensure loading is false
+    window.__internState.student.currentPos = { lat: 33.7681, lng: -116.9679 };
+    window.__internState.student.selectedSite = { name: 'Alliance Diesel' };
+    if (typeof window.__internRender === 'function') window.__internRender();
   });
 
-  expect(hasCheckoutFix.buttonExists).toBe(true);
-  expect(hasCheckoutFix.labelExists).toBe(true);
-  console.log(`Button state: "${hasCheckoutFix.currentLabel}"`);
-
-  // The key checkout fix test: verify the renderClockView code path
-  // doesn't block checkout for CHECKED_IN when GPS is absent
-  const fixVerified = await page.evaluate(() => {
-    // Directly check the button is not permanently disabled by GPS
-    const btn = document.getElementById('primaryActionButton');
-    // In our fix: checkout should only check hasStudent && !loading, NOT selectedSite
-    // We verify this by checking the code loaded correctly
-    return btn !== null;
-  });
-  expect(fixVerified).toBe(true);
-  console.log('✅ Checkout fix verified: button exists and GPS is not blocking checkout');
+  await page.waitForTimeout(300);
+  const isEnabled = await actionBtn.isEnabled();
+  console.log('Action button enabled with GPS:', isEnabled);
+  expect(isEnabled).toBe(true);
 });
 
 // ────────────────────────────────────────────────

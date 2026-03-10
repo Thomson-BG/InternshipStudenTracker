@@ -6,10 +6,12 @@ const CONFIG = {
   minMinutesBetweenInOut: 60,
   adminSessionHours: 8,
   cacheTtlSeconds: 60,
+  cacheValueMaxBytes: 95 * 1024,
   logsSheetName: "Logs",
   shiftsSheetName: "Shifts",
   pointsSheetName: "Points",
   auditSheetName: "Audit",
+  rosterSheetName: "Roster",
   adminPasswordHash: "79f0da1b920dade97eb4e9e02df79a606c265d69349a600a65c0d4e289feaa44"
 };
 
@@ -54,6 +56,12 @@ const POINT_HEADERS = [
   "lastUpdated"
 ];
 
+const ROSTER_HEADERS = [
+  "studentId",
+  "studentName",
+  "status"
+];
+
 const AUDIT_HEADERS = [
   "timestampUtc",
   "localDate",
@@ -67,25 +75,6 @@ const AUDIT_HEADERS = [
   "lng",
   "metadata"
 ];
-
-const ACTIVE_STUDENTS = {
-  "131923": "Jordan Belvin",
-  "168115": "Jonah Chavez",
-  "131523": "Adrian Delgado Hernandez",
-  "160601": "Lenore Ditmore",
-  "132819": "Scarlet Grady",
-  "126607": "Adrian Herrera",
-  "132120": "Ethan Little",
-  "131352": "Diego Ochoa",
-  "159660": "Azriel Perez",
-  "133569": "Porter Preston",
-  "160166": "Maximus Robles",
-  "131356": "Adrian Rodriguez Valdes",
-  "155404": "Carlos Salgado",
-  "132483": "James Windham",
-  "125814": "Zacharias Bramhall",
-  "010101": "Mr. Thomson"
-};
 
 const RESPONSE_CODES = {
   recorded: "RECORDED",
@@ -129,13 +118,19 @@ function doGet(e) {
     }
 
     if (mode === "logs") {
-      const derivedState = ensureDerivedSheetsFresh_(context);
-      return jsonResponse_({ ok: true, data: derivedState.logs });
+      const freshness = ensureDerivedSheetsFresh_(context);
+      const materialized = buildMaterializedState_(context, freshness.derivedState, {
+        includeLogs: true
+      });
+      return jsonResponse_({ ok: true, data: materialized.logs });
     }
 
     if (mode === "points") {
-      const derivedState = ensureDerivedSheetsFresh_(context);
-      return jsonResponse_({ ok: true, data: derivedState.points });
+      const freshness = ensureDerivedSheetsFresh_(context);
+      const materialized = buildMaterializedState_(context, freshness.derivedState, {
+        includePoints: true
+      });
+      return jsonResponse_({ ok: true, data: materialized.points });
     }
 
     if (mode === "student_dashboard") {
@@ -145,17 +140,25 @@ function doGet(e) {
         return errorResponse_(RESPONSE_CODES.missingField, "Missing required field: studentId");
       }
 
-      const derivedState = ensureDerivedSheetsFresh_(context);
-      const dashboard = getStudentDashboardPayload_(derivedState, studentId, range);
+      const freshness = ensureDerivedSheetsFresh_(context);
+      const dashboard = getCachedPayload_("student_dashboard", [studentId, range], function () {
+        const materialized = buildMaterializedState_(context, freshness.derivedState, {
+          includePoints: true
+        });
+        return getStudentDashboardPayload_(materialized, studentId, range);
+      });
       return jsonResponse_({ ok: true, data: dashboard });
     }
 
     if (mode === "admin_dashboard") {
       const range = normalizeRange_(e && e.parameter && e.parameter.range);
       const site = normalizeSite_(e && e.parameter && e.parameter.site);
-      const derivedState = ensureDerivedSheetsFresh_(context);
+      const freshness = ensureDerivedSheetsFresh_(context);
       const payload = getCachedPayload_("admin_dashboard", [range, site], function () {
-        return getAdminDashboardPayload_(derivedState, range, site);
+        const materialized = buildMaterializedState_(context, freshness.derivedState, {
+          includeAudits: true
+        });
+        return getAdminDashboardPayload_(materialized, range, site);
       });
       return jsonResponse_({ ok: true, data: payload });
     }
@@ -165,11 +168,20 @@ function doGet(e) {
       const range = normalizeRange_(e && e.parameter && e.parameter.range);
       const site = normalizeSite_(e && e.parameter && e.parameter.site);
       const studentId = stringify_(e && e.parameter && e.parameter.studentId);
-      const derivedState = ensureDerivedSheetsFresh_(context);
+      const freshness = ensureDerivedSheetsFresh_(context);
       const payload = getCachedPayload_("report_data", [type, range, site, studentId], function () {
-        return getReportPayload_(derivedState, type, range, site, studentId);
+        const materialized = buildMaterializedState_(context, freshness.derivedState, {
+          includeAudits: type === "cohort",
+          includePoints: type === "student"
+        });
+        return getReportPayload_(materialized, type, range, site, studentId);
       });
       return jsonResponse_({ ok: true, data: payload });
+    }
+
+    if (mode === "get_roster") {
+      const roster = getActiveStudentsFromSheet_(context);
+      return jsonResponse_({ ok: true, data: roster });
     }
 
     return errorResponse_(RESPONSE_CODES.invalidMode, "Unsupported mode: " + mode);
@@ -276,9 +288,10 @@ function handleAttendancePost_(e) {
       return errorResponse_(validationError.code, validationError.message, validationError.extra);
     }
 
+    const roster = getActiveStudentsFromSheet_(context);
     const studentId = stringify_(payload.studentId);
-    const studentName = ACTIVE_STUDENTS[studentId] || stringify_(payload.studentName);
-    if (!ACTIVE_STUDENTS[studentId]) {
+    const studentName = roster[studentId] || stringify_(payload.studentName);
+    if (!roster[studentId]) {
       const unknownError = {
         code: RESPONSE_CODES.unknownStudent,
         message: "Student ID is not recognized."
@@ -353,8 +366,11 @@ function handleAttendancePost_(e) {
       source
     ]);
 
-    const derivedState = ensureDerivedSheetsFresh_(context, { force: true });
-    const pointsRow = findPointRow_(derivedState.points, studentId);
+    const freshness = ensureDerivedSheetsFresh_(context, { force: true });
+    const materialized = buildMaterializedState_(context, freshness.derivedState, {
+      includePoints: true
+    });
+    const pointsRow = findPointRow_(materialized.points, studentId);
     const pointsDelta = localDate >= CONFIG.goLiveDate ? CONFIG.pointsPerAction : 0;
 
     return jsonResponse_({
@@ -387,19 +403,70 @@ function handleAttendancePost_(e) {
   }
 }
 
+function getActiveStudentsFromSheet_(context) {
+  seedRosterIfEmpty_(context.rosterSheet);
+  const values = context.rosterSheet.getDataRange().getValues();
+  const index = buildHeaderIndex_(values[0].map(normalizeHeaderCell_));
+  const roster = {};
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const id = normalizeStudentId_(getCellByHeader_(row, index, "studentId"));
+    const name = stringify_(getCellByHeader_(row, index, "studentName"));
+    const status = stringify_(getCellByHeader_(row, index, "status")).toLowerCase();
+
+    if (id && name && status !== "inactive") {
+      roster[id] = name;
+    }
+  }
+  return roster;
+}
+
+function seedRosterIfEmpty_(rosterSheet) {
+  if (rosterSheet.getLastRow() >= 2) {
+    return;
+  }
+
+  const students = {
+    "131923": "Jordan Belvin",
+    "168115": "Jonah Chavez",
+    "131523": "Adrian Delgado Hernandez",
+    "160601": "Lenore Ditmore",
+    "132819": "Scarlet Grady",
+    "126607": "Adrian Herrera",
+    "132120": "Ethan Little",
+    "131352": "Diego Ochoa",
+    "159660": "Azriel Perez",
+    "133569": "Porter Preston",
+    "160166": "Maximus Robles",
+    "131356": "Adrian Rodriguez Valdes",
+    "155404": "Carlos Salgado",
+    "132483": "James Windham",
+    "125814": "Zacharias Bramhall",
+    "010101": "Mr. Thomson"
+  };
+
+  const rows = Object.keys(students).map(function (id) {
+    return [id, students[id], "active"];
+  });
+  rosterSheet.getRange(2, 1, rows.length, 3).setValues(rows);
+}
+
 function ensureSchema_() {
   const spreadsheet = SpreadsheetApp.openById(CONFIG.spreadsheetId);
   const logsSheet = ensureLogsSheet_(spreadsheet);
   const shiftsSheet = ensureSheetWithHeaders_(spreadsheet, CONFIG.shiftsSheetName, SHIFT_HEADERS);
   const pointsSheet = ensureSheetWithHeaders_(spreadsheet, CONFIG.pointsSheetName, POINT_HEADERS);
   const auditSheet = ensureSheetWithHeaders_(spreadsheet, CONFIG.auditSheetName, AUDIT_HEADERS);
+  const rosterSheet = ensureSheetWithHeaders_(spreadsheet, CONFIG.rosterSheetName, ROSTER_HEADERS);
 
   return {
     spreadsheet: spreadsheet,
     logsSheet: logsSheet,
     shiftsSheet: shiftsSheet,
     pointsSheet: pointsSheet,
-    auditSheet: auditSheet
+    auditSheet: auditSheet,
+    rosterSheet: rosterSheet
   };
 }
 
@@ -463,31 +530,46 @@ function ensureSheetWithHeaders_(spreadsheet, sheetName, headers) {
 
 function ensureDerivedSheetsFresh_(context, options) {
   const baselines = getBaselineMap_(context.pointsSheet);
-  const fingerprint = computeDerivedFingerprint_(context.logsSheet, baselines);
+  const fingerprint = computeSourceSignature_(context.logsSheet, baselines);
   const scriptProperties = PropertiesService.getScriptProperties();
-  const priorFingerprint = scriptProperties.getProperty("DERIVED_FINGERPRINT") || "";
+  const priorFingerprint = scriptProperties.getProperty("DERIVED_SOURCE_SIGNATURE") || "";
   const shouldRebuild = Boolean(options && options.force) || fingerprint !== priorFingerprint;
 
   if (shouldRebuild) {
     const logs = listLogRecords_(context.logsSheet);
     const audits = listAuditRecords_(context.auditSheet);
-    const derivedState = buildDerivedState_(logs, audits, baselines);
+    const roster = getActiveStudentsFromSheet_(context);
+    const derivedState = buildDerivedState_(logs, audits, baselines, roster);
     writeSheetRows_(context.shiftsSheet, SHIFT_HEADERS, derivedState.shiftRows);
     writeSheetRows_(context.pointsSheet, POINT_HEADERS, derivedState.pointRows);
-    scriptProperties.setProperty("DERIVED_FINGERPRINT", fingerprint);
+    scriptProperties.setProperty("DERIVED_SOURCE_SIGNATURE", fingerprint);
     scriptProperties.setProperty("DATA_VERSION", String(new Date().getTime()));
-    return buildMaterializedState_(context, derivedState, logs, audits);
+    return {
+      derivedState: derivedState
+    };
   }
 
-  return buildMaterializedState_(context, null, null, null);
+  return {
+    derivedState: null
+  };
 }
 
-function buildMaterializedState_(context, derivedState, providedLogs, providedAudits) {
-  const logs = providedLogs || listLogRecords_(context.logsSheet);
-  const audits = providedAudits || listAuditRecords_(context.auditSheet);
-  const shifts = derivedState ? derivedState.shifts : listShiftRecords_(context.shiftsSheet);
-  const points = derivedState ? derivedState.points : listPointRecords_(context.pointsSheet);
-  const studentDirectory = buildStudentDirectory_(logs, points);
+function buildMaterializedState_(context, derivedState, options) {
+  const includeLogs = Boolean(options && options.includeLogs);
+  const includeAudits = Boolean(options && options.includeAudits);
+  const includePoints = !options || options.includePoints !== false;
+  const logs = includeLogs
+    ? (derivedState && derivedState.logs ? derivedState.logs : listLogRecords_(context.logsSheet))
+    : [];
+  const audits = includeAudits
+    ? (derivedState && derivedState.audits ? derivedState.audits : listAuditRecords_(context.auditSheet))
+    : [];
+  const shifts = derivedState && derivedState.shifts ? derivedState.shifts : listShiftRecords_(context.shiftsSheet);
+  const points = includePoints
+    ? (derivedState && derivedState.points ? derivedState.points : listPointRecords_(context.pointsSheet))
+    : [];
+  const roster = getActiveStudentsFromSheet_(context);
+  const studentDirectory = buildStudentDirectory_(logs, points, shifts, roster);
 
   return {
     logs: logs,
@@ -499,7 +581,7 @@ function buildMaterializedState_(context, derivedState, providedLogs, providedAu
   };
 }
 
-function buildDerivedState_(logs, audits, baselineMap) {
+function buildDerivedState_(logs, audits, baselineMap, roster) {
   const grouped = {};
   logs.forEach(function (event) {
     const key = event.studentId + "::" + event.localDate;
@@ -511,7 +593,7 @@ function buildDerivedState_(logs, audits, baselineMap) {
 
   const shiftRecords = [];
   Object.keys(grouped).sort().forEach(function (key) {
-    const shift = deriveShiftForDay_(grouped[key]);
+    const shift = deriveShiftForDay_(grouped[key], roster);
     if (shift) {
       shiftRecords.push(shift);
     }
@@ -527,10 +609,11 @@ function buildDerivedState_(logs, audits, baselineMap) {
     return 0;
   });
 
-  const studentDirectory = buildStudentDirectory_(logs, null);
+  const studentDirectory = buildStudentDirectory_(logs, null, null, roster);
   const pointRecords = buildPointRecords_(shiftRecords, baselineMap, studentDirectory);
 
   return {
+    logs: logs,
     shifts: shiftRecords,
     shiftRows: shiftRecords.map(serializeShiftRow_),
     points: pointRecords,
@@ -540,7 +623,7 @@ function buildDerivedState_(logs, audits, baselineMap) {
   };
 }
 
-function deriveShiftForDay_(events) {
+function deriveShiftForDay_(events, roster) {
   if (!events || !events.length) {
     return null;
   }
@@ -588,7 +671,7 @@ function deriveShiftForDay_(events) {
 
   const localDate = first.localDate;
   const studentId = first.studentId;
-  const studentName = first.studentName || ACTIVE_STUDENTS[studentId] || studentId;
+  const studentName = first.studentName || (roster ? roster[studentId] : studentId);
   const site = firstCheckIn ? firstCheckIn.site : first.site;
   const eligibleForPoints = localDate >= CONFIG.goLiveDate;
 
@@ -1313,11 +1396,13 @@ function filterAuditTrailForRange_(audits, range) {
   });
 }
 
-function buildStudentDirectory_(logs, points) {
+function buildStudentDirectory_(logs, points, shifts, roster) {
   const directory = {};
-  Object.keys(ACTIVE_STUDENTS).forEach(function (studentId) {
-    directory[studentId] = ACTIVE_STUDENTS[studentId];
-  });
+  if (roster) {
+    Object.keys(roster).forEach(function (studentId) {
+      directory[studentId] = roster[studentId];
+    });
+  }
 
   (logs || []).forEach(function (log) {
     if (log.studentId) {
@@ -1326,6 +1411,12 @@ function buildStudentDirectory_(logs, points) {
   });
 
   (points || []).forEach(function (row) {
+    if (row.studentId) {
+      directory[row.studentId] = row.studentName || directory[row.studentId] || row.studentId;
+    }
+  });
+
+  (shifts || []).forEach(function (row) {
     if (row.studentId) {
       directory[row.studentId] = row.studentName || directory[row.studentId] || row.studentId;
     }
@@ -1361,30 +1452,32 @@ function listLogRecords_(logsSheet) {
 
   for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
     const row = values[rowIndex];
-    const timestampRaw = getCellByHeader_(row, index, "timestampUtc");
+    const timestampRaw = getCellByHeader_(row, index, "timestampUtc") || row[0];
     if (!timestampRaw) {
       continue;
     }
 
     const timestamp = timestampRaw instanceof Date ? timestampRaw : new Date(timestampRaw);
-    const metadata = parseJsonSafe_(getCellByHeader_(row, index, "metadata"));
     const timestampUtc = timestamp instanceof Date && !isNaN(timestamp.getTime())
       ? timestamp.toISOString()
       : stringify_(timestampRaw);
+    const metadata = resolveLogMetadata_(row, index);
+    const coordinates = resolveLogCoordinates_(row, index);
+    const localDate = resolveLogLocalDate_(row, index, timestamp);
 
     records.push({
-      eventId: stringify_(getCellByHeader_(row, index, "eventId")) || ("legacy-" + rowIndex),
+      eventId: resolveLogEventId_(row, index, rowIndex),
       timestampUtc: timestampUtc,
       timestamp: timestamp instanceof Date && !isNaN(timestamp.getTime()) ? timestamp : new Date(timestampUtc),
-      localDate: stringify_(getCellByHeader_(row, index, "localDate")) || formatLocalDate_(timestamp),
-      studentId: stringify_(getCellByHeader_(row, index, "studentId")),
+      localDate: localDate,
+      studentId: normalizeStudentId_(getCellByHeader_(row, index, "studentId") || row[1]),
       studentName: stringify_(getCellByHeader_(row, index, "studentName")),
       action: stringify_(getCellByHeader_(row, index, "action")),
       site: stringify_(getCellByHeader_(row, index, "site")),
-      lat: getCellByHeader_(row, index, "lat"),
-      lng: getCellByHeader_(row, index, "lng"),
+      lat: coordinates.lat,
+      lng: coordinates.lng,
       metadata: metadata,
-      source: stringify_(getCellByHeader_(row, index, "source")) || stringify_(metadata.source) || "legacy"
+      source: resolveLogSource_(row, index, metadata)
     });
   }
 
@@ -1392,6 +1485,84 @@ function listLogRecords_(logsSheet) {
     return a.timestamp.getTime() - b.timestamp.getTime();
   });
   return records;
+}
+
+function resolveLogCoordinates_(row, index) {
+  const candidates = [
+    [getCellByHeader_(row, index, "lat"), getCellByHeader_(row, index, "lng")],
+    [row[7], row[8]],
+    [row[5], row[6]]
+  ];
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const lat = coerceCoordinate_(candidates[i][0], -90, 90);
+    const lng = coerceCoordinate_(candidates[i][1], -180, 180);
+    if (lat !== "" && lng !== "") {
+      return { lat: lat, lng: lng };
+    }
+  }
+
+  return { lat: "", lng: "" };
+}
+
+function resolveLogLocalDate_(row, index, timestamp) {
+  const candidates = [
+    getCellByHeader_(row, index, "localDate"),
+    row[7],
+    row[8]
+  ];
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const value = candidates[i];
+    if (value instanceof Date && !isNaN(value.getTime())) {
+      return formatLocalDate_(value);
+    }
+    const localDate = stringify_(value);
+    if (isLocalDateString_(localDate)) {
+      return localDate;
+    }
+  }
+
+  return formatLocalDate_(timestamp);
+}
+
+function resolveLogMetadata_(row, index) {
+  const metadataCandidates = [
+    getCellByHeader_(row, index, "metadata"),
+    row[8],
+    row[9]
+  ];
+
+  for (let i = 0; i < metadataCandidates.length; i += 1) {
+    const value = metadataCandidates[i];
+    if (!value) {
+      continue;
+    }
+    if (typeof value === "string" && value.charAt(0) === "{") {
+      return parseJsonSafe_(value);
+    }
+    if (looksLikeUserAgent_(value)) {
+      return { userAgent: stringify_(value) };
+    }
+  }
+
+  return {};
+}
+
+function resolveLogEventId_(row, index, rowIndex) {
+  const explicitEventId = stringify_(getCellByHeader_(row, index, "eventId"));
+  if (explicitEventId && !looksLikeUserAgent_(explicitEventId)) {
+    return explicitEventId;
+  }
+  return "legacy-" + rowIndex;
+}
+
+function resolveLogSource_(row, index, metadata) {
+  const explicitSource = stringify_(getCellByHeader_(row, index, "source") || row[10]);
+  if (explicitSource && !looksLikeUserAgent_(explicitSource)) {
+    return explicitSource;
+  }
+  return stringify_(metadata.source) || "legacy";
 }
 
 function listShiftRecords_(shiftsSheet) {
@@ -1494,15 +1665,17 @@ function getBaselineMap_(pointsSheet) {
   return baselineMap;
 }
 
-function computeDerivedFingerprint_(logsSheet, baselineMap) {
-  const values = logsSheet.getDataRange().getDisplayValues();
-  const flattenedLogs = values.map(function (row) {
-    return row.join("|");
-  }).join("\n");
+function computeSourceSignature_(logsSheet, baselineMap) {
+  const lastRow = logsSheet.getLastRow();
+  const lastColumn = Math.min(logsSheet.getLastColumn(), LOG_HEADERS.length);
+  let lastRowSignature = "";
+  if (lastRow >= 2 && lastColumn > 0) {
+    lastRowSignature = logsSheet.getRange(lastRow, 1, 1, lastColumn).getDisplayValues()[0].join("|");
+  }
   const baselineRows = Object.keys(baselineMap).sort().map(function (studentId) {
     return studentId + ":" + baselineMap[studentId];
   }).join("|");
-  return sha256Hex_(flattenedLogs + "\n---\n" + baselineRows);
+  return sha256Hex_([String(lastRow), String(lastColumn), lastRowSignature, baselineRows].join("\n---\n"));
 }
 
 function writeSheetRows_(sheet, headers, rows) {
@@ -1611,8 +1784,23 @@ function getCachedPayload_(namespace, keyParts, producer) {
   }
 
   const payload = producer();
-  cache.put(cacheKey, JSON.stringify(payload), CONFIG.cacheTtlSeconds);
+  cachePayloadSafely_(cache, cacheKey, payload);
   return payload;
+}
+
+function cachePayloadSafely_(cache, cacheKey, payload) {
+  const serialized = JSON.stringify(payload);
+  const byteLength = Utilities.newBlob(serialized).getBytes().length;
+  if (byteLength > CONFIG.cacheValueMaxBytes) {
+    Logger.log("Skipping cache write for %s because payload is %s bytes.", cacheKey, byteLength);
+    return;
+  }
+
+  try {
+    cache.put(cacheKey, serialized, CONFIG.cacheTtlSeconds);
+  } catch (err) {
+    Logger.log("Cache write skipped for %s: %s", cacheKey, err.message);
+  }
 }
 
 function validateAttendancePayload_(payload) {
@@ -1849,6 +2037,37 @@ function normalizeHeaderCell_(value) {
 
 function formatLocalDate_(dateObj) {
   return Utilities.formatDate(dateObj, CONFIG.timezone, "yyyy-MM-dd");
+}
+
+function normalizeStudentId_(value) {
+  const studentId = stringify_(value);
+  return /^\d+$/.test(studentId) ? studentId.padStart(6, "0") : studentId;
+}
+
+function isLocalDateString_(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(stringify_(value));
+}
+
+function coerceCoordinate_(value, min, max) {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue < min || numberValue > max) {
+    return "";
+  }
+  return numberValue;
+}
+
+function looksLikeUserAgent_(value) {
+  const text = stringify_(value);
+  return Boolean(text) && (
+    text.indexOf("Mozilla/") === 0 ||
+    text.indexOf("AppleWebKit/") >= 0 ||
+    text.indexOf("Chrome/") >= 0 ||
+    text.indexOf("Safari/") >= 0 ||
+    text.indexOf("Mobile/") >= 0
+  );
 }
 
 function coerceNumber_(value) {

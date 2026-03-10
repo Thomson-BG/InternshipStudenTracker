@@ -13,6 +13,7 @@ const persistedTheme = localStorage.getItem(THEME_KEY);
 export const state = {
   theme: persistedTheme || "dark",
   currentView: "clock",
+  roster: {},
   localHistory: readJsonStorage(localStorage, LOCAL_HISTORY_KEY, []),
   student: {
     id: "",

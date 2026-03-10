@@ -1,13 +1,12 @@
 import {
   ADMIN_SESSION_KEY,
   LOCAL_HISTORY_KEY,
-  STUDENT_DB,
   STUDENT_LOOKUP_DEBOUNCE_MS,
   SITES,
   ALLOWED_RADIUS_METERS,
   THEME_KEY
 } from "./config.js";
-import { adminAuth, fetchAdminDashboard, fetchReportData, fetchStudentDashboard, submitAttendance } from "./api.js";
+import { adminAuth, fetchAdminDashboard, fetchReportData, fetchRoster, fetchStudentDashboard, submitAttendance } from "./api.js";
 import { renderAdminCharts, renderDetailCharts } from "./charts.js";
 import { downloadReportPdf, openBrowserPrint, renderReportMarkup } from "./reports.js";
 import { restoreAdminSession, state } from "./state.js";
@@ -105,7 +104,7 @@ const dom = {
 let locationWatchId = null;
 let reportContext = null;
 
-function init() {
+async function init() {
   applyTheme();
   restoreAdminSession();
   bindEvents();
@@ -115,6 +114,14 @@ function init() {
   renderProgressView();
   renderAdminState();
   startLocationWatch();
+
+  try {
+    const response = await fetchRoster();
+    state.roster = response.data || {};
+  } catch (error) {
+    console.error("Failed to fetch roster:", error);
+  }
+
   if (state.admin.token) {
     loadAdminDashboard();
   }
@@ -228,6 +235,20 @@ function bindEvents() {
         armStudentSessionTimeout();
       }
     }, { passive: true });
+  });
+
+  // Handle visibility change (backgrounding on mobile)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      // If hidden, wait a short grace period then clear if still hidden
+      setTimeout(() => {
+        if (document.visibilityState === "hidden" && state.student.id) {
+          clearStudentSession("Session cleared for privacy.");
+        }
+      }, 10000); // 10s grace
+    } else if (state.student.id) {
+      armStudentSessionTimeout();
+    }
   });
 }
 
@@ -343,7 +364,7 @@ function handleStudentLookup() {
     return;
   }
 
-  const studentName = STUDENT_DB[studentId];
+  const studentName = state.roster[studentId];
   if (!studentName) {
     abortStudentDashboardRequest();
     clearStudentPrefetch();
@@ -1115,7 +1136,7 @@ function clearStudentSession(message, options = {}) {
     dom.studentIdInput.value = "";
   }
   state.student.id = preserveInput ? dom.studentIdInput.value.trim() : "";
-  state.student.name = preserveInput && STUDENT_DB[state.student.id] ? STUDENT_DB[state.student.id] : "";
+  state.student.name = preserveInput && state.roster[state.student.id] ? state.roster[state.student.id] : "";
   state.student.loading = false;
   state.student.dashboard = null;
   state.student.dashboardCache = {};
@@ -1184,7 +1205,7 @@ function renderAdminState() {
   }
 }
 
-async function loadAdminDashboard() {
+async function loadAdminDashboard(retries = 3) {
   if (!state.admin.token) {
     renderAdminState();
     return;
@@ -1209,6 +1230,13 @@ async function loadAdminDashboard() {
       showToast("Admin session expired. Sign in again.", "danger");
       return;
     }
+    
+    if (retries > 0) {
+      console.warn(`Admin dashboard load failed. Retrying... (${retries} left)`);
+      setTimeout(() => loadAdminDashboard(retries - 1), 1000);
+      return;
+    }
+
     showToast(error.message || "Unable to load admin dashboard.", "danger");
   }
 }
@@ -1542,3 +1570,13 @@ window.addEventListener("beforeunload", () => {
 });
 
 init();
+
+// Testing hooks
+if (typeof window !== "undefined") {
+  window.__internState = state;
+  window.__internRender = () => {
+    renderClockView();
+    renderProgressView();
+    renderAdminState();
+  };
+}

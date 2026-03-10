@@ -3,7 +3,7 @@ export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3GBhNT
 export const API_ENDPOINTS = {
   submit: APPS_SCRIPT_URL,
   adminAuth: `${APPS_SCRIPT_URL}?mode=admin_auth`,
-  studentDashboard: (studentId, range = "overall") =>
+  studentDashboard: (studentId, range = "week") =>
     `${APPS_SCRIPT_URL}?mode=student_dashboard&studentId=${encodeURIComponent(studentId)}&range=${encodeURIComponent(range)}`,
   adminDashboard: (token, range = "overall", site = "all") =>
     `${APPS_SCRIPT_URL}?mode=admin_dashboard&token=${encodeURIComponent(token)}&range=${encodeURIComponent(range)}&site=${encodeURIComponent(site)}`,
@@ -21,11 +21,14 @@ export const API_ENDPOINTS = {
     return `${APPS_SCRIPT_URL}?${parts.join("&")}`;
   },
   logs: (token) => `${APPS_SCRIPT_URL}?mode=logs&token=${encodeURIComponent(token)}`,
-  points: (token) => `${APPS_SCRIPT_URL}?mode=points&token=${encodeURIComponent(token)}`
+  points: (token) => `${APPS_SCRIPT_URL}?mode=points&token=${encodeURIComponent(token)}`,
+  getRoster: () => `${APPS_SCRIPT_URL}?mode=get_roster`
 };
 
 export const ACTION_COOLDOWN_MS = 60 * 60 * 1000;
 export const STUDENT_SESSION_TIMEOUT_MS = 90 * 1000;
+export const STUDENT_LOOKUP_DEBOUNCE_MS = 120;
+export const STUDENT_DASHBOARD_PREFETCH_DELAY_MS = 180;
 export const LOCAL_HISTORY_KEY = "intern-track-local-history";
 export const ADMIN_SESSION_KEY = "intern-track-admin-session";
 export const THEME_KEY = "intern-track-theme";
@@ -46,30 +49,11 @@ export const SITES = [
   { name: "Hemet High Bulldog Garage", lat: 33.728014603500704, lng: -116.93369905999955 }
 ];
 
-export const STUDENT_DB = {
-  "131923": "Jordan Belvin",
-  "168115": "Jonah Chavez",
-  "131523": "Adrian Delgado Hernandez",
-  "160601": "Lenore Ditmore",
-  "132819": "Scarlet Grady",
-  "126607": "Adrian Herrera",
-  "132120": "Ethan Little",
-  "131352": "Diego Ochoa",
-  "159660": "Azriel Perez",
-  "133569": "Porter Preston",
-  "160166": "Maximus Robles",
-  "131356": "Adrian Rodriguez Valdes",
-  "155404": "Carlos Salgado",
-  "132483": "James Windham",
-  "125814": "Zacharias Bramhall",
-  "010101": "Mr. Thomson"
-};
-
 export const CHART_COLORS = {
-  brand: "#FF3B30",
-  brandSoft: "rgba(255, 59, 48, 0.20)",
-  accent: "#FF9F0A",
-  accentSoft: "rgba(255, 159, 10, 0.20)",
+  brand: "#0A84FF",
+  brandSoft: "rgba(10, 132, 255, 0.20)",
+  accent: "#30D158",
+  accentSoft: "rgba(48, 209, 88, 0.18)",
   success: "#30D158",
   info: "#64D2FF",
   infoSoft: "rgba(100, 210, 255, 0.20)",
