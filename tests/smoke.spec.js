@@ -3,7 +3,15 @@ const path = require("path");
 const { test, expect } = require("@playwright/test");
 
 const STUDENT_ID = "160601";
-const ADMIN_PASSWORD = process.env.PLAYWRIGHT_ADMIN_PASSWORD || "Bulldog!1";
+const ADMIN_PASSWORD = (() => {
+  if (!process.env.PLAYWRIGHT_ADMIN_PASSWORD) {
+    throw new Error(
+      'PLAYWRIGHT_ADMIN_PASSWORD environment variable is required to run tests. ' +
+      'Set it before running: export PLAYWRIGHT_ADMIN_PASSWORD="your_password"'
+    );
+  }
+  return process.env.PLAYWRIGHT_ADMIN_PASSWORD;
+})();
 const SMOKE_LABEL = (process.env.PLAYWRIGHT_SMOKE_LABEL || "smoke")
   .toLowerCase()
   .replace(/[^a-z0-9_-]+/g, "-");

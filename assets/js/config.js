@@ -1,4 +1,16 @@
-export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3GBhNTbtaOlSVBL6r9SJqXX1CuTgSNP0DOnp8jxH0zvTofzyZkmK_OWruVqq9Fbs/exec";
+// SECURITY: Use environment variable to avoid exposing Apps Script deployment ID in source
+// Set VITE_APPS_SCRIPT_URL in .env.production or deployment environment
+export const APPS_SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL || (
+  typeof window !== 'undefined' && window.APPS_SCRIPT_URL
+    ? window.APPS_SCRIPT_URL
+    : (() => {
+        throw new Error(
+          'VITE_APPS_SCRIPT_URL environment variable is not set. ' +
+          'Please set it in .env.production or your deployment environment.'
+        );
+      })()
+);
+export const GOOGLE_SHEET_ID = "1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY";
 
 export const API_ENDPOINTS = {
   submit: APPS_SCRIPT_URL,

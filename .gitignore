@@ -1,6 +1,40 @@
+# Dependencies
 node_modules/
+package-lock.json
+yarn.lock
+
+# Environment Variables (IMPORTANT: Never commit secrets)
+.env
+.env.local
+.env.production
+.env.*.local
+.env.test
+
+# Build & Test Output
+dist/
+build/
 playwright-report/
+playwright-results/
 test-results/
 output/
-dist/
+coverage/
+
+# IDE & Editor Configuration
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*~
+
+# OS Files
 .DS_Store
+Thumbs.db
+.AppleDouble
+
+# Deployment
+.vercel
+.vercelignore
+
+# Local Development
+.cache/
