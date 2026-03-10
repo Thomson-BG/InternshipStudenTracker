@@ -14,6 +14,7 @@ export const state = {
   theme: persistedTheme || "dark",
   currentView: "clock",
   roster: {},
+  rosterLoading: false,
   localHistory: readJsonStorage(localStorage, LOCAL_HISTORY_KEY, []),
   student: {
     id: "",

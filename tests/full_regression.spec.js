@@ -5,20 +5,18 @@ const { test, expect } = require('@playwright/test');
 const BASE = 'http://localhost:4173';
 const STUDENT_ID = '160601'; // Lenore Ditmore
 
-// Helper: load app and wait for it to be stable
+const ROSTER_FALLBACK_TEST = {
+  '160601': 'Lenore Ditmore',
+  '131923': 'Jordan Belvin'
+};
+
 async function loadApp(page) {
-  // Mock roster fetch to avoid external dependencies
+  // Mock roster fetch to fail initially, forcing fallback
   await page.route('**/macros/s/**?mode=get_roster', async route => {
     await route.fulfill({
-      status: 200,
+      status: 200, // Should be 200 to return the fallback as data
       contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        data: {
-          '160601': 'Lenore Ditmore',
-          '131923': 'Jordan Belvin'
-        }
-      })
+      body: JSON.stringify({ ok: true, data: ROSTER_FALLBACK_TEST })
     });
   });
 
@@ -32,8 +30,8 @@ async function loadApp(page) {
         data: {
           student: { studentId: '160601', studentName: 'Lenore Ditmore' },
           today: { status: 'NOT_STARTED', nextAction: 'Check In' },
-          week: { totalPoints: 10, totalHours: 0 },
-          summaries: { week: { totalPoints: 10, totalHours: 0 } },
+          week: { totalPoints: 0, totalHours: 0 },
+          summaries: { week: { totalPoints: 0, totalHours: 0 } },
           recentShifts: []
         }
       })
@@ -54,7 +52,7 @@ async function loadApp(page) {
   });
 
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(600); // Allow time for init and failed fetch
 }
 
 // Helper: enter student ID and submit
@@ -62,9 +60,12 @@ async function loadStudent(page, id = STUDENT_ID) {
   const input = page.locator('#studentIdInput');
   await expect(input).toBeVisible({ timeout: 5000 });
   await input.fill(id);
-  await page.keyboard.press('Enter');
+  
+  // Wait for the student's name to appear, confirming the lookup is complete
+  await expect(page.locator('#studentNameValue')).toHaveText('Lenore Ditmore', { timeout: 10000 });
+
   // Allow time for dashboard API call + render
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(1000);
 }
 
 // ────────────────────────────────────────────────

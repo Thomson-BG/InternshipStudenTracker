@@ -38,6 +38,25 @@ export const STATUS_FILTER_OPTIONS = ["all", "complete", "open", "exception"];
 
 export const ALLOWED_RADIUS_METERS = 91.44;
 
+export const ROSTER_FALLBACK = {
+  "131923": "Jordan Belvin",
+  "168115": "Jonah Chavez",
+  "131523": "Adrian Delgado Hernandez",
+  "160601": "Lenore Ditmore",
+  "132819": "Scarlet Grady",
+  "126607": "Adrian Herrera",
+  "132120": "Ethan Little",
+  "131352": "Diego Ochoa",
+  "159660": "Azriel Perez",
+  "133569": "Porter Preston",
+  "160166": "Maximus Robles",
+  "131356": "Adrian Rodriguez Valdes",
+  "155404": "Carlos Salgado",
+  "132483": "James Windham",
+  "125814": "Zacharias Bramhall",
+  "010101": "Mr. Thomson"
+};
+
 export const SITES = [
   { name: "Alliance Diesel", lat: 33.7681647078012, lng: -116.96797385328925 },
   { name: "Phils Auto Clinic", lat: 33.74851138217792, lng: -116.92004436101942 },

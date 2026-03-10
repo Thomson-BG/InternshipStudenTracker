@@ -115,11 +115,18 @@ async function init() {
   renderAdminState();
   startLocationWatch();
 
+  state.rosterLoading = true;
   try {
     const response = await fetchRoster();
     state.roster = response.data || {};
   } catch (error) {
-    console.error("Failed to fetch roster:", error);
+    console.error("Failed to fetch roster, using fallback:", error);
+    state.roster = ROSTER_FALLBACK;
+  } finally {
+    state.rosterLoading = false;
+    renderStudentIdentity();
+    renderClockView();
+    renderProgressView();
   }
 
   if (state.admin.token) {
@@ -355,55 +362,43 @@ function setView(view) {
 function handleStudentLookup() {
   const studentId = dom.studentIdInput.value.trim();
   if (studentId.length < 6) {
-    abortStudentDashboardRequest();
-    clearStudentPrefetch();
-    clearStudentSession(null, { preserveInput: true, preserveLocation: true });
-    renderStudentIdentity();
-    renderProgressView();
-    renderClockView();
+    if (state.student.id) {
+      clearStudentSession(null, { preserveInput: true, preserveLocation: true });
+    }
+    return;
+  }
+
+  // If roster is still loading, wait a bit and retry
+  if (state.rosterLoading) {
+    setTimeout(handleStudentLookup, 250);
     return;
   }
 
   const studentName = state.roster[studentId];
   if (!studentName) {
-    abortStudentDashboardRequest();
-    clearStudentPrefetch();
     state.student.id = studentId;
     state.student.name = "";
-    state.student.loading = false;
-    state.student.dashboard = null;
-    state.student.dashboardCache = {};
-    renderStudentLoadingState();
     renderStudentIdentity();
-    renderProgressView();
-    renderClockView();
     return;
   }
 
   const isSameStudent = state.student.id === studentId;
-  if (isSameStudent && state.student.dashboard && !state.student.loading) {
+  if (isSameStudent && state.student.dashboard) {
     armStudentSessionTimeout();
-    renderStudentIdentity();
-    renderClockView();
     return;
   }
 
-  if (!isSameStudent) {
-    abortStudentDashboardRequest();
-    clearStudentPrefetch();
-    state.student.dashboard = null;
-    state.student.dashboardCache = {};
-    state.student.range = "week";
-  }
-
+  // New student or first lookup
   state.student.id = studentId;
   state.student.name = studentName;
   state.student.loading = true;
+  state.student.dashboard = null;
+  state.student.dashboardCache = {};
+  
   renderStudentIdentity();
   renderStudentLoadingState();
   renderClockMessage("Loading student progress...", "info");
-  renderClockView();
-  renderProgressView();
+  
   armStudentSessionTimeout();
   loadStudentDashboard();
 }
