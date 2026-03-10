@@ -1,19 +1,17 @@
 import {
   ADMIN_SESSION_KEY,
   LOCAL_HISTORY_KEY,
-  RANGE_OPTIONS,
-  STATUS_FILTER_OPTIONS,
   STUDENT_DB,
+  STUDENT_LOOKUP_DEBOUNCE_MS,
   SITES,
   ALLOWED_RADIUS_METERS,
   THEME_KEY
 } from "./config.js";
 import { adminAuth, fetchAdminDashboard, fetchReportData, fetchStudentDashboard, submitAttendance } from "./api.js";
-import { renderAdminCharts, renderDetailCharts, renderStudentCharts } from "./charts.js";
+import { renderAdminCharts, renderDetailCharts } from "./charts.js";
 import { downloadReportPdf, openBrowserPrint, renderReportMarkup } from "./reports.js";
 import { restoreAdminSession, state } from "./state.js";
 import {
-  computeGaugeDash,
   debounce,
   downloadCsv,
   escapeHtml,
@@ -26,7 +24,6 @@ import {
   formatShortDate,
   formatTimeOnly,
   haversineMeters,
-  percentileLabel,
   round,
   statusTone,
   toRangeLabel,
@@ -45,12 +42,10 @@ const dom = {
     admin: document.getElementById("adminView")
   },
   studentIdInput: document.getElementById("studentIdInput"),
+  studentLookupLoader: document.getElementById("studentLookupLoader"),
+  studentLookupLoaderText: document.getElementById("studentLookupLoaderText"),
   studentNameValue: document.getElementById("studentNameValue"),
   studentNameCopy: document.getElementById("studentNameCopy"),
-  sidebarStudentName: document.getElementById("sidebarStudentName"),
-  sidebarStudentMeta: document.getElementById("sidebarStudentMeta"),
-  sidebarLocationStatus: document.getElementById("sidebarLocationStatus"),
-  sidebarLocationMeta: document.getElementById("sidebarLocationMeta"),
   studentSessionBadge: document.getElementById("studentSessionBadge"),
   locationStatusBanner: document.getElementById("locationStatusBanner"),
   siteSelectWrap: document.getElementById("siteSelectWrap"),
@@ -58,29 +53,21 @@ const dom = {
   checkInButton: document.getElementById("checkInButton"),
   checkOutButton: document.getElementById("checkOutButton"),
   clearStudentButton: document.getElementById("clearStudentButton"),
-  jumpToProgressButton: document.getElementById("jumpToProgressButton"),
+  primaryActionButton: document.getElementById("primaryActionButton"),
+  primaryActionLabel: document.getElementById("primaryActionLabel"),
+  heroStatusCard: document.getElementById("heroStatusCard"),
   clockMessage: document.getElementById("clockMessage"),
-  clockStatusBadge: document.getElementById("clockStatusBadge"),
   todayHeadline: document.getElementById("todayHeadline"),
   todayCopy: document.getElementById("todayCopy"),
   nextActionBadge: document.getElementById("nextActionBadge"),
   selectedSiteBadge: document.getElementById("selectedSiteBadge"),
-  todayPointsStat: document.getElementById("todayPointsStat"),
-  todayHoursStat: document.getElementById("todayHoursStat"),
-  clockQuickStats: document.getElementById("clockQuickStats"),
-  localHistoryList: document.getElementById("localHistoryList"),
   progressEmptyState: document.getElementById("progressEmptyState"),
+  progressLoadingState: document.getElementById("progressLoadingState"),
   progressContent: document.getElementById("progressContent"),
-  rangeButtons: Array.from(document.querySelectorAll("[data-range-button]")),
   progressStudentName: document.getElementById("progressStudentName"),
-  progressPercentileBadge: document.getElementById("progressPercentileBadge"),
-  progressRangeBadge: document.getElementById("progressRangeBadge"),
-  progressSummaryCards: document.getElementById("progressSummaryCards"),
-  gaugeGrid: document.getElementById("gaugeGrid"),
-  studentHeatmap: document.getElementById("studentHeatmap"),
-  studentHeatmapLegend: document.getElementById("studentHeatmapLegend"),
-  recentShiftsTableBody: document.getElementById("recentShiftsTableBody"),
-  studentExceptionsList: document.getElementById("studentExceptionsList"),
+  weekPointsStat: document.getElementById("weekPointsStat"),
+  weekHoursStat: document.getElementById("weekHoursStat"),
+  sevenDayHistoryList: document.getElementById("sevenDayHistoryList"),
   adminAuthBadge: document.getElementById("adminAuthBadge"),
   adminLoginState: document.getElementById("adminLoginState"),
   adminContent: document.getElementById("adminContent"),
@@ -100,6 +87,7 @@ const dom = {
   adminExceptionList: document.getElementById("adminExceptionList"),
   adminHeatmap: document.getElementById("adminHeatmap"),
   adminHeatmapLegend: document.getElementById("adminHeatmapLegend"),
+  adminAdvancedDetails: document.getElementById("adminAdvancedDetails"),
   auditTrailList: document.getElementById("auditTrailList"),
   detailDrawer: document.getElementById("studentDetailDrawer"),
   closeDetailDrawerButton: document.getElementById("closeDetailDrawerButton"),
@@ -121,7 +109,6 @@ function init() {
   applyTheme();
   restoreAdminSession();
   bindEvents();
-  renderLocalHistory();
   renderStudentIdentity();
   renderLocationSummary("Searching", "Waiting for device GPS.", "info");
   renderClockView();
@@ -134,25 +121,47 @@ function init() {
 }
 
 function bindEvents() {
-  dom.themeToggle.addEventListener("click", toggleTheme);
+  if (dom.themeToggle) {
+    dom.themeToggle.addEventListener("click", toggleTheme);
+  }
   dom.navButtons.forEach((button) => {
     button.addEventListener("click", () => setView(button.dataset.viewButton));
   });
-  dom.studentIdInput.addEventListener("input", debounce(handleStudentLookup, 200));
+  dom.studentIdInput.addEventListener("input", debounce(handleStudentLookup, STUDENT_LOOKUP_DEBOUNCE_MS));
   dom.siteSelect.addEventListener("change", handleManualSiteSelection);
   dom.checkInButton.addEventListener("click", () => handleAttendanceAction("Check In"));
   dom.checkOutButton.addEventListener("click", () => handleAttendanceAction("Check Out"));
+  if (dom.primaryActionButton) {
+    dom.primaryActionButton.addEventListener("click", () => {
+      const action = dom.primaryActionButton.dataset.currentAction;
+      if (action) {
+        handleAttendanceAction(action);
+      }
+    });
+  }
   dom.clearStudentButton.addEventListener("click", () => clearStudentSession("Student session reset."));
-  dom.jumpToProgressButton.addEventListener("click", () => {
-    if (!state.student.id) {
-      showToast("Load a student first.", "info");
-      return;
-    }
-    setView("progress");
-  });
-  dom.rangeButtons.forEach((button) => {
-    button.addEventListener("click", () => setStudentRange(button.dataset.rangeButton));
-  });
+
+  // Stats modal — Clock tab button
+  const statsBtn = document.getElementById("myStatsButton");
+  if (statsBtn) {
+    statsBtn.addEventListener("click", openStatsModal);
+  }
+  // Stats modal — My Week tab button
+  const progressStatsBtn = document.getElementById("progressStatsButton");
+  if (progressStatsBtn) {
+    progressStatsBtn.addEventListener("click", openStatsModal);
+  }
+  const statsModalClose = document.getElementById("statsModalClose");
+  if (statsModalClose) {
+    statsModalClose.addEventListener("click", closeStatsModal);
+  }
+  const statsModalOverlay = document.getElementById("statsModal");
+  if (statsModalOverlay) {
+    statsModalOverlay.addEventListener("click", (e) => {
+      if (e.target === statsModalOverlay) closeStatsModal();
+    });
+  }
+
   dom.adminLoginButton.addEventListener("click", handleAdminLogin);
   dom.adminPasswordInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
@@ -185,6 +194,14 @@ function bindEvents() {
   dom.adminPdfCohortButton.addEventListener("click", async () => {
     await openReport("cohort", { downloadPdfAfterOpen: true });
   });
+  if (dom.adminAdvancedDetails) {
+    dom.adminAdvancedDetails.addEventListener("toggle", () => {
+      if (dom.adminAdvancedDetails.open && state.admin.dashboard) {
+        renderHeatmap(dom.adminHeatmap, dom.adminHeatmapLegend, state.admin.dashboard.charts.heatmap || [], "activeStudents");
+        renderAdminCharts(state.admin.dashboard);
+      }
+    });
+  }
   dom.closeDetailDrawerButton.addEventListener("click", closeDetailDrawer);
   const drawerOverlay = document.getElementById("drawerOverlay");
   if (drawerOverlay) {
@@ -215,13 +232,18 @@ function bindEvents() {
 }
 
 function applyTheme() {
+  // Dark is the default — add theme-light class only when in light mode
   dom.body.classList.toggle("theme-light", state.theme === "light");
-  dom.themeIndicator.textContent = state.theme === "light" ? "Light" : "Dark";
+  dom.body.classList.remove("theme-dark"); // clean up legacy class if present
+  if (dom.themeIndicator) {
+    dom.themeIndicator.textContent = state.theme === "dark" ? "Dark" : "Light";
+  }
   const sunIcon = document.getElementById("themeIconSun");
   const moonIcon = document.getElementById("themeIconMoon");
   if (sunIcon && moonIcon) {
+    // Show sun (switch to light) when currently dark, moon (switch to dark) when currently light
     sunIcon.classList.toggle("is-hidden", state.theme === "light");
-    moonIcon.classList.toggle("is-hidden", state.theme !== "light");
+    moonIcon.classList.toggle("is-hidden", state.theme === "dark");
   }
 }
 
@@ -229,6 +251,52 @@ function toggleTheme() {
   state.theme = state.theme === "light" ? "dark" : "light";
   localStorage.setItem(THEME_KEY, state.theme);
   applyTheme();
+}
+
+function studentCacheKey(studentId, range) {
+  return `${studentId}:${range}`;
+}
+
+function abortStudentDashboardRequest() {
+  if (state.student.requestController) {
+    state.student.requestController.abort();
+    state.student.requestController = null;
+  }
+}
+
+function clearStudentPrefetch() {
+  clearTimeout(state.student.prefetchTimer);
+  state.student.prefetchTimer = null;
+}
+
+function renderStudentLoadingState() {
+  const loading = Boolean(state.student.loading);
+  if (dom.studentLookupLoader) {
+    dom.studentLookupLoader.classList.toggle("is-hidden", !loading);
+  }
+  if (dom.studentLookupLoaderText) {
+    dom.studentLookupLoaderText.textContent = state.student.name
+      ? `Loading ${state.student.name}'s progress...`
+      : "Loading student progress...";
+  }
+}
+
+function syncStudentDashboard(data, options = {}) {
+  if (!data || !data.student) {
+    return;
+  }
+  state.student.dashboard = data;
+  state.student.range = "week";
+  state.student.loading = false;
+  state.student.dashboardCache[studentCacheKey(data.student.studentId || state.student.id, "week")] = data;
+  renderStudentLoadingState();
+  renderStudentIdentity();
+  renderClockView();
+  renderProgressView();
+  updateStatsButton();
+  if (!options.silent) {
+    renderClockMessage("Student progress loaded.", "success");
+  }
 }
 
 function setView(view) {
@@ -249,15 +317,25 @@ function setView(view) {
   if (view === "clock") {
     dom.topbarSummary.textContent = "Use Student Clock for attendance. My Progress stays private to the active student.";
   } else if (view === "progress") {
-    dom.topbarSummary.textContent = "My Progress shows private points, hours, percentile, and benchmark standing for the active student only.";
+    dom.topbarSummary.textContent = "My Week shows the active student's weekly points, hours, and the last 7 days of attendance.";
   } else {
     dom.topbarSummary.textContent = "Admin Dashboard shows cohort analytics, exceptions, reports, and printable visuals tied to the Google Sheet backend.";
+    if (state.admin.dashboard) {
+      window.requestAnimationFrame(() => {
+        renderAdminCharts(state.admin.dashboard);
+        if (dom.adminAdvancedDetails?.open) {
+          renderHeatmap(dom.adminHeatmap, dom.adminHeatmapLegend, state.admin.dashboard.charts.heatmap || [], "activeStudents");
+        }
+      });
+    }
   }
 }
 
 function handleStudentLookup() {
   const studentId = dom.studentIdInput.value.trim();
   if (studentId.length < 6) {
+    abortStudentDashboardRequest();
+    clearStudentPrefetch();
     clearStudentSession(null, { preserveInput: true, preserveLocation: true });
     renderStudentIdentity();
     renderProgressView();
@@ -267,49 +345,118 @@ function handleStudentLookup() {
 
   const studentName = STUDENT_DB[studentId];
   if (!studentName) {
+    abortStudentDashboardRequest();
+    clearStudentPrefetch();
     state.student.id = studentId;
     state.student.name = "";
+    state.student.loading = false;
     state.student.dashboard = null;
+    state.student.dashboardCache = {};
+    renderStudentLoadingState();
     renderStudentIdentity();
     renderProgressView();
     renderClockView();
     return;
   }
 
-  if (state.student.id === studentId && state.student.dashboard) {
+  const isSameStudent = state.student.id === studentId;
+  if (isSameStudent && state.student.dashboard && !state.student.loading) {
     armStudentSessionTimeout();
     renderStudentIdentity();
     renderClockView();
     return;
   }
 
+  if (!isSameStudent) {
+    abortStudentDashboardRequest();
+    clearStudentPrefetch();
+    state.student.dashboard = null;
+    state.student.dashboardCache = {};
+    state.student.range = "week";
+  }
+
   state.student.id = studentId;
   state.student.name = studentName;
+  state.student.loading = true;
   renderStudentIdentity();
+  renderStudentLoadingState();
   renderClockMessage("Loading student progress...", "info");
+  renderClockView();
+  renderProgressView();
   armStudentSessionTimeout();
   loadStudentDashboard();
 }
 
-async function loadStudentDashboard(range = state.student.range) {
+async function loadStudentDashboard(range = state.student.range, options = {}) {
   if (!state.student.id || !state.student.name) {
     return;
   }
 
-  try {
-    const response = await fetchStudentDashboard(state.student.id, range);
-    if (state.student.id !== response.data.student.studentId) {
-      return;
+  range = "week";
+
+  const requestedStudentId = state.student.id;
+  const cacheStore = state.student.dashboardCache;
+  const background = Boolean(options.background);
+  const cacheKey = studentCacheKey(requestedStudentId, range);
+  const cached = options.force ? null : state.student.dashboardCache[cacheKey];
+
+  if (cached) {
+    if (!background) {
+      syncStudentDashboard(cached, {
+        silent: true
+      });
     }
-    state.student.dashboard = response.data;
-    state.student.range = response.data.currentRange;
+    return cached;
+  }
+
+  const requestId = background ? state.student.activeRequestId : state.student.activeRequestId + 1;
+  if (!background) {
+    state.student.activeRequestId = requestId;
+  }
+  let controller = null;
+
+  if (!background) {
+    abortStudentDashboardRequest();
+    state.student.loading = true;
+    renderStudentLoadingState();
     renderClockView();
     renderProgressView();
-    renderClockMessage("Student progress loaded.", "info");
+    renderClockMessage("Loading student progress...", "info");
+    controller = new AbortController();
+    state.student.requestController = controller;
+  }
+
+  try {
+    const response = await fetchStudentDashboard(requestedStudentId, range, controller ? { signal: controller.signal } : {});
+    const responseStudentId = response.data?.student?.studentId || response.data?.student?.id || requestedStudentId;
+    if (requestedStudentId !== responseStudentId || state.student.id !== requestedStudentId) {
+      return;
+    }
+    cacheStore[cacheKey] = response.data;
+    if (background) {
+      return response.data;
+    }
+    if (requestId !== state.student.activeRequestId) {
+      return;
+    }
+    syncStudentDashboard(response.data);
   } catch (error) {
-    state.student.dashboard = null;
-    renderProgressView();
-    renderClockMessage(error.message || "Unable to load student progress.", "danger");
+    if (error?.name === "AbortError" || error?.code === "REQUEST_ABORTED") {
+      return;
+    }
+    if (!background) {
+      state.student.loading = false;
+      renderStudentLoadingState();
+      if (!state.student.dashboard) {
+        renderProgressView();
+      }
+      renderClockView();
+      renderClockMessage(error.message || "Unable to load student progress.", "danger");
+    }
+  } finally {
+    if (!background && state.student.requestController === controller) {
+      state.student.requestController = null;
+    }
   }
 }
 
@@ -318,112 +465,103 @@ function renderStudentIdentity() {
   const hasId = Boolean(state.student.id);
   dom.studentNameValue.textContent = hasName ? state.student.name : hasId ? "ID not found" : "-";
   dom.studentNameCopy.textContent = hasName
-    ? `Student ID ${state.student.id}`
+    ? state.student.loading
+      ? `Student ID ${state.student.id} is loading latest progress.`
+      : `Student ID ${state.student.id}`
     : hasId
       ? "That ID is not in the active student roster."
       : "No student loaded.";
-  dom.sidebarStudentName.textContent = hasName ? state.student.name : "-";
-  dom.sidebarStudentMeta.textContent = hasName
-    ? `ID ${state.student.id} is the active private session.`
-    : hasId
-      ? "Unknown student ID."
-      : "Enter a 6-digit ID to load progress.";
-  dom.studentSessionBadge.textContent = hasName ? "Student loaded" : "No student loaded";
-  dom.studentSessionBadge.dataset.tone = hasName ? "success" : "info";
+  if (dom.progressStudentName && !state.student.dashboard) {
+    dom.progressStudentName.textContent = hasName ? state.student.name : "—";
+  }
 }
 
 function renderClockView() {
   const dashboard = state.student.dashboard;
-  const today = dashboard?.today;
+  const today = dashboard?.today || null;
+  const hasStudent = Boolean(state.student.id && state.student.name);
+  const hasVerifiedLocation = Boolean(state.student.currentPos && state.student.selectedSite);
+  const readyForAction = Boolean(hasStudent && hasVerifiedLocation && !state.student.loading);
 
-  if (!state.student.id || !state.student.name || !dashboard) {
-    dom.clockStatusBadge.textContent = state.student.name ? "Loading" : "Waiting for student";
-    dom.clockStatusBadge.dataset.tone = state.student.name ? "info" : "info";
-    dom.todayHeadline.textContent = state.student.name ? `Loading ${state.student.name}...` : "Ready to verify attendance";
-    dom.todayCopy.textContent = state.student.name
-      ? "Pulling current points, hours, and today's attendance status."
-      : "Enter a student ID and confirm location to unlock check-in and check-out.";
-    dom.nextActionBadge.textContent = "Next action: Check In";
+  dom.selectedSiteBadge.textContent = state.student.selectedSite ? state.student.selectedSite.name : "Site pending";
+  dom.selectedSiteBadge.dataset.tone = state.student.selectedSite ? "success" : "warning";
+
+  if (!hasStudent) {
+    dom.todayHeadline.textContent = "Ready to verify attendance";
+    dom.todayCopy.textContent = "Enter your student ID below to check in or out.";
+    dom.nextActionBadge.textContent = "Check In";
     dom.nextActionBadge.dataset.tone = "info";
-    dom.selectedSiteBadge.textContent = state.student.selectedSite ? `Site: ${state.student.selectedSite.name}` : "Site pending";
-    dom.selectedSiteBadge.dataset.tone = state.student.selectedSite ? "success" : "warning";
-    dom.todayPointsStat.textContent = "0 pts";
-    dom.todayHoursStat.textContent = "0 hrs";
-    dom.clockQuickStats.innerHTML = defaultClockQuickStatsMarkup();
+    setPrimaryActionState({
+      label: "Check In",
+      action: "Check In",
+      variant: "checkin",
+      disabled: true
+    });
     updateActionButtons();
     return;
   }
 
-  dom.clockStatusBadge.textContent = today?.status || "NOT_STARTED";
-  dom.clockStatusBadge.dataset.tone = statusTone(today?.status || "NOT_STARTED");
+  if (state.student.loading && !dashboard) {
+    dom.todayHeadline.textContent = `Loading ${state.student.name}…`;
+    dom.todayCopy.textContent = "Retrieving this week's attendance and status.";
+    dom.nextActionBadge.textContent = "Loading";
+    dom.nextActionBadge.dataset.tone = "info";
+    setPrimaryActionState({
+      label: "Loading…",
+      action: "",
+      variant: "checkin",
+      disabled: true
+    });
+    updateActionButtons();
+    return;
+  }
+
+  const todayStatus = normalizeTodayStatus(today);
   dom.todayHeadline.textContent = studentHeadline(today);
   dom.todayCopy.textContent = studentTodayCopy(today);
-  dom.nextActionBadge.textContent = `Next action: ${today?.nextAction || "Check In"}`;
-  dom.nextActionBadge.dataset.tone = statusTone(today?.status || "NOT_STARTED");
-  dom.selectedSiteBadge.textContent = state.student.selectedSite ? `Site: ${state.student.selectedSite.name}` : "Site pending";
-  dom.selectedSiteBadge.dataset.tone = state.student.selectedSite ? "success" : "warning";
-  dom.todayPointsStat.textContent = formatPoints(today?.pointsToday || 0);
-  dom.todayHoursStat.textContent = formatHours(today?.hoursToday || 0);
-  dom.clockQuickStats.innerHTML = quickStatsMarkup(dashboard);
+
+  if (todayStatus === "CHECKED_IN") {
+    dom.nextActionBadge.textContent = "Check Out";
+    dom.nextActionBadge.dataset.tone = "info";
+    const readyForCheckout = readyForAction;
+    setPrimaryActionState({
+      label: "Check Out",
+      action: "Check Out",
+      variant: "checkout",
+      disabled: !readyForCheckout
+    });
+  } else if (todayStatus === "COMPLETED") {
+    dom.nextActionBadge.textContent = "Done";
+    dom.nextActionBadge.dataset.tone = "success";
+    setPrimaryActionState({
+      label: "Done for today",
+      action: "",
+      variant: "done",
+      disabled: true
+    });
+  } else {
+    dom.nextActionBadge.textContent = "Check In";
+    dom.nextActionBadge.dataset.tone = todayStatus === "EXCEPTION" ? "danger" : "info";
+    setPrimaryActionState({
+      label: "Check In",
+      action: "Check In",
+      variant: "checkin",
+      disabled: !readyForAction
+    });
+  }
+
   updateActionButtons();
 }
 
-function defaultClockQuickStatsMarkup() {
-  return [
-    { label: "Overall Points", value: "0 pts", copy: "Load a student to see live totals." },
-    { label: "Overall Hours", value: "0 hrs", copy: "Derived from completed valid shifts." },
-    { label: "Points vs Top", value: "0%", copy: "Top student defines the 100% benchmark." },
-    { label: "Hours vs Top", value: "0%", copy: "Top logged hours define the 100% benchmark." }
-  ].map((card) => `
-    <div class="metric-card">
-      <div class="stat-label">${escapeHtml(card.label)}</div>
-      <div class="metric-value">${escapeHtml(card.value)}</div>
-      <div class="metric-copy">${escapeHtml(card.copy)}</div>
-    </div>
-  `).join("");
-}
-
-function quickStatsMarkup(dashboard) {
-  const overall = dashboard?.summaries?.overall || {};
-  return [
-    {
-      label: "Overall Points",
-      value: formatPoints(overall.points || 0),
-      copy: `${round(overall.completedShifts || 0)} completed shifts.`
-    },
-    {
-      label: "Overall Hours",
-      value: formatHours(overall.hours || 0),
-      copy: `${round(overall.openShifts || 0)} open shifts / ${round(overall.exceptionCount || 0)} exceptions.`
-    },
-    {
-      label: "Points vs Top",
-      value: formatPercent(overall.pointsPctOfTop || 0),
-      copy: `Gap: ${formatPoints(overall.gapToTopPoints || 0)}`
-    },
-    {
-      label: "Hours vs Top",
-      value: formatPercent(overall.hoursPctOfTop || 0),
-      copy: `Gap: ${formatHours(overall.gapToTopHours || 0)}`
-    }
-  ].map((card) => `
-    <div class="metric-card" data-tone="brand">
-      <div class="stat-label">${escapeHtml(card.label)}</div>
-      <div class="metric-value">${escapeHtml(card.value)}</div>
-      <div class="metric-copy">${escapeHtml(card.copy)}</div>
-    </div>
-  `).join("");
-}
-
 function studentHeadline(today) {
-  if (!today) return "Student ready";
-  if (today.status === "CHECKED_IN") {
-    return `Checked in at ${formatTimeOnly(today.checkInUtc)}`;
+  if (!today) return "Ready to verify attendance";
+  if (normalizeTodayStatus(today) === "CHECKED_IN") {
+    return `Checked in at ${today.checkInTime || formatTimeOnly(today.checkInUtc)}`;
   }
-  if (today.status === "COMPLETED") {
-    return `Shift completed at ${formatTimeOnly(today.checkOutUtc)}`;
+  if (normalizeTodayStatus(today) === "COMPLETED") {
+    return `Shift completed at ${today.checkOutTime || formatTimeOnly(today.checkOutUtc)}`;
   }
-  if (today.status === "EXCEPTION") {
+  if (normalizeTodayStatus(today) === "EXCEPTION") {
     return "Today's shift needs review";
   }
   return "Ready to verify attendance";
@@ -431,90 +569,313 @@ function studentHeadline(today) {
 
 function studentTodayCopy(today) {
   if (!today) return "Load a student to pull today's status.";
-  if (today.status === "CHECKED_IN") {
+  if (normalizeTodayStatus(today) === "CHECKED_IN") {
     const readyLabel = today.nextEligibleCheckoutAt ? formatCountdownMinutes(today.nextEligibleCheckoutAt) : "Soon";
     return `Checkout unlocks after the one-hour minimum. Next eligible checkout: ${readyLabel}.`;
   }
-  if (today.status === "COMPLETED") {
-    return "Both actions have been accepted for today. Hours and points are already reflected in progress analytics.";
+  if (normalizeTodayStatus(today) === "COMPLETED") {
+    return "Both actions have been accepted for today. Weekly totals are already updated.";
   }
-  if (today.status === "EXCEPTION") {
+  if (normalizeTodayStatus(today) === "EXCEPTION") {
     return "A historical issue exists for today. Admin review may be required.";
   }
   return "No action recorded yet today. Check in to start earning points and logging hours.";
 }
 
 function renderProgressView() {
-  const dashboard = state.student.dashboard;
-  if (!state.student.id || !state.student.name || !dashboard) {
-    dom.progressEmptyState.classList.remove("is-hidden");
-    dom.progressContent.classList.add("is-hidden");
+  const { student } = state;
+  if (!student.id) {
+    dom.progressEmptyState?.classList.remove("is-hidden");
+    dom.progressLoadingState?.classList.add("is-hidden");
+    dom.progressContent?.classList.add("is-hidden");
+    return;
+  }
+  if (student.loading) {
+    dom.progressEmptyState?.classList.add("is-hidden");
+    dom.progressLoadingState?.classList.remove("is-hidden");
+    dom.progressContent?.classList.add("is-hidden");
     return;
   }
 
-  dom.progressEmptyState.classList.add("is-hidden");
-  dom.progressContent.classList.remove("is-hidden");
-  dom.progressStudentName.textContent = dashboard.student.studentName;
-  dom.progressPercentileBadge.textContent = percentileLabel(dashboard.selected.percentile || 0);
-  dom.progressPercentileBadge.dataset.tone = "info";
-  dom.progressRangeBadge.textContent = toRangeLabel(dashboard.currentRange);
+  const data = student.dashboard;
+  if (!data) {
+    dom.progressEmptyState?.classList.remove("is-hidden");
+    dom.progressLoadingState?.classList.add("is-hidden");
+    dom.progressContent?.classList.add("is-hidden");
+    return;
+  }
 
-  dom.rangeButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.rangeButton === dashboard.currentRange);
-  });
+  dom.progressEmptyState?.classList.add("is-hidden");
+  dom.progressLoadingState?.classList.add("is-hidden");
+  dom.progressContent?.classList.remove("is-hidden");
 
-  dom.progressSummaryCards.innerHTML = RANGE_OPTIONS.map((range) => {
-    const summary = dashboard.summaries[range] || {};
-    return `
-      <div class="summary-card">
-        <div class="stat-label">${escapeHtml(toRangeLabel(range))}</div>
-        <div class="metric-value">${escapeHtml(formatPoints(summary.points || 0))}</div>
-        <div class="metric-copy">${escapeHtml(formatHours(summary.hours || 0))}</div>
-        <div class="metric-copy">${escapeHtml(formatPercent(summary.pointsPctOfTop || 0))} points / ${escapeHtml(formatPercent(summary.hoursPctOfTop || 0))} hours vs top</div>
-      </div>
-    `;
-  }).join("");
+  if (dom.progressStudentName) {
+    dom.progressStudentName.textContent = getStudentDisplayName(data);
+  }
 
-  dom.gaugeGrid.innerHTML = gaugeMarkup(dashboard.selected);
-  dom.recentShiftsTableBody.innerHTML = renderRecentShiftsRows(dashboard.recentShifts || []);
-  dom.studentExceptionsList.innerHTML = renderStudentExceptions(dashboard.exceptions || []);
-  renderHeatmap(dom.studentHeatmap, dom.studentHeatmapLegend, dashboard.charts.heatmap || [], "points");
-  renderStudentCharts(dashboard);
+  const weekSummary = getWeekSummary(data);
+  if (dom.weekPointsStat) dom.weekPointsStat.textContent = String(weekSummary.totalPoints);
+  if (dom.weekHoursStat) dom.weekHoursStat.textContent = String(round(weekSummary.hoursDecimal, 1));
+
+  render7DayHistory(data.recentShifts || []);
 }
 
-function gaugeMarkup(summary) {
-  const pointGauge = computeGaugeDash(summary.pointsPctOfTop || 0);
-  const hourGauge = computeGaugeDash(summary.hoursPctOfTop || 0);
-  return `
-    <div class="gauge-card">
-      <div class="card-label">Points benchmark</div>
-      <div class="gauge-shell">
-        <svg class="gauge-svg" viewBox="0 0 120 120" aria-hidden="true">
-          <circle class="gauge-track" cx="60" cy="60" r="46"></circle>
-          <circle class="gauge-progress" cx="60" cy="60" r="46" stroke-dasharray="${pointGauge.circumference}" stroke-dashoffset="${pointGauge.offset}"></circle>
-        </svg>
-        <div class="gauge-meta">
-          <div class="gauge-value">${escapeHtml(formatPercent(summary.pointsPctOfTop || 0))}</div>
-          <div class="metric-copy">${escapeHtml(formatPoints(summary.points || 0))} earned in ${escapeHtml(toRangeLabel(state.student.range).toLowerCase())}</div>
-          <div class="metric-copy">Gap to top: ${escapeHtml(formatPoints(summary.gapToTopPoints || 0))}</div>
-        </div>
+function render7DayHistory(shifts) {
+  if (!dom.sevenDayHistoryList) return;
+
+  const days = buildRecentPacificDays(7);
+  const shiftByDate = {};
+  shifts.forEach((shift) => {
+    if (shift?.localDate && !shiftByDate[shift.localDate]) {
+      shiftByDate[shift.localDate] = shift;
+    }
+  });
+
+  const rows = days.map((dateStr) => {
+    const shift = shiftByDate[dateStr];
+    const label = formatShortDate(dateStr);
+    let eventsHtml = "";
+
+    if (!shift) {
+      eventsHtml = `
+        <div class="history-event">
+          <span class="history-dot none"></span>
+          <span style="color: var(--text-tertiary)">No activity</span>
+        </div>`;
+    } else {
+      const checkInTime = shift.checkInUtc ? formatTimeOnly(new Date(shift.checkInUtc)) : null;
+      const checkOutTime = shift.checkOutUtc ? formatTimeOnly(new Date(shift.checkOutUtc)) : null;
+
+      if (checkInTime) {
+        eventsHtml += `
+          <div class="history-event">
+            <span class="history-dot checkin"></span>
+            <span>Check in · ${escapeHtml(checkInTime)}</span>
+          </div>`;
+      }
+      if (checkOutTime) {
+        eventsHtml += `
+          <div class="history-event">
+            <span class="history-dot checkout"></span>
+            <span>Check out · ${escapeHtml(checkOutTime)}</span>
+          </div>`;
+      } else if (checkInTime) {
+        eventsHtml += `
+          <div class="history-event">
+            <span class="history-dot none"></span>
+            <span style="color: var(--text-tertiary)">Still checked in</span>
+          </div>`;
+      }
+    }
+
+    return `
+      <div class="history-day-row">
+        <div class="history-date">${escapeHtml(label)}</div>
+        <div class="history-events">${eventsHtml}</div>
+      </div>`;
+  });
+
+  dom.sevenDayHistoryList.innerHTML = rows.join("");
+}
+
+// ─── STATS MODAL ────────────────────────────────────────────────────────────
+
+function openStatsModal() {
+  const modal = document.getElementById("statsModal");
+  if (!modal) return;
+  populateStatsModal();
+  modal.classList.add("is-open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeStatsModal() {
+  const modal = document.getElementById("statsModal");
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  document.body.style.overflow = "";
+}
+
+function populateStatsModal() {
+  const content = document.getElementById("statsModalContent");
+  if (!content) return;
+
+  const data = state.student.dashboard;
+  if (!data) {
+    content.innerHTML = `<div class="stats-modal-empty">No student data loaded. Enter your student ID on the Clock tab first.</div>`;
+    return;
+  }
+
+  const today = data.today || {};
+  const weekSummary = getWeekSummary(data);
+  const monthSummary = data.summaries?.month || {};
+  const overallSummary = data.summaries?.overall || {};
+  const todayStatus = normalizeTodayStatus(today);
+  const studentName = getStudentDisplayName(data);
+
+  const statusLabel = {
+    "CHECKED_IN": "Checked In",
+    "COMPLETED": "Completed",
+    "NOT_STARTED": "Not Started",
+    "EXCEPTION": "Exception"
+  }[todayStatus] || "Not Started";
+
+  const statusToneMap = {
+    "CHECKED_IN": "info",
+    "COMPLETED": "success",
+    "NOT_STARTED": "default",
+    "EXCEPTION": "danger"
+  };
+  const tone = statusToneMap[todayStatus] || "default";
+
+  content.innerHTML = `
+    <div class="stats-modal-header">
+      <div class="stats-modal-name">${escapeHtml(studentName)}</div>
+      <div class="stats-modal-id">ID: ${escapeHtml(state.student.id)}</div>
+      <span class="status-pill" data-tone="${tone}" style="margin-top:6px;">${escapeHtml(statusLabel)}</span>
+    </div>
+
+    <div class="stats-section-label">Today</div>
+    <div class="stats-row-grid">
+      <div class="stats-cell">
+        <div class="stats-cell-value">${escapeHtml(formatPoints(today.pointsToday || 0))}</div>
+        <div class="stats-cell-label">Points Today</div>
+      </div>
+      <div class="stats-cell">
+        <div class="stats-cell-value">${escapeHtml(formatHours(today.hoursToday || 0))}</div>
+        <div class="stats-cell-label">Hours Today</div>
       </div>
     </div>
-    <div class="gauge-card">
-      <div class="card-label">Hours benchmark</div>
-      <div class="gauge-shell">
-        <svg class="gauge-svg" viewBox="0 0 120 120" aria-hidden="true">
-          <circle class="gauge-track" cx="60" cy="60" r="46"></circle>
-          <circle class="gauge-progress" data-tone="hours" cx="60" cy="60" r="46" stroke-dasharray="${hourGauge.circumference}" stroke-dashoffset="${hourGauge.offset}"></circle>
-        </svg>
-        <div class="gauge-meta">
-          <div class="gauge-value">${escapeHtml(formatPercent(summary.hoursPctOfTop || 0))}</div>
-          <div class="metric-copy">${escapeHtml(formatHours(summary.hours || 0))} logged in ${escapeHtml(toRangeLabel(state.student.range).toLowerCase())}</div>
-          <div class="metric-copy">Gap to top: ${escapeHtml(formatHours(summary.gapToTopHours || 0))}</div>
-        </div>
+
+    <div class="stats-section-label">This Week</div>
+    <div class="stats-row-grid">
+      <div class="stats-cell">
+        <div class="stats-cell-value">${escapeHtml(String(weekSummary.totalPoints || 0))}</div>
+        <div class="stats-cell-label">Points</div>
+      </div>
+      <div class="stats-cell">
+        <div class="stats-cell-value">${escapeHtml(String(round(weekSummary.hoursDecimal || 0, 1)))}</div>
+        <div class="stats-cell-label">Hours</div>
       </div>
     </div>
+
+    <div class="stats-section-label">This Month</div>
+    <div class="stats-row-grid">
+      <div class="stats-cell">
+        <div class="stats-cell-value">${escapeHtml(formatPoints(monthSummary.points || 0))}</div>
+        <div class="stats-cell-label">Points</div>
+      </div>
+      <div class="stats-cell">
+        <div class="stats-cell-value">${escapeHtml(formatHours(monthSummary.hours || 0))}</div>
+        <div class="stats-cell-label">Hours</div>
+      </div>
+    </div>
+
+    <div class="stats-section-label">Overall</div>
+    <div class="stats-row-grid">
+      <div class="stats-cell">
+        <div class="stats-cell-value">${escapeHtml(formatPoints(overallSummary.points || 0))}</div>
+        <div class="stats-cell-label">Points</div>
+      </div>
+      <div class="stats-cell">
+        <div class="stats-cell-value">${escapeHtml(formatHours(overallSummary.hours || 0))}</div>
+        <div class="stats-cell-label">Hours</div>
+      </div>
+    </div>
+
+    ${today.checkInUtc ? `
+    <div class="stats-section-label">Today's Shift</div>
+    <div class="stats-shift-detail">
+      <div class="stats-shift-row">
+        <span class="history-dot checkin" style="margin-right:8px;"></span>
+        <span>Check In · ${escapeHtml(formatTimeOnly(new Date(today.checkInUtc)))}</span>
+      </div>
+      ${today.checkOutUtc ? `
+      <div class="stats-shift-row">
+        <span class="history-dot checkout" style="margin-right:8px;"></span>
+        <span>Check Out · ${escapeHtml(formatTimeOnly(new Date(today.checkOutUtc)))}</span>
+      </div>` : `
+      <div class="stats-shift-row">
+        <span class="history-dot none" style="margin-right:8px;"></span>
+        <span style="color:var(--text-secondary)">Waiting for check out</span>
+      </div>`}
+      ${today.site ? `<div class="stats-shift-site">📍 ${escapeHtml(today.site)}</div>` : ""}
+    </div>` : ""}
   `;
+}
+
+// Update stats button visibility whenever student state changes
+function updateStatsButton() {
+  const statsBtn = document.getElementById("myStatsButton");
+  if (!statsBtn) return;
+  const hasStudent = Boolean(state.student.id && state.student.name);
+  statsBtn.classList.toggle("is-hidden", !hasStudent);
+}
+
+function setPrimaryActionState({ label, action, variant, disabled }) {
+  if (!dom.primaryActionButton || !dom.primaryActionLabel) {
+    return;
+  }
+  dom.primaryActionLabel.textContent = label;
+  dom.primaryActionButton.dataset.currentAction = action || "";
+  dom.primaryActionButton.disabled = Boolean(disabled);
+  dom.primaryActionButton.classList.remove("checkin", "checkout", "done");
+  if (variant) {
+    dom.primaryActionButton.classList.add(variant);
+  }
+}
+
+function normalizeTodayStatus(today) {
+  const rawStatus = String(today?.status || "").toUpperCase();
+  if (["COMPLETE", "BACKFILLED_COMPLETE", "COMPLETED"].includes(rawStatus)) {
+    return "COMPLETED";
+  }
+  if (["OPEN", "CHECKED_IN"].includes(rawStatus)) {
+    return "CHECKED_IN";
+  }
+  if (rawStatus === "EXCEPTION") {
+    return "EXCEPTION";
+  }
+  return "NOT_STARTED";
+}
+
+function getStudentDisplayName(data) {
+  return data?.student?.name || data?.student?.studentName || state.student.name || "—";
+}
+
+function getWeekSummary(data) {
+  const week = data?.week || data?.summaries?.week || {};
+  const selected = data?.currentRange === "week" ? data?.selected || {} : {};
+  return {
+    totalPoints: Number(week.totalPoints ?? week.points ?? selected.totalPoints ?? selected.points ?? 0),
+    hoursDecimal: Number(week.hoursDecimal ?? week.hours ?? selected.hoursDecimal ?? selected.hours ?? 0)
+  };
+}
+
+function buildRecentPacificDays(count) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const todayParts = formatter.formatToParts(new Date()).reduce((acc, part) => {
+    if (part.type !== "literal") {
+      acc[part.type] = part.value;
+    }
+    return acc;
+  }, {});
+  const pacificMidnight = new Date(Date.UTC(
+    Number(todayParts.year),
+    Number(todayParts.month) - 1,
+    Number(todayParts.day)
+  ));
+  const days = [];
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const date = new Date(pacificMidnight);
+    date.setUTCDate(date.getUTCDate() - i);
+    days.push(date.toISOString().slice(0, 10));
+  }
+  return days;
 }
 
 function renderRecentShiftsRows(rows) {
@@ -546,9 +907,8 @@ function renderStudentExceptions(rows) {
 }
 
 function renderLocationSummary(label, copy, tone = "info") {
-  dom.sidebarLocationStatus.textContent = label;
-  dom.sidebarLocationMeta.textContent = copy;
   dom.locationStatusBanner.dataset.tone = tone;
+  dom.locationStatusBanner.setAttribute("aria-label", label + ": " + copy);
 }
 
 function updateLocationBanner(message, tone = "info", siteOptions = null) {
@@ -645,10 +1005,10 @@ function handleManualSiteSelection() {
 }
 
 function updateActionButtons() {
-  const ready = Boolean(state.student.id && state.student.name && state.student.selectedSite);
-  const todayStatus = state.student.dashboard?.today?.status || "NOT_STARTED";
-  const disableCheckIn = !ready || ["CHECKED_IN", "COMPLETED"].includes(todayStatus);
-  const disableCheckOut = !ready || ["NOT_STARTED", "COMPLETED"].includes(todayStatus);
+  const ready = Boolean(state.student.id && state.student.name && state.student.currentPos && state.student.selectedSite);
+  const todayStatus = normalizeTodayStatus(state.student.dashboard?.today);
+  const disableCheckIn = state.student.loading || !ready || ["CHECKED_IN", "COMPLETED"].includes(todayStatus);
+  const disableCheckOut = state.student.loading || !ready || ["NOT_STARTED", "COMPLETED"].includes(todayStatus);
   dom.checkInButton.disabled = disableCheckIn;
   dom.checkOutButton.disabled = disableCheckOut;
 }
@@ -664,37 +1024,47 @@ async function handleAttendanceAction(action) {
     return;
   }
 
+  // Check-in + check-out both require live GPS verification at an approved site.
   if (!state.student.currentPos || !state.student.selectedSite) {
     showToast("Location must be verified before submitting attendance.", "danger");
+    renderClockMessage("Enable location access and be at an approved internship site.", "danger");
     return;
+  }
+
+  // Determine site and coordinates for the submission
+  const submissionSite = state.student.selectedSite.name;
+  const submissionLat = state.student.currentPos.lat;
+  const submissionLng = state.student.currentPos.lng;
+
+  // FIX: Enforce cooldown on the frontend BEFORE attempting submission
+  const cooldownReady = state.student.dashboard?.today?.nextEligibleCheckoutAt;
+  if (action === "Check Out" && cooldownReady) {
+    const remainingMs = new Date(cooldownReady).getTime() - Date.now();
+    if (remainingMs > 0) {
+      renderClockMessage(`Checkout unlocks in ${formatCountdownMinutes(cooldownReady)}.`, "warning");
+      return; // Block early — don't submit if cooldown not met
+    }
   }
 
   const payload = {
     studentId: state.student.id,
     studentName: state.student.name,
     action,
-    site: state.student.selectedSite.name,
-    lat: state.student.currentPos.lat,
-    lng: state.student.currentPos.lng,
+    site: submissionSite,
+    lat: submissionLat,
+    lng: submissionLng,
     clientTimestamp: new Date().toISOString(),
     userAgent: navigator.userAgent
   };
 
-  const cooldownReady = state.student.dashboard?.today?.nextEligibleCheckoutAt;
-  if (action === "Check Out" && cooldownReady) {
-    const remainingMs = new Date(cooldownReady).getTime() - Date.now();
-    if (remainingMs > 0) {
-      renderClockMessage(`Checkout becomes available in ${formatCountdownMinutes(cooldownReady)}.`, "warning");
-    }
-  }
-
   try {
-    renderClockMessage(`Submitting ${action}...`, "info");
+    renderClockMessage(`Submitting ${action}…`, "info");
     const response = await submitAttendance(payload);
-    rememberLocalAction(action, state.student.selectedSite.name);
-    renderClockMessage(`${action} accepted. +${response.pointsDelta} points.`, "success");
+    const recordedSite = submissionSite || state.student.selectedSite?.name || "";
+    rememberLocalAction(action, recordedSite);
+    renderClockMessage(`${action} accepted. +${response.pointsDelta} pts.`, "success");
     showToast(`${action} accepted for ${state.student.name}.`, "success");
-    await loadStudentDashboard(state.student.range);
+    await loadStudentDashboard(state.student.range, { force: true });
   } catch (error) {
     const message = mapActionError(error, action);
     renderClockMessage(message, "danger");
@@ -726,35 +1096,6 @@ function rememberLocalAction(action, site) {
   };
   state.localHistory = [nextItem].concat(state.localHistory).slice(0, 8);
   writeJsonStorage(localStorage, LOCAL_HISTORY_KEY, state.localHistory);
-  renderLocalHistory();
-}
-
-function renderLocalHistory() {
-  if (!state.localHistory.length) {
-    dom.localHistoryList.innerHTML = "<div class=\"empty-copy\">No local submissions yet.</div>";
-    return;
-  }
-
-  dom.localHistoryList.innerHTML = state.localHistory.map((item) => `
-    <div class="summary-card">
-      <div class="stat-label">${escapeHtml(item.action)}</div>
-      <div><strong>${escapeHtml(item.studentName || item.studentId)}</strong></div>
-      <div class="metric-copy">${escapeHtml(item.site || "-")}</div>
-      <div class="metric-copy">${escapeHtml(formatDateTime(item.timestamp))}</div>
-    </div>
-  `).join("");
-}
-
-function setStudentRange(range) {
-  if (state.student.range === range) {
-    return;
-  }
-  state.student.range = range;
-  if (!state.student.id || !state.student.name) {
-    renderProgressView();
-    return;
-  }
-  loadStudentDashboard(range);
 }
 
 function armStudentSessionTimeout() {
@@ -765,6 +1106,8 @@ function armStudentSessionTimeout() {
 }
 
 function clearStudentSession(message, options = {}) {
+  abortStudentDashboardRequest();
+  clearStudentPrefetch();
   clearTimeout(state.student.sessionTimer);
   const preserveInput = Boolean(options.preserveInput);
   const preserveLocation = Boolean(options.preserveLocation);
@@ -773,14 +1116,21 @@ function clearStudentSession(message, options = {}) {
   }
   state.student.id = preserveInput ? dom.studentIdInput.value.trim() : "";
   state.student.name = preserveInput && STUDENT_DB[state.student.id] ? STUDENT_DB[state.student.id] : "";
+  state.student.loading = false;
   state.student.dashboard = null;
+  state.student.dashboardCache = {};
+  state.student.range = "week";
+  state.student.requestController = null;
   if (!preserveLocation) {
     state.student.selectedSite = null;
     state.student.nearbySites = [];
   }
+  renderStudentLoadingState();
   renderStudentIdentity();
   renderClockView();
   renderProgressView();
+  updateStatsButton();
+  closeStatsModal();
   if (message) {
     showToast(message, "info");
     renderClockMessage(message, "info");
@@ -886,7 +1236,9 @@ function renderAdminDashboard() {
   dom.adminKpiGrid.innerHTML = adminKpiMarkup(state.admin.dashboard);
   renderAdminTables();
   renderHeatmap(dom.adminHeatmap, dom.adminHeatmapLegend, state.admin.dashboard.charts.heatmap || [], "activeStudents");
-  renderAdminCharts(state.admin.dashboard);
+  if (state.currentView === "admin") {
+    renderAdminCharts(state.admin.dashboard);
+  }
 }
 
 function adminKpiMarkup(dashboard) {
@@ -1075,12 +1427,12 @@ function renderHeatmap(container, legend, series, valueKey) {
   }
 
   legend.innerHTML = `<span>Lower</span><span class="legend-chip">Intensity based on ${escapeHtml(valueKey)}</span><span>Higher</span>`;
-  container.innerHTML = series.slice(-24).map((row) => {
+  container.innerHTML = series.slice(-18).map((row) => {
     const intensity = Math.max(0, Math.min(100, Number(row.intensity) || 0));
     const alpha = intensity === 0 ? 0.08 : 0.18 + intensity / 160;
     const background = valueKey === "activeStudents"
-      ? `rgba(216, 179, 93, ${alpha})`
-      : `rgba(225, 77, 97, ${alpha})`;
+      ? `rgba(48, 209, 88, ${alpha})`
+      : `rgba(10, 132, 255, ${alpha})`;
     const value = valueKey === "activeStudents"
       ? `${row.activeStudents || 0} active`
       : `${row.points || 0} pts`;

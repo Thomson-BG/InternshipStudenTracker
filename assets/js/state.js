@@ -9,10 +9,9 @@ import {
 import { readJsonStorage } from "./utils.js";
 
 const persistedTheme = localStorage.getItem(THEME_KEY);
-const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
 export const state = {
-  theme: persistedTheme || (prefersDark ? "dark" : "light"),
+  theme: persistedTheme || "dark",
   currentView: "clock",
   localHistory: readJsonStorage(localStorage, LOCAL_HISTORY_KEY, []),
   student: {
@@ -21,9 +20,14 @@ export const state = {
     currentPos: null,
     selectedSite: null,
     nearbySites: [],
+    loading: false,
     dashboard: null,
-    range: RANGE_OPTIONS[2],
+    dashboardCache: {},
+    range: RANGE_OPTIONS[0],
     sessionTimer: null,
+    requestController: null,
+    activeRequestId: 0,
+    prefetchTimer: null,
     lastActionTimestamps: {},
     timeoutMs: STUDENT_SESSION_TIMEOUT_MS
   },
