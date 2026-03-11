@@ -69,22 +69,17 @@ test("startup, student dashboard, admin dashboard smoke", async ({ page, baseURL
   tracker.assertNone();
   await capture(page, "clock");
 
-  const studentDashboardRequest = page.waitForResponse(
-    (response) => response.url().includes(`mode=student_dashboard&studentId=${STUDENT_ID}`),
-    { timeout: 20000 }
-  );
-
   await page.locator("#studentIdInput").fill(STUDENT_ID);
-  await studentDashboardRequest;
   await expect(page.locator("#studentNameValue")).toHaveText("Lenore Ditmore");
   await expect(page.locator("#studentNameCopy")).not.toContainText("loading latest progress", { timeout: 20000 });
-  await expect(page.locator("#primaryActionLabel")).not.toHaveText("Loading…", { timeout: 20000 });
+  await expect(page.locator("#clockMessage")).toHaveText("Student progress loaded.", { timeout: 20000 });
   tracker.assertNone();
   await capture(page, "student");
 
   await page.locator('[data-view-button="progress"]').click();
   await expect(page.locator("#progressView")).toHaveClass(/is-active/);
   await expect(page.locator("#progressStudentName")).toContainText("Lenore");
+  await expect(page.locator("#sevenDayHistoryList .history-day-row")).toHaveCount(7);
   tracker.assertNone();
   await capture(page, "progress");
 
