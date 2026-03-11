@@ -659,11 +659,48 @@ body.theme-light .ios-select {
   color: var(--text-secondary);
 }
 
-/* Legacy two-button layout — hidden */
-.action-buttons { display: none; }
+/* Two-button layout — Check In & Check Out */
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 0 var(--screen-padding) 8px;
+}
 
 .action-btn {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  white-space: nowrap;
+}
+
+.action-btn:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+.action-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-btn.checkin {
+  background: var(--success);
+}
+
+.action-btn.checkout {
+  background: var(--accent);
 }
 
 /* ---------- SITE SELECT ---------- */

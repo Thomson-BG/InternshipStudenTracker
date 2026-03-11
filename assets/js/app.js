@@ -53,8 +53,6 @@ const dom = {
   checkInButton: document.getElementById("checkInButton"),
   checkOutButton: document.getElementById("checkOutButton"),
   clearStudentButton: document.getElementById("clearStudentButton"),
-  primaryActionButton: document.getElementById("primaryActionButton"),
-  primaryActionLabel: document.getElementById("primaryActionLabel"),
   heroStatusCard: document.getElementById("heroStatusCard"),
   clockMessage: document.getElementById("clockMessage"),
   todayHeadline: document.getElementById("todayHeadline"),
@@ -146,14 +144,6 @@ function bindEvents() {
   dom.siteSelect.addEventListener("change", handleManualSiteSelection);
   dom.checkInButton.addEventListener("click", () => handleAttendanceAction("Check In"));
   dom.checkOutButton.addEventListener("click", () => handleAttendanceAction("Check Out"));
-  if (dom.primaryActionButton) {
-    dom.primaryActionButton.addEventListener("click", () => {
-      const action = dom.primaryActionButton.dataset.currentAction;
-      if (action) {
-        handleAttendanceAction(action);
-      }
-    });
-  }
   dom.clearStudentButton.addEventListener("click", () => clearStudentSession("Student session reset."));
 
   // Stats modal — Clock tab button
@@ -444,7 +434,10 @@ async function loadStudentDashboard(range = state.student.range, options = {}) {
   }
 
   try {
-    const response = await fetchStudentDashboard(requestedStudentId, range, controller ? { signal: controller.signal } : {});
+    const response = await fetchStudentDashboard(requestedStudentId, range, {
+      signal: controller ? controller.signal : undefined,
+      forceFresh: Boolean(options.force)
+    });
     const responseStudentId = response.data?.student?.studentId || response.data?.student?.id || requestedStudentId;
     if (requestedStudentId !== responseStudentId || state.student.id !== requestedStudentId) {
       return;
@@ -828,16 +821,36 @@ function updateStatsButton() {
   statsBtn.classList.toggle("is-hidden", !hasStudent);
 }
 
-function setPrimaryActionState({ label, action, variant, disabled }) {
-  if (!dom.primaryActionButton || !dom.primaryActionLabel) {
+function updateActionButtonStates({ checkInDisabled = true, checkOutDisabled = true }) {
+  if (!dom.checkInButton || !dom.checkOutButton) {
     return;
   }
-  dom.primaryActionLabel.textContent = label;
-  dom.primaryActionButton.dataset.currentAction = action || "";
-  dom.primaryActionButton.disabled = Boolean(disabled);
-  dom.primaryActionButton.classList.remove("checkin", "checkout", "done");
-  if (variant) {
-    dom.primaryActionButton.classList.add(variant);
+  dom.checkInButton.disabled = Boolean(checkInDisabled);
+  dom.checkOutButton.disabled = Boolean(checkOutDisabled);
+}
+
+// Backwards compatibility: setPrimaryActionState now updates individual buttons
+function setPrimaryActionState({ label, action, variant, disabled }) {
+  // Convert single button state to dual button state
+  const actionType = action || variant;
+  const isDisabled = Boolean(disabled);
+
+  if (actionType === "Check In") {
+    updateActionButtonStates({
+      checkInDisabled: isDisabled,
+      checkOutDisabled: true  // Cannot check out if checking in
+    });
+  } else if (actionType === "Check Out") {
+    updateActionButtonStates({
+      checkInDisabled: true,  // Cannot check in if checking out
+      checkOutDisabled: isDisabled
+    });
+  } else {
+    // Loading or done state - disable both
+    updateActionButtonStates({
+      checkInDisabled: true,
+      checkOutDisabled: true
+    });
   }
 }
 
