@@ -59,6 +59,10 @@ const dom = {
   todayCopy: document.getElementById("todayCopy"),
   nextActionBadge: document.getElementById("nextActionBadge"),
   selectedSiteBadge: document.getElementById("selectedSiteBadge"),
+  shiftTimerValue: document.getElementById("shiftTimerValue"),
+  mapSiteName: document.getElementById("mapSiteName"),
+  mapLatValue: document.getElementById("mapLatValue"),
+  mapLngValue: document.getElementById("mapLngValue"),
   progressEmptyState: document.getElementById("progressEmptyState"),
   progressLoadingState: document.getElementById("progressLoadingState"),
   progressContent: document.getElementById("progressContent"),
@@ -101,6 +105,7 @@ const dom = {
 };
 
 let locationWatchId = null;
+let shiftTimerId = null;
 let reportContext = null;
 
 async function init() {
@@ -113,6 +118,7 @@ async function init() {
   renderProgressView();
   renderAdminState();
   startLocationWatch();
+  syncLocationMapFields();
 
   state.rosterLoading = true;
   try {
@@ -493,10 +499,13 @@ function renderClockView() {
   const hasVerifiedLocation = Boolean(state.student.currentPos && state.student.selectedSite);
   const readyForAction = Boolean(hasStudent && hasVerifiedLocation && !state.student.loading);
 
+  syncLocationMapFields();
+
   dom.selectedSiteBadge.textContent = state.student.selectedSite ? state.student.selectedSite.name : "Site pending";
   dom.selectedSiteBadge.dataset.tone = state.student.selectedSite ? "success" : "warning";
 
   if (!hasStudent) {
+    syncShiftTimer(null);
     dom.todayHeadline.textContent = "Ready to verify attendance";
     dom.todayCopy.textContent = "Enter your student ID below to check in or out.";
     dom.nextActionBadge.textContent = "Check In";
@@ -512,6 +521,7 @@ function renderClockView() {
   }
 
   if (state.student.loading && !dashboard) {
+    syncShiftTimer(null);
     dom.todayHeadline.textContent = `Loading ${state.student.name}…`;
     dom.todayCopy.textContent = "Retrieving this week's attendance and status.";
     dom.nextActionBadge.textContent = "Loading";
@@ -527,6 +537,7 @@ function renderClockView() {
   }
 
   const todayStatus = normalizeTodayStatus(today);
+  syncShiftTimer(today);
   dom.todayHeadline.textContent = studentHeadline(today);
   dom.todayCopy.textContent = studentTodayCopy(today);
 
@@ -590,6 +601,85 @@ function studentTodayCopy(today) {
     return "A historical issue exists for today. Admin review may be required.";
   }
   return "No action recorded yet today. Check in to start earning points and logging hours.";
+}
+
+function clearShiftTimer() {
+  if (shiftTimerId) {
+    clearInterval(shiftTimerId);
+    shiftTimerId = null;
+  }
+}
+
+function formatElapsedClock(ms) {
+  const safeMs = Math.max(0, Number(ms) || 0);
+  const totalSeconds = Math.floor(safeMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function setShiftTimerValue(value) {
+  if (!dom.shiftTimerValue) {
+    return;
+  }
+  dom.shiftTimerValue.textContent = value;
+}
+
+function syncShiftTimer(today) {
+  clearShiftTimer();
+  if (!today || !dom.shiftTimerValue) {
+    setShiftTimerValue("00:00:00");
+    return;
+  }
+
+  const status = normalizeTodayStatus(today);
+  const checkInMs = today.checkInUtc ? new Date(today.checkInUtc).getTime() : NaN;
+  const checkOutMs = today.checkOutUtc ? new Date(today.checkOutUtc).getTime() : NaN;
+
+  if (!Number.isFinite(checkInMs)) {
+    setShiftTimerValue("00:00:00");
+    return;
+  }
+
+  if (status === "COMPLETED" && Number.isFinite(checkOutMs)) {
+    setShiftTimerValue(formatElapsedClock(checkOutMs - checkInMs));
+    return;
+  }
+
+  if (status === "CHECKED_IN") {
+    const tick = () => setShiftTimerValue(formatElapsedClock(Date.now() - checkInMs));
+    tick();
+    shiftTimerId = setInterval(tick, 1000);
+    return;
+  }
+
+  setShiftTimerValue("00:00:00");
+}
+
+function formatCoordinate(value, axis) {
+  if (!Number.isFinite(value)) {
+    return "--";
+  }
+  const abs = Math.abs(value).toFixed(4);
+  const suffix = axis === "lat"
+    ? value >= 0 ? "N" : "S"
+    : value >= 0 ? "E" : "W";
+  return `${abs}° ${suffix}`;
+}
+
+function syncLocationMapFields() {
+  if (dom.mapSiteName) {
+    dom.mapSiteName.textContent = state.student.selectedSite?.name || "Waiting for approved site match";
+  }
+  const lat = Number(state.student.currentPos?.lat);
+  const lng = Number(state.student.currentPos?.lng);
+  if (dom.mapLatValue) {
+    dom.mapLatValue.textContent = formatCoordinate(lat, "lat");
+  }
+  if (dom.mapLngValue) {
+    dom.mapLngValue.textContent = formatCoordinate(lng, "lng");
+  }
 }
 
 function renderProgressView() {
@@ -961,6 +1051,8 @@ function startLocationWatch() {
   if (!navigator.geolocation) {
     renderLocationSummary("Unavailable", "This device does not support geolocation.", "danger");
     updateLocationBanner("Geolocation is not supported on this device.", "danger");
+    syncLocationMapFields();
+    renderClockView();
     updateActionButtons();
     return;
   }
@@ -978,6 +1070,8 @@ function startLocationWatch() {
       updateLocationBanner(`Location error: ${escapeHtml(error.message || "Unable to resolve GPS.")}`, "danger");
       state.student.selectedSite = null;
       state.student.nearbySites = [];
+      syncLocationMapFields();
+      renderClockView();
       updateActionButtons();
     },
     { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
@@ -1004,6 +1098,8 @@ function validateLocation() {
     })).sort((a, b) => a.distance - b.distance)[0];
     renderLocationSummary("Too far", `Nearest site: ${nearest?.name || "Unknown"} (${Math.round(nearest?.distance || 0)}m).`, "danger");
     updateLocationBanner(`Too far from an approved internship site. Nearest site: ${escapeHtml(nearest?.name || "Unknown")} (${Math.round(nearest?.distance || 0)}m).`, "danger");
+    syncLocationMapFields();
+    renderClockView();
     updateActionButtons();
     return;
   }
@@ -1138,6 +1234,7 @@ function armStudentSessionTimeout() {
 function clearStudentSession(message, options = {}) {
   abortStudentDashboardRequest();
   clearStudentPrefetch();
+  clearShiftTimer();
   clearTimeout(state.student.sessionTimer);
   const preserveInput = Boolean(options.preserveInput);
   const preserveLocation = Boolean(options.preserveLocation);

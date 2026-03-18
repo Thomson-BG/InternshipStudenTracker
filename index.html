@@ -8,6 +8,10 @@
   <meta name="theme-color" content="#000000">
   <title>Intern Track</title>
   <meta name="description" content="Intern Track — student attendance, progress dashboards, and admin analytics.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/styles/main.css">
   <link rel="stylesheet" href="assets/styles/print.css" media="print">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" defer></script>
@@ -21,12 +25,13 @@
     <!-- ========== HEADER ========== -->
     <header class="app-header">
       <div class="header-left">
-        <span class="app-header-title">Intern Track</span>
+        <span class="material-symbols-outlined brand-mark">pets</span>
+        <span class="app-header-title">BULLDOG GARAGE</span>
       </div>
       <div class="header-right">
         <button id="themeToggle" class="header-icon-btn" type="button" aria-label="Toggle theme">
-          <svg id="themeIconSun" class="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          <svg id="themeIconMoon" class="theme-icon is-hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <span id="themeIconSun" class="material-symbols-outlined theme-icon">light_mode</span>
+          <span id="themeIconMoon" class="material-symbols-outlined theme-icon is-hidden">dark_mode</span>
         </button>
       </div>
     </header>
@@ -37,60 +42,108 @@
       <!-- ===== CLOCK VIEW ===== -->
       <section id="clockView" class="view is-active">
 
-        <h1 class="view-large-title">Clock In</h1>
-
-        <!-- Hero status card -->
-        <div id="heroStatusCard" class="hero-card">
-          <div id="todayHeadline" class="hero-title">Ready to verify attendance</div>
-          <div id="todayCopy" class="hero-subtitle">Enter your student ID below to check in or out.</div>
-          <div class="badge-row" style="margin-top: 10px;">
-            <div id="nextActionBadge" class="status-pill" data-tone="info">Check In</div>
-            <div id="selectedSiteBadge" class="status-pill" data-tone="warning">Site pending</div>
+        <section class="workshop-card">
+          <div class="workshop-card-head">
+            <div>
+              <h1 class="workshop-title">INTERNSHIP HOURS</h1>
+              <p class="workshop-kicker">Session Authorization Required</p>
+            </div>
+            <div class="geofence-pill">
+              <span class="geofence-dot"></span>
+              <span>Geofence Valid</span>
+            </div>
           </div>
-        </div>
 
-        <!-- Location status banner -->
-        <div id="locationStatusBanner" class="info-banner" data-tone="info">Waiting for device GPS.</div>
+          <div class="workshop-entry-grid">
+            <div class="student-entry-wrap">
+              <label class="student-entry-label" for="studentIdInput">Student ID#</label>
+              <input id="studentIdInput" data-testid="student-id-input" class="ios-input student-id-input" type="tel" inputmode="numeric" maxlength="6" placeholder="6-digit student ID" autocomplete="off">
+              <div id="studentLookupLoader" class="loading-row is-hidden">
+                <span class="loading-spinner"></span>
+                <span id="studentLookupLoaderText">Looking up student…</span>
+              </div>
+              <div id="studentNameValue" class="text-headline student-name-value">—</div>
+              <div id="studentNameCopy" class="text-footnote student-name-copy">No student loaded.</div>
+            </div>
 
-        <!-- Site select (multiple sites detected) -->
-        <div id="siteSelectWrap" class="site-select-wrap">
-          <label class="stat-label" for="siteSelect" style="padding: 0 0 6px; display: block;">Multiple sites detected — select yours:</label>
-          <select id="siteSelect" class="ios-select"></select>
-        </div>
-
-        <!-- DEDICATED CHECK IN & CHECK OUT BUTTONS -->
-        <div class="action-buttons">
-          <button id="checkInButton" data-testid="check-in-button" class="action-btn checkin" type="button" disabled>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            <span>Check In</span>
-          </button>
-          <button id="checkOutButton" data-testid="check-out-button" class="action-btn checkout" type="button" disabled>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span>Check Out</span>
-          </button>
-        </div>
-
-        <!-- Feedback message -->
-        <div id="clockMessage" data-testid="clock-message" class="feedback-message"></div>
-
-        <!-- Student ID Input -->
-        <div class="section-group-header">Student ID</div>
-        <div class="glass-card padded">
-          <input id="studentIdInput" data-testid="student-id-input" class="ios-input" type="tel" inputmode="numeric" maxlength="6" placeholder="6-digit student ID" autocomplete="off" style="margin-bottom: 12px;">
-          <div id="studentLookupLoader" class="loading-row is-hidden">
-            <span class="loading-spinner"></span>
-            <span id="studentLookupLoaderText">Looking up student…</span>
+            <div class="action-buttons">
+              <button id="checkInButton" data-testid="check-in-button" class="action-btn checkin" type="button" disabled>
+                <span class="material-symbols-outlined">login</span>
+                <span>Check-In</span>
+              </button>
+              <button id="checkOutButton" data-testid="check-out-button" class="action-btn checkout" type="button" disabled>
+                <span class="material-symbols-outlined">logout</span>
+                <span>Check-Out</span>
+              </button>
+            </div>
           </div>
-          <div id="studentNameValue" class="text-headline" style="margin-top: 4px;">—</div>
-          <div id="studentNameCopy" class="text-footnote" style="color: var(--text-secondary); margin-top: 2px;">No student loaded.</div>
-          <div style="display: flex; gap: 10px; margin-top: 12px; align-items: center; flex-wrap: wrap;">
-            <button id="myStatsButton" class="ios-button accent is-hidden" type="button" style="flex: 1; min-width: 120px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+
+          <div class="student-actions">
+            <button id="myStatsButton" class="ios-button accent is-hidden" type="button">
+              <span class="material-symbols-outlined">query_stats</span>
               My Stats
             </button>
-            <button id="clearStudentButton" class="link-button" type="button" style="font-size: 14px;">Reset session</button>
+            <button id="clearStudentButton" class="link-button" type="button">Reset Session</button>
           </div>
-        </div>
+        </section>
+
+        <section class="status-header">
+          <div class="status-header-copy">
+            <p class="status-kicker">Current Status</p>
+            <h2 id="todayHeadline" class="status-title">Ready to verify attendance</h2>
+            <p id="todayCopy" class="status-subtitle">Enter your student ID below to check in or out.</p>
+          </div>
+          <div class="status-timer">
+            <span class="material-symbols-outlined">timer</span>
+            <span id="shiftTimerValue">00:00:00</span>
+          </div>
+          <div id="heroStatusCard" class="hero-card">
+            <div class="badge-row">
+              <div id="nextActionBadge" class="status-pill" data-tone="info">Check In</div>
+              <div id="selectedSiteBadge" class="status-pill" data-tone="warning">Site pending</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="glass-card location-verification">
+          <div class="location-card-head">
+            <h3>Location Verification</h3>
+            <span class="material-symbols-outlined">location_on</span>
+          </div>
+          <div class="location-site-row">
+            <span class="material-symbols-outlined">radio_button_checked</span>
+            <span id="mapSiteName">HEMET HIGH SCHOOL BULLDOG GARAGE</span>
+          </div>
+          <div id="locationStatusBanner" class="info-banner" data-tone="info">Waiting for device GPS.</div>
+          <div class="location-map-shell">
+            <div class="location-grid-dots"></div>
+            <div class="location-ring">
+              <div class="location-core-glow"></div>
+              <div class="location-pin-wrap">
+                <div class="location-pin">
+                  <span class="material-symbols-outlined">location_on</span>
+                </div>
+                <div class="location-pin-label">Verified Location</div>
+              </div>
+            </div>
+            <div class="location-coordinates">
+              <div class="coord-item">
+                <span class="coord-label">LAT</span>
+                <span id="mapLatValue">--</span>
+              </div>
+              <div class="coord-item">
+                <span class="coord-label">LONG</span>
+                <span id="mapLngValue">--</span>
+              </div>
+            </div>
+          </div>
+          <div id="siteSelectWrap" class="site-select-wrap">
+            <label class="stat-label" for="siteSelect">Multiple sites detected - select yours:</label>
+            <select id="siteSelect" class="ios-select"></select>
+          </div>
+        </section>
+
+        <div id="clockMessage" data-testid="clock-message" class="feedback-message"></div>
 
         <!-- Legacy hidden elements for JS compat -->
         <div id="sidebarStudentName" class="is-hidden">-</div>
@@ -108,7 +161,7 @@
       <!-- ===== MY WEEK VIEW ===== -->
       <section id="progressView" class="view">
 
-        <h1 class="view-large-title">My Week</h1>
+        <h1 class="view-large-title">CHECK-IN HISTORY</h1>
 
         <!-- Empty state -->
         <div id="progressEmptyState" class="glass-card padded empty-state" style="margin: 0 20px 8px;">
@@ -174,14 +227,35 @@
         </div>
 
         <!-- Login state -->
-        <div id="adminLoginState" class="glass-card login-card">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <h3 class="login-title">Admin Sign-In</h3>
-          <p class="login-subtitle">Analytics and reports require authentication.</p>
-          <div class="login-form">
-            <input id="adminPasswordInput" class="ios-input" type="password" placeholder="Enter admin password">
-            <button id="adminLoginButton" class="ios-button primary" type="button">Unlock</button>
+        <div id="adminLoginState" class="admin-access-shell">
+          <div class="admin-access-accent admin-access-accent-one"></div>
+          <div class="admin-access-accent admin-access-accent-two"></div>
+          <div class="admin-access-card">
+            <div class="admin-access-card-sheen"></div>
+            <div class="admin-access-content">
+              <div class="admin-access-head">
+                <span class="admin-access-kicker">Secure Terminal</span>
+                <h3 class="login-title">Admin Access</h3>
+                <div class="admin-access-rule"></div>
+              </div>
+              <div class="login-form">
+                <label class="stat-label admin-password-label" for="adminPasswordInput">PASSWORD</label>
+                <input id="adminPasswordInput" class="ios-input admin-password-input" type="password" placeholder="........">
+                <button id="adminLoginButton" class="ios-button primary admin-login-btn" type="button">
+                  <span>Initiate Login</span>
+                  <span class="material-symbols-outlined">login</span>
+                </button>
+              </div>
+              <div class="admin-access-foot">
+                <div class="admin-system-status">
+                  <span class="status-dot"></span>
+                  <span>Workshop System Online</span>
+                </div>
+                <p class="login-subtitle">Authorized personnel only. All access attempts are logged under Hemet High School security protocols.</p>
+              </div>
+            </div>
           </div>
+          <p class="admin-login-copyright">© 2026 HEMET HIGH BULLDOG GARAGE</p>
         </div>
 
         <!-- Admin content -->
@@ -346,16 +420,20 @@
     <!-- ========== BOTTOM TAB BAR ========== -->
     <nav class="tab-bar">
       <button class="tab-item is-active" data-view-button="clock" type="button">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span>Clock</span>
+        <span class="material-symbols-outlined tab-icon">dashboard</span>
+        <span>DASHBOARD</span>
       </button>
       <button class="tab-item" data-view-button="progress" type="button">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <span>My Week</span>
+        <span class="material-symbols-outlined tab-icon">history</span>
+        <span>HISTORY</span>
       </button>
       <button class="tab-item" data-view-button="admin" type="button">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>Admin</span>
+        <span class="material-symbols-outlined tab-icon">admin_panel_settings</span>
+        <span>ADMIN</span>
+      </button>
+      <button class="tab-item" type="button">
+        <span class="material-symbols-outlined tab-icon">person</span>
+        <span>PROFILE</span>
       </button>
     </nav>
   </div>
