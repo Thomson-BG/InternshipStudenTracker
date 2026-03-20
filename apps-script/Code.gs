@@ -2,7 +2,7 @@ const CONFIG = {
   spreadsheetId: "1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY",
   timezone: "America/Los_Angeles",
   goLiveDate: "2026-02-24",
-  pointsPerAction: 10,
+  pointsPerAction: 5,
   minMinutesBetweenInOut: 60,
   adminSessionHours: 8,
   cacheTtlSeconds: 60,
@@ -552,6 +552,50 @@ function ensureDerivedSheetsFresh_(context, options) {
   return {
     derivedState: null
   };
+}
+
+/**
+ * Manual maintenance utility for Apps Script editor runs.
+ * Forces a full derived rebuild (Shifts + Points) and returns integrity diagnostics.
+ */
+function rebuildDerivedSheetsNow() {
+  const lock = LockService.getScriptLock();
+  let hasLock = false;
+  lock.waitLock(20000);
+  hasLock = true;
+  try {
+    const context = ensureSchema_();
+    const freshness = ensureDerivedSheetsFresh_(context, { force: true });
+    const derivedState = freshness.derivedState || buildMaterializedState_(context, null, { includePoints: true });
+    const shifts = derivedState.shifts || [];
+    const invalidPointRows = shifts.filter(function (shift) {
+      const validPointSet = shift.checkInPoints === 0 || shift.checkInPoints === CONFIG.pointsPerAction;
+      const validCheckoutSet = shift.checkOutPoints === 0 || shift.checkOutPoints === CONFIG.pointsPerAction;
+      const validMax = Number(shift.totalPoints || 0) <= CONFIG.pointsPerAction * 2;
+      const validSum = Number(shift.totalPoints || 0) === Number(shift.checkInPoints || 0) + Number(shift.checkOutPoints || 0);
+      return !(validPointSet && validCheckoutSet && validMax && validSum);
+    });
+
+    const result = {
+      ok: invalidPointRows.length === 0,
+      rebuiltAt: new Date().toISOString(),
+      pointsPerAction: CONFIG.pointsPerAction,
+      maxDailyPoints: CONFIG.pointsPerAction * 2,
+      totalShifts: shifts.length,
+      totalPointsRows: (derivedState.points || []).length,
+      invalidShiftRows: invalidPointRows.length,
+      sampleInvalidShiftIds: invalidPointRows.slice(0, 10).map(function (row) {
+        return row.shiftId;
+      })
+    };
+
+    Logger.log("Derived rebuild result: %s", JSON.stringify(result));
+    return result;
+  } finally {
+    if (hasLock) {
+      lock.releaseLock();
+    }
+  }
 }
 
 function buildMaterializedState_(context, derivedState, options) {
@@ -1571,14 +1615,17 @@ function listShiftRecords_(shiftsSheet) {
   }
 
   return shiftsSheet.getRange(2, 1, shiftsSheet.getLastRow() - 1, SHIFT_HEADERS.length).getValues().map(function (row) {
+    const localDate = normalizeLocalDateCell_(row[1]);
+    const checkInUtc = normalizeUtcTimestampCell_(row[5]);
+    const checkOutUtc = normalizeUtcTimestampCell_(row[6]);
     return {
       shiftId: stringify_(row[0]),
-      localDate: stringify_(row[1]),
-      studentId: stringify_(row[2]),
+      localDate: localDate,
+      studentId: normalizeStudentId_(row[2]),
       studentName: stringify_(row[3]),
       site: stringify_(row[4]),
-      checkInUtc: stringify_(row[5]),
-      checkOutUtc: stringify_(row[6]),
+      checkInUtc: checkInUtc,
+      checkOutUtc: checkOutUtc,
       durationMinutes: Number(row[7] || 0),
       hoursDecimal: Number(row[8] || 0),
       checkInPoints: Number(row[9] || 0),
@@ -1588,6 +1635,8 @@ function listShiftRecords_(shiftsSheet) {
       source: stringify_(row[13]),
       notes: stringify_(row[14])
     };
+  }).filter(function (row) {
+    return row.localDate && row.studentId;
   });
 }
 
@@ -1598,12 +1647,12 @@ function listPointRecords_(pointsSheet) {
 
   return pointsSheet.getRange(2, 1, pointsSheet.getLastRow() - 1, POINT_HEADERS.length).getValues().map(function (row) {
     return {
-      studentId: stringify_(row[0]),
+      studentId: normalizeStudentId_(row[0]),
       studentName: stringify_(row[1]),
       baselinePoints: Number(row[2] || 0),
       earnedPoints: Number(row[3] || 0),
       totalPoints: Number(row[4] || 0),
-      lastUpdated: row[5] instanceof Date ? row[5].toISOString() : stringify_(row[5])
+      lastUpdated: normalizeUtcTimestampCell_(row[5])
     };
   }).sort(function (a, b) {
     if (b.totalPoints !== a.totalPoints) {
@@ -1619,19 +1668,23 @@ function listAuditRecords_(auditSheet) {
   }
 
   return auditSheet.getRange(2, 1, auditSheet.getLastRow() - 1, AUDIT_HEADERS.length).getValues().map(function (row) {
+    const timestampUtc = normalizeUtcTimestampCell_(row[0]);
+    const localDate = normalizeLocalDateCell_(row[1]) || (timestampUtc ? formatLocalDate_(new Date(timestampUtc)) : "");
     return {
-      timestampUtc: row[0] instanceof Date ? row[0].toISOString() : stringify_(row[0]),
-      localDate: stringify_(row[1]),
+      timestampUtc: timestampUtc,
+      localDate: localDate,
       actorType: stringify_(row[2]),
-      studentId: stringify_(row[3]),
+      studentId: normalizeStudentId_(row[3]),
       action: stringify_(row[4]),
       outcomeCode: stringify_(row[5]),
       message: stringify_(row[6]),
       site: stringify_(row[7]),
-      lat: row[8],
-      lng: row[9],
+      lat: coerceNumber_(row[8]),
+      lng: coerceNumber_(row[9]),
       metadata: parseJsonSafe_(row[10])
     };
+  }).filter(function (row) {
+    return Boolean(row.timestampUtc);
   });
 }
 
@@ -1675,7 +1728,15 @@ function computeSourceSignature_(logsSheet, baselineMap) {
   const baselineRows = Object.keys(baselineMap).sort().map(function (studentId) {
     return studentId + ":" + baselineMap[studentId];
   }).join("|");
-  return sha256Hex_([String(lastRow), String(lastColumn), lastRowSignature, baselineRows].join("\n---\n"));
+  return sha256Hex_([
+    String(lastRow),
+    String(lastColumn),
+    lastRowSignature,
+    baselineRows,
+    "POINTS_PER_ACTION=" + String(CONFIG.pointsPerAction),
+    "GO_LIVE_DATE=" + String(CONFIG.goLiveDate),
+    "MIN_MINUTES_IN_OUT=" + String(CONFIG.minMinutesBetweenInOut)
+  ].join("\n---\n"));
 }
 
 function writeSheetRows_(sheet, headers, rows) {
@@ -1909,7 +1970,7 @@ function getRangeBounds_(range) {
 function filterShiftsByRange_(shifts, range) {
   const bounds = getRangeBounds_(range);
   return shifts.filter(function (shift) {
-    return isLocalDateInRange_(shift.localDate, bounds);
+    return isLocalDateInRange_(normalizeLocalDateCell_(shift.localDate), bounds);
   });
 }
 
@@ -1941,13 +2002,20 @@ function filterShiftsBySite_(shifts, site) {
 }
 
 function isLocalDateInRange_(localDate, bounds) {
+  const canonicalDate = normalizeLocalDateCell_(localDate);
+  if (!canonicalDate) {
+    return false;
+  }
+
+  const start = normalizeLocalDateCell_(bounds && bounds.start) || "";
+  const end = normalizeLocalDateCell_(bounds && bounds.end) || "";
   if (!bounds) {
     return true;
   }
-  if (bounds.start && localDate < bounds.start) {
+  if (start && canonicalDate < start) {
     return false;
   }
-  if (bounds.end && localDate > bounds.end) {
+  if (end && canonicalDate > end) {
     return false;
   }
   return true;
@@ -2037,6 +2105,59 @@ function normalizeHeaderCell_(value) {
 
 function formatLocalDate_(dateObj) {
   return Utilities.formatDate(dateObj, CONFIG.timezone, "yyyy-MM-dd");
+}
+
+function normalizeLocalDateCell_(value) {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return formatLocalDate_(value);
+  }
+
+  const text = stringify_(value);
+  if (!text) {
+    return "";
+  }
+
+  if (isLocalDateString_(text)) {
+    return text;
+  }
+
+  const parsed = new Date(text);
+  if (parsed instanceof Date && !isNaN(parsed.getTime())) {
+    return formatLocalDate_(parsed);
+  }
+
+  return "";
+}
+
+function normalizeUtcTimestampCell_(value) {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+
+  const text = stringify_(value);
+  if (!text) {
+    return "";
+  }
+
+  if (isLocalDateString_(text)) {
+    const dayStamp = new Date(text + "T00:00:00Z");
+    return dayStamp instanceof Date && !isNaN(dayStamp.getTime()) ? dayStamp.toISOString() : "";
+  }
+
+  const parsed = new Date(text);
+  if (parsed instanceof Date && !isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+
+  return "";
 }
 
 function normalizeStudentId_(value) {

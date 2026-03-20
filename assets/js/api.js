@@ -357,8 +357,8 @@ function buildMetricsByStudent(shifts, studentDirectory) {
   return lookup;
 }
 
-function buildStudentDirectory(shifts) {
-  const directory = { ...ROSTER_FALLBACK };
+function buildStudentDirectory(shifts, roster = null) {
+  const directory = { ...ROSTER_FALLBACK, ...(roster || {}) };
   shifts.forEach((shift) => {
     const studentId = normalizeStudentId(shift.studentId);
     if (studentId) {
@@ -478,6 +478,52 @@ function parseShiftRows(rows) {
   })).filter((row) => row.studentId && row.localDate);
 }
 
+function parseRosterRows(rows) {
+  if (!rows.length) {
+    return {};
+  }
+
+  const [headers, ...records] = rows;
+  const index = buildHeaderIndex(headers);
+  const roster = {};
+
+  records.forEach((row) => {
+    const studentId = normalizeStudentId(getCell(row, index, "studentid", 0));
+    const studentName = String(getCell(row, index, "studentname", 1) || "").trim();
+    const status = String(getCell(row, index, "status", 2) || "active").trim().toLowerCase();
+    if (!studentId || !studentName || status === "inactive") {
+      return;
+    }
+    roster[studentId] = studentName;
+  });
+
+  return roster;
+}
+
+function parseAuditRows(rows) {
+  if (!rows.length) {
+    return [];
+  }
+
+  const [headers, ...records] = rows;
+  const index = buildHeaderIndex(headers);
+  return records.map((row) => {
+    const timestampUtc = String(getCell(row, index, "timestamputc", 0) || "");
+    const localDate = String(getCell(row, index, "localdate", 1) || "");
+    return {
+      timestampUtc,
+      localDate: localDate || (timestampUtc ? new Date(timestampUtc).toISOString().slice(0, 10) : ""),
+      actorType: String(getCell(row, index, "actortype", 2) || ""),
+      studentId: normalizeStudentId(getCell(row, index, "studentid", 3)),
+      action: String(getCell(row, index, "action", 4) || ""),
+      outcomeCode: String(getCell(row, index, "outcomecode", 5) || ""),
+      message: String(getCell(row, index, "message", 6) || "")
+    };
+  }).filter((row) => row.timestampUtc).sort((a, b) => {
+    return (Date.parse(b.timestampUtc) || 0) - (Date.parse(a.timestampUtc) || 0);
+  });
+}
+
 async function buildStudentDashboardFromSheet(studentId, range = "week", options = {}) {
   const normalizedStudentId = normalizeStudentId(studentId);
   const shiftRows = parseShiftRows(await fetchSheetCsv("Shifts", options));
@@ -510,6 +556,512 @@ async function buildStudentDashboardFromSheet(studentId, range = "week", options
       topPoints: summaries[range]?.topPoints || 0,
       topHours: summaries[range]?.topHours || 0,
       benchmarkLabel: `Top student in ${range}`
+    }
+  };
+}
+
+function localDateToUtcDate(localDate) {
+  const [year, month, day] = String(localDate || "").split("-").map(Number);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function shortDateLabel(localDate) {
+  const date = localDateToUtcDate(localDate);
+  if (!date) {
+    return String(localDate || "");
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    month: "numeric",
+    day: "numeric",
+    timeZone: "UTC"
+  }).format(date);
+}
+
+function buildDateSpan(startDate, endDate) {
+  const start = localDateToUtcDate(startDate);
+  const end = localDateToUtcDate(endDate);
+  if (!start || !end || start > end) {
+    return [];
+  }
+
+  const dates = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+function resolveSeriesBounds(bounds, shifts) {
+  const sortedDates = shifts
+    .map((shift) => String(shift.localDate || ""))
+    .filter(Boolean)
+    .sort();
+  const fallbackToday = pacificToday();
+  return {
+    start: bounds.start || sortedDates[0] || fallbackToday,
+    end: bounds.end || sortedDates[sortedDates.length - 1] || fallbackToday
+  };
+}
+
+function buildDailySeries(startDate, endDate, shifts, valueSelector) {
+  const grouped = {};
+  shifts.forEach((shift) => {
+    const key = String(shift.localDate || "");
+    if (!key) {
+      return;
+    }
+    grouped[key] = round((grouped[key] || 0) + toNumber(valueSelector(shift)), 2);
+  });
+
+  return buildDateSpan(startDate, endDate).map((localDate) => ({
+    date: localDate,
+    label: shortDateLabel(localDate),
+    value: round(toNumber(grouped[localDate] || 0), 2)
+  }));
+}
+
+function summarizeRange(shifts, rankedList) {
+  const activeStudents = new Set();
+  let pointsTotal = 0;
+  let hoursTotal = 0;
+  let completedShifts = 0;
+  let openShifts = 0;
+  let exceptionCount = 0;
+
+  shifts.forEach((shift) => {
+    activeStudents.add(shift.studentId);
+    pointsTotal += toNumber(shift.totalPoints);
+    hoursTotal += toNumber(shift.hoursDecimal);
+    const status = String(shift.status || "").toUpperCase();
+    if (COMPLETE_STATUSES.has(status)) {
+      completedShifts += 1;
+    } else if (status === "OPEN") {
+      openShifts += 1;
+    } else if (status === "EXCEPTION") {
+      exceptionCount += 1;
+    }
+  });
+
+  const activeCount = activeStudents.size;
+  return {
+    activeStudents: activeCount,
+    pointsTotal: round(pointsTotal, 1),
+    hoursTotal: round(hoursTotal, 2),
+    completedShifts,
+    openShifts,
+    exceptionCount,
+    averagePoints: activeCount ? round(pointsTotal / activeCount, 1) : 0,
+    averageHours: activeCount ? round(hoursTotal / activeCount, 2) : 0,
+    topPoints: rankedList.length ? toNumber(rankedList[0].topPoints) : 0,
+    topHours: rankedList.length ? toNumber(rankedList[0].topHours) : 0,
+    topStudentName: rankedList.length ? rankedList[0].studentName : "No benchmark yet"
+  };
+}
+
+function buildTodaySummary(shifts, site) {
+  const today = pacificToday();
+  const todayShifts = shifts.filter((shift) => {
+    if (shift.localDate !== today) {
+      return false;
+    }
+    if (!site || site === "all") {
+      return true;
+    }
+    return String(shift.site || "") === site;
+  });
+
+  const activeStudents = new Set();
+  let completedShifts = 0;
+  let openShifts = 0;
+  let exceptionCount = 0;
+
+  todayShifts.forEach((shift) => {
+    activeStudents.add(shift.studentId);
+    const status = String(shift.status || "").toUpperCase();
+    if (COMPLETE_STATUSES.has(status)) {
+      completedShifts += 1;
+    } else if (status === "OPEN") {
+      openShifts += 1;
+    } else if (status === "EXCEPTION") {
+      exceptionCount += 1;
+    }
+  });
+
+  return {
+    localDate: today,
+    activeStudents: activeStudents.size,
+    completedShifts,
+    openShifts,
+    exceptionCount
+  };
+}
+
+function buildSiteBreakdown(shifts) {
+  const map = {};
+  shifts.forEach((shift) => {
+    const site = String(shift.site || "Unknown");
+    if (!map[site]) {
+      map[site] = {
+        site,
+        points: 0,
+        hours: 0,
+        completedShifts: 0
+      };
+    }
+    map[site].points += toNumber(shift.totalPoints);
+    map[site].hours += toNumber(shift.hoursDecimal);
+    if (COMPLETE_STATUSES.has(String(shift.status || "").toUpperCase())) {
+      map[site].completedShifts += 1;
+    }
+  });
+
+  return Object.values(map).map((row) => ({
+    site: row.site,
+    points: round(row.points, 1),
+    hours: round(row.hours, 2),
+    completedShifts: row.completedShifts
+  })).sort((a, b) => b.points - a.points);
+}
+
+function buildExceptionBreakdown(shifts) {
+  const buckets = {
+    COMPLETE: 0,
+    OPEN: 0,
+    EXCEPTION: 0
+  };
+  shifts.forEach((shift) => {
+    const status = String(shift.status || "").toUpperCase();
+    if (COMPLETE_STATUSES.has(status)) {
+      buckets.COMPLETE += 1;
+    } else if (status === "OPEN") {
+      buckets.OPEN += 1;
+    } else {
+      buckets.EXCEPTION += 1;
+    }
+  });
+  return [
+    { label: "Complete", value: buckets.COMPLETE },
+    { label: "Open", value: buckets.OPEN },
+    { label: "Exception", value: buckets.EXCEPTION }
+  ];
+}
+
+function buildCohortHeatmapSeries(shifts) {
+  const maxDate = pacificToday();
+  const minDate = shiftLocalDateString(maxDate, -83);
+  const grouped = {};
+
+  shifts.forEach((shift) => {
+    if (shift.localDate < minDate || shift.localDate > maxDate) {
+      return;
+    }
+    if (!grouped[shift.localDate]) {
+      grouped[shift.localDate] = {
+        activeStudents: new Set(),
+        points: 0,
+        hours: 0
+      };
+    }
+    grouped[shift.localDate].activeStudents.add(shift.studentId);
+    grouped[shift.localDate].points += toNumber(shift.totalPoints);
+    grouped[shift.localDate].hours += toNumber(shift.hoursDecimal);
+  });
+
+  const maxActive = Math.max(
+    0,
+    ...Object.values(grouped).map((row) => row.activeStudents.size)
+  );
+
+  return buildDateSpan(minDate, maxDate).map((localDate) => {
+    const day = grouped[localDate];
+    const activeStudents = day ? day.activeStudents.size : 0;
+    const points = day ? day.points : 0;
+    const hours = day ? day.hours : 0;
+    return {
+      date: localDate,
+      label: localDate,
+      activeStudents,
+      points: round(points, 1),
+      hours: round(hours, 2),
+      intensity: maxActive > 0 ? round((activeStudents / maxActive) * 100, 1) : 0
+    };
+  });
+}
+
+function filterAuditByRange(auditRows, range) {
+  const bounds = getRangeBounds(range);
+  return auditRows.filter((row) => isLocalDateInRange(row.localDate, bounds));
+}
+
+function hasMetricActivity(metrics = {}) {
+  return [
+    metrics.points,
+    metrics.totalPoints,
+    metrics.hours,
+    metrics.hoursDecimal,
+    metrics.completedShifts,
+    metrics.openShifts,
+    metrics.exceptionCount,
+    metrics.activityDays
+  ].some((value) => toNumber(value) > 0);
+}
+
+function hasSummaryActivity(summary = {}) {
+  return [
+    summary.pointsTotal,
+    summary.hoursTotal,
+    summary.completedShifts,
+    summary.openShifts,
+    summary.exceptionCount,
+    summary.activeStudents
+  ].some((value) => toNumber(value) > 0);
+}
+
+function hasAnyDashboardActivity(payload = {}) {
+  if (hasSummaryActivity(payload.selected || {})) {
+    return true;
+  }
+
+  const students = Array.isArray(payload.students) ? payload.students : [];
+  if (students.some((row) => ["week", "month", "overall", "selectedRange"].some((key) => hasMetricActivity(row?.[key] || {})))) {
+    return true;
+  }
+
+  if ((payload.recentShifts || []).length > 0 || (payload.exceptions || []).length > 0) {
+    return true;
+  }
+
+  if ((payload.leaderboard || []).some((entry) => toNumber(entry.points) > 0 || toNumber(entry.hours) > 0)) {
+    return true;
+  }
+
+  return false;
+}
+
+async function probeShiftSourceQuality(options = {}) {
+  try {
+    const shiftCsv = await fetchSheetCsv("Shifts", options);
+    const shifts = parseShiftRows(shiftCsv);
+    const hasRows = shifts.length > 0;
+    const hasActivity = shifts.some((row) => (
+      toNumber(row.totalPoints) > 0 ||
+      toNumber(row.hoursDecimal) > 0 ||
+      Boolean(String(row.status || "").trim())
+    ));
+    return {
+      ok: true,
+      rowCount: shifts.length,
+      hasRows,
+      hasActivity
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      rowCount: 0,
+      hasRows: false,
+      hasActivity: false
+    };
+  }
+}
+
+function withAdminDiagnostics(data, meta) {
+  const diagnostics = meta?.diagnostics || {};
+  return {
+    ...(data || {}),
+    source: meta?.source || "apps_script",
+    dataQuality: meta?.dataQuality || "ok",
+    diagnostics
+  };
+}
+
+async function reconcileAdminPayloadQuality(serverData, range, site, options = {}) {
+  if (hasAnyDashboardActivity(serverData)) {
+    const meta = {
+      source: "apps_script",
+      dataQuality: "ok",
+      fallbackUsed: false,
+      diagnostics: {}
+    };
+    return {
+      data: withAdminDiagnostics(serverData, meta),
+      meta
+    };
+  }
+
+  const sourceProbe = await probeShiftSourceQuality(options);
+  if (!sourceProbe.ok || !sourceProbe.hasRows) {
+    const meta = {
+      source: "apps_script",
+      dataQuality: "empty_dataset",
+      fallbackUsed: false,
+      diagnostics: {
+        shiftRows: sourceProbe.rowCount,
+        sourceProbeOk: sourceProbe.ok
+      }
+    };
+    return {
+      data: withAdminDiagnostics(serverData, meta),
+      meta
+    };
+  }
+
+  try {
+    const fallbackData = await buildAdminDashboardFromSheet(range || "overall", site || "all", options);
+    const fallbackHasActivity = hasAnyDashboardActivity(fallbackData);
+    const meta = {
+      source: "sheet_fallback",
+      dataQuality: fallbackHasActivity ? "recovered_zeroed_backend" : "fallback_zero_activity",
+      fallbackUsed: true,
+      diagnostics: {
+        shiftRows: sourceProbe.rowCount
+      }
+    };
+    return {
+      data: withAdminDiagnostics(fallbackData, meta),
+      meta
+    };
+  } catch (fallbackError) {
+    const meta = {
+      source: "apps_script",
+      dataQuality: "suspect_zeroed_backend",
+      fallbackUsed: false,
+      diagnostics: {
+        shiftRows: sourceProbe.rowCount,
+        fallbackError: String(fallbackError?.message || fallbackError || "")
+      }
+    };
+    return {
+      data: withAdminDiagnostics(serverData, meta),
+      meta
+    };
+  }
+}
+
+async function buildAdminDashboardFromSheet(range = "overall", site = "all", options = {}) {
+  const [shiftCsv, rosterCsv, auditCsv] = await Promise.all([
+    fetchSheetCsv("Shifts", options),
+    fetchSheetCsv("Roster", options).catch(() => []),
+    fetchSheetCsv("Audit", options).catch(() => [])
+  ]);
+
+  const shiftRows = parseShiftRows(shiftCsv);
+  const roster = parseRosterRows(rosterCsv);
+  const auditTrail = parseAuditRows(auditCsv);
+  const studentDirectory = buildStudentDirectory(shiftRows, roster);
+  const knownSites = Array.from(new Set(shiftRows.map((row) => String(row.site || "")).filter(Boolean))).sort();
+
+  const rangeData = {};
+  ["week", "month", "overall"].forEach((rangeKey) => {
+    const bounds = getRangeBounds(rangeKey);
+    const filteredShifts = shiftRows.filter((shift) => {
+      if (!isLocalDateInRange(shift.localDate, bounds)) {
+        return false;
+      }
+      if (!site || site === "all") {
+        return true;
+      }
+      return String(shift.site || "") === site;
+    });
+
+    const metricsByStudent = buildMetricsByStudent(filteredShifts, studentDirectory);
+    const rankedList = Object.values(metricsByStudent).sort((a, b) => (a.rank || 0) - (b.rank || 0));
+
+    rangeData[rangeKey] = {
+      filteredShifts,
+      metricsByStudent,
+      rankedList,
+      summary: summarizeRange(filteredShifts, rankedList)
+    };
+  });
+
+  const selectedRange = rangeData[range] || rangeData.overall;
+  const selectedShifts = selectedRange.filteredShifts;
+  const selectedBounds = resolveSeriesBounds(getRangeBounds(range), selectedShifts);
+
+  const students = Object.keys(studentDirectory).map((studentId) => {
+    const studentName = studentDirectory[studentId];
+    return {
+      studentId,
+      studentName,
+      week: rangeData.week.metricsByStudent[studentId] || emptyStudentMetrics(studentId, studentName),
+      month: rangeData.month.metricsByStudent[studentId] || emptyStudentMetrics(studentId, studentName),
+      overall: rangeData.overall.metricsByStudent[studentId] || emptyStudentMetrics(studentId, studentName),
+      selectedRange: selectedRange.metricsByStudent[studentId] || emptyStudentMetrics(studentId, studentName)
+    };
+  }).sort((a, b) => a.studentName.localeCompare(b.studentName));
+
+  const exceptions = selectedShifts
+    .filter((shift) => {
+      const status = String(shift.status || "").toUpperCase();
+      return status === "OPEN" || status === "EXCEPTION";
+    })
+    .sort(sortShiftsDesc)
+    .slice(0, 20)
+    .map((shift) => ({
+      studentId: shift.studentId,
+      studentName: shift.studentName,
+      localDate: shift.localDate,
+      status: shift.status,
+      site: shift.site,
+      message: String(shift.status || "").toUpperCase() === "OPEN"
+        ? "Checkout still missing."
+        : (shift.notes || "Shift needs review."),
+      lastActivityUtc: shift.checkOutUtc || shift.checkInUtc || ""
+    }));
+
+  const recentShifts = selectedShifts.slice().sort(sortShiftsDesc).slice(0, 12);
+
+  return {
+    currentRange: range,
+    currentSite: site || "all",
+    generatedAt: new Date().toISOString(),
+    sites: ["all", ...knownSites],
+    summaries: {
+      week: rangeData.week.summary,
+      month: rangeData.month.summary,
+      overall: rangeData.overall.summary
+    },
+    today: buildTodaySummary(shiftRows, site),
+    selected: selectedRange.summary,
+    leaderboard: selectedRange.rankedList,
+    students,
+    charts: {
+      pointsTrend: buildDailySeries(selectedBounds.start, selectedBounds.end, selectedShifts, (shift) => shift.totalPoints),
+      hoursTrend: buildDailySeries(selectedBounds.start, selectedBounds.end, selectedShifts, (shift) => shift.hoursDecimal),
+      leaderboard: selectedRange.rankedList.slice(0, 10).map((row) => ({
+        label: row.studentName,
+        studentId: row.studentId,
+        points: row.points,
+        hours: row.hours,
+        pointsPctOfTop: row.pointsPctOfTop,
+        hoursPctOfTop: row.hoursPctOfTop
+      })),
+      scatter: selectedRange.rankedList.map((row) => ({
+        label: row.studentName,
+        studentId: row.studentId,
+        x: row.hours,
+        y: row.points
+      })),
+      siteBreakdown: buildSiteBreakdown(selectedShifts),
+      exceptionBreakdown: buildExceptionBreakdown(selectedShifts),
+      heatmap: buildCohortHeatmapSeries(
+        !site || site === "all"
+          ? shiftRows
+          : shiftRows.filter((shift) => String(shift.site || "") === site)
+      )
+    },
+    exceptions,
+    auditTrail: filterAuditByRange(auditTrail, range).slice(0, 15),
+    recentShifts,
+    printable: {
+      title: "Cohort Summary Report",
+      subtitle: `${range} / ${site || "all"}`,
+      generatedAt: new Date().toISOString()
     }
   };
 }
@@ -550,7 +1102,36 @@ export async function fetchStudentDashboard(studentId, range = "week", options =
 }
 
 export async function fetchAdminDashboard({ token, range, site }, options = {}) {
-  return requestJson(API_ENDPOINTS.adminDashboard(token, range, site), options);
+  const normalizedRange = range || "overall";
+  const normalizedSite = site || "all";
+  try {
+    const response = await requestJson(API_ENDPOINTS.adminDashboard(token, normalizedRange, normalizedSite), options);
+    if (response?.data) {
+      const reconciled = await reconcileAdminPayloadQuality(response.data, normalizedRange, normalizedSite, options);
+      return {
+        ok: true,
+        data: reconciled.data,
+        meta: reconciled.meta
+      };
+    }
+  } catch (error) {
+    if (error?.code === "AUTH_REQUIRED") {
+      throw error;
+    }
+  }
+
+  const fallbackData = await buildAdminDashboardFromSheet(normalizedRange, normalizedSite, options);
+  const fallbackMeta = {
+    source: "sheet_fallback",
+    dataQuality: hasAnyDashboardActivity(fallbackData) ? "backend_unavailable_recovered" : "backend_unavailable_empty",
+    fallbackUsed: true,
+    diagnostics: {}
+  };
+  return {
+    ok: true,
+    data: withAdminDiagnostics(fallbackData, fallbackMeta),
+    meta: fallbackMeta
+  };
 }
 
 export async function fetchReportData({ token, type, range, site, studentId }) {

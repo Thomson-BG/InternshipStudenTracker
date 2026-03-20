@@ -84,6 +84,7 @@ const dom = {
   adminSiteSelect: document.getElementById("adminSiteSelect"),
   adminStatusSelect: document.getElementById("adminStatusSelect"),
   adminSearchInput: document.getElementById("adminSearchInput"),
+  adminStateNotice: document.getElementById("adminStateNotice"),
   adminKpiGrid: document.getElementById("adminKpiGrid"),
   adminStudentsTableBody: document.getElementById("adminStudentsTableBody"),
   adminExceptionList: document.getElementById("adminExceptionList"),
@@ -1295,6 +1296,10 @@ function clearAdminSession() {
   state.admin.token = "";
   state.admin.expiresAt = "";
   state.admin.dashboard = null;
+  state.admin.loading = false;
+  state.admin.error = "";
+  state.admin.dataSource = "";
+  state.admin.dataQuality = "";
   state.admin.selectedStudent = null;
   sessionStorage.removeItem(ADMIN_SESSION_KEY);
   renderAdminState();
@@ -1307,6 +1312,9 @@ function renderAdminState() {
   dom.adminLoginState.classList.toggle("is-hidden", authenticated);
   dom.adminContent.classList.toggle("is-hidden", !authenticated);
   if (!authenticated) {
+    setAdminNotice("", "info");
+  }
+  if (!authenticated) {
     closeDetailDrawer();
   }
 }
@@ -1317,6 +1325,10 @@ async function loadAdminDashboard(retries = 3) {
     return;
   }
 
+  state.admin.loading = true;
+  state.admin.error = "";
+  renderAdminLoadingState(retries < 3 ? "Retrying admin analytics…" : "Loading admin analytics…");
+
   try {
     const response = await fetchAdminDashboard({
       token: state.admin.token,
@@ -1324,13 +1336,19 @@ async function loadAdminDashboard(retries = 3) {
       site: state.admin.site
     });
     state.admin.dashboard = response.data;
+    state.admin.loading = false;
+    state.admin.error = "";
+    state.admin.dataSource = response?.meta?.source || response?.data?.source || "apps_script";
+    state.admin.dataQuality = response?.meta?.dataQuality || response?.data?.dataQuality || "ok";
     populateAdminSiteSelect(response.data.sites || []);
     renderAdminState();
     renderAdminDashboard();
+    renderAdminDiagnosticsNotice();
     if (state.admin.selectedStudent) {
       openStudentDetail(state.admin.selectedStudent.studentId);
     }
   } catch (error) {
+    state.admin.loading = false;
     if (error.code === "AUTH_REQUIRED") {
       clearAdminSession();
       showToast("Admin session expired. Sign in again.", "danger");
@@ -1343,7 +1361,10 @@ async function loadAdminDashboard(retries = 3) {
       return;
     }
 
-    showToast(error.message || "Unable to load admin dashboard.", "danger");
+    const message = error.message || "Unable to load admin dashboard.";
+    state.admin.error = message;
+    renderAdminErrorState(message);
+    showToast(message, "danger");
   }
 }
 
@@ -1373,6 +1394,114 @@ function renderAdminDashboard() {
   if (state.currentView === "admin") {
     renderAdminCharts(state.admin.dashboard);
   }
+  if (!adminDashboardHasActivity(state.admin.dashboard)) {
+    renderAdminNoDataState("No analytics data for the current filters yet. Try Overall and All Sites.");
+  }
+}
+
+function adminDashboardHasActivity(dashboard) {
+  if (!dashboard) {
+    return false;
+  }
+  const selected = dashboard.selected || {};
+  const selectedHasActivity = [
+    selected.pointsTotal,
+    selected.hoursTotal,
+    selected.completedShifts,
+    selected.openShifts,
+    selected.exceptionCount,
+    selected.activeStudents
+  ].some((value) => Number(value || 0) > 0);
+  if (selectedHasActivity) {
+    return true;
+  }
+
+  if ((dashboard.recentShifts || []).length > 0 || (dashboard.exceptions || []).length > 0) {
+    return true;
+  }
+
+  return (dashboard.leaderboard || []).some((row) => Number(row.points || 0) > 0 || Number(row.hours || 0) > 0);
+}
+
+function setAdminNotice(message, tone = "info") {
+  if (!dom.adminStateNotice) {
+    return;
+  }
+
+  dom.adminStateNotice.classList.remove("is-hidden", "error", "success");
+  dom.adminStateNotice.textContent = message || "";
+
+  if (!message) {
+    dom.adminStateNotice.classList.add("is-hidden");
+    return;
+  }
+
+  if (tone === "danger") {
+    dom.adminStateNotice.classList.add("error");
+  } else if (tone === "success") {
+    dom.adminStateNotice.classList.add("success");
+  }
+}
+
+function renderAdminLoadingState(message = "Loading admin analytics…") {
+  setAdminNotice(message, "info");
+  dom.adminKpiGrid.innerHTML = `
+    <div class="loading-row">
+      <span class="loading-spinner"></span>
+      <span>${escapeHtml(message)}</span>
+    </div>
+  `;
+  dom.adminStudentsTableBody.innerHTML = `<tr><td colspan="8" class="empty-copy">Loading student analytics…</td></tr>`;
+  dom.adminExceptionList.innerHTML = `<div class="empty-copy">Loading exceptions…</div>`;
+  dom.auditTrailList.innerHTML = `<div class="empty-copy">Loading audit trail…</div>`;
+}
+
+function renderAdminErrorState(message) {
+  setAdminNotice(message || "Unable to load admin analytics.", "danger");
+  dom.adminKpiGrid.innerHTML = `<div class="empty-copy">${escapeHtml(message || "Unable to load admin analytics.")}</div>`;
+  dom.adminStudentsTableBody.innerHTML = `<tr><td colspan="8" class="empty-copy">${escapeHtml(message || "Unable to load student analytics.")}</td></tr>`;
+  dom.adminExceptionList.innerHTML = `<div class="empty-copy">No exception data available because the dashboard failed to load.</div>`;
+  dom.auditTrailList.innerHTML = `<div class="empty-copy">No audit data available because the dashboard failed to load.</div>`;
+}
+
+function renderAdminNoDataState(message) {
+  setAdminNotice(message, "info");
+}
+
+function renderAdminDiagnosticsNotice() {
+  if (state.admin.loading || state.admin.error) {
+    return;
+  }
+
+  const source = state.admin.dataSource || state.admin.dashboard?.source || "apps_script";
+  const quality = state.admin.dataQuality || state.admin.dashboard?.dataQuality || "ok";
+  const diagnostics = state.admin.dashboard?.diagnostics || {};
+  const shiftRows = Number(diagnostics.shiftRows || 0);
+
+  if (!adminDashboardHasActivity(state.admin.dashboard)) {
+    renderAdminNoDataState("No analytics data for the current filters yet. Try Overall and All Sites.");
+    return;
+  }
+
+  if (source === "sheet_fallback" && quality !== "ok") {
+    const copy = shiftRows > 0
+      ? `Analytics recovered from Google Sheet fallback (${shiftRows} shift rows).`
+      : "Analytics recovered from Google Sheet fallback.";
+    setAdminNotice(copy, "success");
+    return;
+  }
+
+  if (quality === "suspect_zeroed_backend") {
+    setAdminNotice("Apps Script returned a zeroed payload while sheet rows exist. Refresh after redeploying Apps Script.", "danger");
+    return;
+  }
+
+  if (quality !== "ok" && quality !== "empty_dataset") {
+    setAdminNotice(`Analytics quality status: ${quality}.`, "info");
+    return;
+  }
+
+  setAdminNotice("", "info");
 }
 
 function adminKpiMarkup(dashboard) {

@@ -18,10 +18,10 @@ Intern Track v2 is a static frontend plus Google Apps Script backend that uses a
 
 ## Core Attendance Rules
 
-- `Check In` = `+10` points
-- `Check Out` = `+10` points
+- `Check In` = `+5` points
+- `Check Out` = `+5` points
 - Max `1` accepted check-in and `1` accepted check-out per student per local day
-- Max `20` points per student per day
+- Max `10` points per student per day
 - `Check Out` requires a same-day `Check In`
 - Minimum `60` minutes between accepted check-in and accepted check-out
 - Timezone: `America/Los_Angeles`
@@ -111,7 +111,7 @@ Success response:
 {
   "ok": true,
   "code": "RECORDED",
-  "pointsDelta": 10,
+  "pointsDelta": 5,
   "totalPoints": 40,
   "localDate": "2026-03-08",
   "action": "Check In"
@@ -224,3 +224,4 @@ Then open:
    - Who has access: `Anyone` (or your preferred policy)
 4. Update `APPS_SCRIPT_URL` in `assets/js/config.js` if the deployment URL changes.
 5. If you want a different admin password, set `ADMIN_PASSWORD_HASH` in Apps Script `Script Properties`.
+6. In the Apps Script editor, run `rebuildDerivedSheetsNow()` once after deploy to force-refresh `Shifts`/`Points` from `Logs` and verify the `+5/+5` (max `10/day`) rule integrity.
