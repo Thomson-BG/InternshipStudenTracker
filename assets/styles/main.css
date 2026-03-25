@@ -693,76 +693,51 @@ textarea {
   border-radius: var(--radius-sm);
   background: var(--surface-lowest);
   border: 1px solid color-mix(in srgb, var(--outline-variant) 35%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
 }
 
-.location-grid-dots {
+.location-map-canvas {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, color-mix(in srgb, var(--surface-high) 92%, transparent) 1px, transparent 1px);
-  background-size: 22px 22px;
-  opacity: 0.65;
-}
-
-.location-ring {
-  width: min(68vw, 260px);
-  aspect-ratio: 1 / 1;
-  border-radius: 50%;
-  border: 2px dashed color-mix(in srgb, var(--secondary) 36%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--secondary) 6%, transparent);
-  position: relative;
-}
-
-.location-core-glow {
-  position: absolute;
-  width: 130px;
-  height: 130px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--secondary) 28%, transparent);
-  filter: blur(26px);
-}
-
-.location-pin-wrap {
-  position: relative;
   z-index: 1;
-  display: flex;
+  background:
+    radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--secondary) 10%, transparent), transparent 32%),
+    radial-gradient(circle at 80% 18%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 30%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-highest) 45%, var(--surface-lowest)), var(--surface-lowest));
+}
+
+.location-map-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-}
-
-.location-pin {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--secondary);
-  color: var(--on-secondary);
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--secondary) 30%, transparent);
+  gap: 6px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-lowest) 92%, transparent);
+  transition: opacity 140ms ease;
 }
 
-.location-pin .material-symbols-outlined {
-  font-size: 24px;
-  font-variation-settings: "FILL" 1, "wght" 600, "GRAD" 0, "opsz" 24;
+.location-map-shell.map-ready:not(.map-inline-status) .location-map-fallback {
+  opacity: 0;
+  pointer-events: none;
 }
 
-.location-pin-label {
-  padding: 5px 8px;
-  background: color-mix(in srgb, var(--surface-highest) 90%, transparent);
+.location-map-shell.map-inline-status .location-map-fallback {
+  inset: auto 10px 54px 10px;
+  width: auto;
+  min-height: 0;
+  padding: 8px 10px;
+  flex-direction: row;
+  justify-content: flex-start;
   border-radius: var(--radius-sm);
-  font-family: var(--font-headline);
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 32%, transparent);
+  background: color-mix(in srgb, var(--surface-lowest) 86%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.18);
+  z-index: 4;
 }
 
 .location-coordinates {
@@ -772,6 +747,11 @@ textarea {
   bottom: 10px;
   display: flex;
   gap: 16px;
+  z-index: 3;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-lowest) 88%, transparent);
+  backdrop-filter: blur(2px);
 }
 
 .coord-item {
@@ -793,6 +773,28 @@ textarea {
   font-family: var(--font-headline);
   font-size: 0.7rem;
   color: var(--text-soft);
+}
+
+.location-map-shell .leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+.location-map-shell .leaflet-control-attribution {
+  font-size: 0.55rem;
+  background: color-mix(in srgb, var(--surface-lowest) 90%, transparent);
+  color: var(--text-muted);
+}
+
+.location-map-shell .leaflet-bar a {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface-high) 90%, transparent);
+  border-color: color-mix(in srgb, var(--outline-variant) 40%, transparent);
+}
+
+.location-map-shell .leaflet-control-attribution a {
+  color: var(--secondary);
 }
 
 .feedback-message {

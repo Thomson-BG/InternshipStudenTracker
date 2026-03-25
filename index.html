@@ -116,15 +116,10 @@
           </div>
           <div id="locationStatusBanner" class="info-banner" data-tone="info">Waiting for device GPS.</div>
           <div class="location-map-shell">
-            <div class="location-grid-dots"></div>
-            <div class="location-ring">
-              <div class="location-core-glow"></div>
-              <div class="location-pin-wrap">
-                <div class="location-pin">
-                  <span class="material-symbols-outlined">location_on</span>
-                </div>
-                <div class="location-pin-label">Verified Location</div>
-              </div>
+            <div id="locationMapCanvas" class="location-map-canvas" aria-label="Live internship location map"></div>
+            <div id="locationMapFallback" class="location-map-fallback">
+              <span class="material-symbols-outlined">map</span>
+              <span>Loading map...</span>
             </div>
             <div class="location-coordinates">
               <div class="coord-item">
@@ -320,6 +315,29 @@
           <div class="glass-card">
             <div class="section-label">Cohort Health</div>
             <div id="adminKpiGrid" class="stats-grid"></div>
+          </div>
+
+          <!-- Today's activity -->
+          <div class="glass-card">
+            <div class="card-head">
+              <div class="section-label">Today's Student Activity</div>
+              <div class="metric-copy">Check-in/out, active status, location, and worked duration</div>
+            </div>
+            <div class="table-scroll">
+              <table class="ios-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Check In</th>
+                    <th>Status</th>
+                    <th>Check Out</th>
+                    <th>Location</th>
+                    <th>Duration</th>
+                  </tr>
+                </thead>
+                <tbody id="adminTodayTableBody"></tbody>
+              </table>
+            </div>
           </div>
 
           <!-- Charts -->

@@ -29,6 +29,8 @@ import {
   toRangeLabel,
   writeJsonStorage
 } from "./utils.js";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 const dom = {
   body: document.body,
@@ -61,6 +63,8 @@ const dom = {
   selectedSiteBadge: document.getElementById("selectedSiteBadge"),
   shiftTimerValue: document.getElementById("shiftTimerValue"),
   mapSiteName: document.getElementById("mapSiteName"),
+  locationMapCanvas: document.getElementById("locationMapCanvas"),
+  locationMapFallback: document.getElementById("locationMapFallback"),
   mapLatValue: document.getElementById("mapLatValue"),
   mapLngValue: document.getElementById("mapLngValue"),
   progressEmptyState: document.getElementById("progressEmptyState"),
@@ -86,6 +90,7 @@ const dom = {
   adminSearchInput: document.getElementById("adminSearchInput"),
   adminStateNotice: document.getElementById("adminStateNotice"),
   adminKpiGrid: document.getElementById("adminKpiGrid"),
+  adminTodayTableBody: document.getElementById("adminTodayTableBody"),
   adminStudentsTableBody: document.getElementById("adminStudentsTableBody"),
   adminExceptionList: document.getElementById("adminExceptionList"),
   adminHeatmap: document.getElementById("adminHeatmap"),
@@ -108,6 +113,17 @@ const dom = {
 let locationWatchId = null;
 let shiftTimerId = null;
 let reportContext = null;
+const locationMapState = {
+  map: null,
+  marker: null,
+  tileLayer: null,
+  geofenceCircle: null,
+  userCircle: null,
+  hasCentered: false,
+  basemapUnavailable: false,
+  unavailable: false,
+  tileErrors: 0
+};
 
 async function init() {
   applyTheme();
@@ -118,6 +134,7 @@ async function init() {
   renderClockView();
   renderProgressView();
   renderAdminState();
+  initializeLocationMap();
   startLocationWatch();
   syncLocationMapFields();
 
@@ -342,6 +359,13 @@ function setView(view) {
 
   if (view === "clock") {
     dom.topbarSummary.textContent = "Use Student Clock for attendance. My Progress stays private to the active student.";
+    window.requestAnimationFrame(() => {
+      initializeLocationMap();
+      if (locationMapState.map) {
+        locationMapState.map.invalidateSize(false);
+        refreshLocationMap();
+      }
+    });
   } else if (view === "progress") {
     dom.topbarSummary.textContent = "My Week shows the active student's weekly points, hours, and the last 7 days of attendance.";
   } else {
@@ -669,6 +693,180 @@ function formatCoordinate(value, axis) {
   return `${abs}° ${suffix}`;
 }
 
+function getLocationMapShell() {
+  return dom.locationMapCanvas?.closest(".location-map-shell") || null;
+}
+
+function setLocationMapState(mode, message) {
+  const shell = getLocationMapShell();
+  if (!shell || !dom.locationMapFallback) {
+    return;
+  }
+
+  const defaults = {
+    loading: { icon: "map", text: "Loading map..." },
+    waiting: { icon: "my_location", text: "Waiting for GPS" },
+    ready: { icon: "check_circle", text: "Map ready" },
+    "basemap-unavailable": { icon: "layers_clear", text: "Basemap unavailable, GPS overlay still active" },
+    unavailable: { icon: "map_off", text: "Map unavailable" }
+  };
+  const selection = defaults[mode] || defaults.loading;
+  const detail = message || selection.text;
+
+  shell.classList.toggle("map-ready", mode === "ready");
+  shell.classList.toggle("map-inline-status", mode === "basemap-unavailable");
+  dom.locationMapFallback.dataset.state = mode;
+  dom.locationMapFallback.innerHTML = `
+    <span class="material-symbols-outlined">${selection.icon}</span>
+    <span>${escapeHtml(detail)}</span>
+  `;
+}
+
+function syncLocationMapState() {
+  const hasGps = Number.isFinite(Number(state.student.currentPos?.lat)) && Number.isFinite(Number(state.student.currentPos?.lng));
+
+  if (locationMapState.unavailable) {
+    setLocationMapState("unavailable");
+    return;
+  }
+
+  if (!locationMapState.map) {
+    setLocationMapState("loading");
+    return;
+  }
+
+  if (locationMapState.basemapUnavailable && hasGps) {
+    setLocationMapState("basemap-unavailable");
+    return;
+  }
+
+  if (!hasGps) {
+    setLocationMapState("waiting");
+    return;
+  }
+
+  setLocationMapState("ready");
+}
+
+function initializeLocationMap() {
+  if (!dom.locationMapCanvas || locationMapState.map || state.currentView !== "clock") {
+    return;
+  }
+
+  setLocationMapState("loading");
+
+  try {
+    const fallbackSite = SITES[0] || { lat: 33.728, lng: -116.934 };
+    const initialLat = Number(fallbackSite.lat);
+    const initialLng = Number(fallbackSite.lng);
+
+    locationMapState.map = L.map(dom.locationMapCanvas, {
+      zoomControl: true,
+      attributionControl: true,
+      preferCanvas: true
+    }).setView([initialLat, initialLng], 14);
+
+    const allowRemoteTiles = !navigator.webdriver;
+    if (allowRemoteTiles) {
+      locationMapState.tileLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(locationMapState.map);
+
+      locationMapState.tileLayer.on("load", () => {
+        locationMapState.basemapUnavailable = false;
+        locationMapState.tileErrors = 0;
+        syncLocationMapState();
+      });
+
+      locationMapState.tileLayer.on("tileerror", () => {
+        locationMapState.tileErrors += 1;
+        if (locationMapState.tileErrors >= 2) {
+          locationMapState.basemapUnavailable = true;
+          console.warn("Map tiles failed to load. Keeping GPS overlay active.");
+          syncLocationMapState();
+        }
+      });
+    } else {
+      locationMapState.basemapUnavailable = true;
+    }
+
+    locationMapState.marker = L.circleMarker([initialLat, initialLng], {
+      radius: 7,
+      color: "#FFFFFF",
+      weight: 2,
+      fillColor: "#0A84FF",
+      fillOpacity: 1
+    }).addTo(locationMapState.map);
+
+    locationMapState.userCircle = L.circle([initialLat, initialLng], {
+      radius: 20,
+      color: "#0A84FF",
+      weight: 2,
+      fillOpacity: 0.22
+    }).addTo(locationMapState.map);
+
+    locationMapState.geofenceCircle = L.circle([initialLat, initialLng], {
+      radius: ALLOWED_RADIUS_METERS,
+      color: "#FF9F0A",
+      weight: 2,
+      dashArray: "6 4",
+      fillOpacity: 0.08
+    }).addTo(locationMapState.map);
+
+    locationMapState.map.whenReady(() => {
+      window.requestAnimationFrame(() => {
+        locationMapState.map.invalidateSize(false);
+        refreshLocationMap();
+      });
+    });
+
+    syncLocationMapState();
+  } catch (error) {
+    locationMapState.unavailable = true;
+    console.warn("Location map failed to initialize.", error);
+    setLocationMapState("unavailable");
+  }
+}
+
+function refreshLocationMap() {
+  if (!locationMapState.map) {
+    return;
+  }
+
+  const site = state.student.selectedSite || null;
+  const lat = Number(state.student.currentPos?.lat);
+  const lng = Number(state.student.currentPos?.lng);
+  const hasGps = Number.isFinite(lat) && Number.isFinite(lng);
+
+  if (site && Number.isFinite(Number(site.lat)) && Number.isFinite(Number(site.lng))) {
+    const siteLat = Number(site.lat);
+    const siteLng = Number(site.lng);
+    locationMapState.geofenceCircle?.setLatLng([siteLat, siteLng]);
+    locationMapState.geofenceCircle?.setRadius(ALLOWED_RADIUS_METERS);
+    if (!hasGps && !locationMapState.hasCentered) {
+      locationMapState.map.setView([siteLat, siteLng], 15);
+    }
+  }
+
+  if (hasGps) {
+    locationMapState.marker?.setLatLng([lat, lng]);
+    locationMapState.userCircle?.setLatLng([lat, lng]);
+    const accuracy = Number(state.student.currentPos?.accuracy);
+    locationMapState.userCircle?.setRadius(Number.isFinite(accuracy) ? Math.max(accuracy, 12) : 20);
+
+    if (!locationMapState.hasCentered) {
+      locationMapState.map.setView([lat, lng], 15);
+      locationMapState.hasCentered = true;
+    } else {
+      locationMapState.map.panTo([lat, lng], { animate: true, duration: 0.25 });
+    }
+  }
+
+  syncLocationMapState();
+  locationMapState.map.invalidateSize(false);
+}
+
 function syncLocationMapFields() {
   if (dom.mapSiteName) {
     dom.mapSiteName.textContent = state.student.selectedSite?.name || "Waiting for approved site match";
@@ -681,6 +879,8 @@ function syncLocationMapFields() {
   if (dom.mapLngValue) {
     dom.mapLngValue.textContent = formatCoordinate(lng, "lng");
   }
+  initializeLocationMap();
+  refreshLocationMap();
 }
 
 function renderProgressView() {
@@ -1389,6 +1589,7 @@ function renderAdminDashboard() {
   dom.adminStatusSelect.value = state.admin.statusFilter;
   dom.adminSearchInput.value = state.admin.search;
   dom.adminKpiGrid.innerHTML = adminKpiMarkup(state.admin.dashboard);
+  renderAdminTodayTable();
   renderAdminTables();
   renderHeatmap(dom.adminHeatmap, dom.adminHeatmapLegend, state.admin.dashboard.charts.heatmap || [], "activeStudents");
   if (state.currentView === "admin") {
@@ -1451,6 +1652,9 @@ function renderAdminLoadingState(message = "Loading admin analytics…") {
       <span>${escapeHtml(message)}</span>
     </div>
   `;
+  if (dom.adminTodayTableBody) {
+    dom.adminTodayTableBody.innerHTML = `<tr><td colspan="6" class="empty-copy">Loading today's activity…</td></tr>`;
+  }
   dom.adminStudentsTableBody.innerHTML = `<tr><td colspan="8" class="empty-copy">Loading student analytics…</td></tr>`;
   dom.adminExceptionList.innerHTML = `<div class="empty-copy">Loading exceptions…</div>`;
   dom.auditTrailList.innerHTML = `<div class="empty-copy">Loading audit trail…</div>`;
@@ -1459,6 +1663,9 @@ function renderAdminLoadingState(message = "Loading admin analytics…") {
 function renderAdminErrorState(message) {
   setAdminNotice(message || "Unable to load admin analytics.", "danger");
   dom.adminKpiGrid.innerHTML = `<div class="empty-copy">${escapeHtml(message || "Unable to load admin analytics.")}</div>`;
+  if (dom.adminTodayTableBody) {
+    dom.adminTodayTableBody.innerHTML = `<tr><td colspan="6" class="empty-copy">No today's activity data available because the dashboard failed to load.</td></tr>`;
+  }
   dom.adminStudentsTableBody.innerHTML = `<tr><td colspan="8" class="empty-copy">${escapeHtml(message || "Unable to load student analytics.")}</td></tr>`;
   dom.adminExceptionList.innerHTML = `<div class="empty-copy">No exception data available because the dashboard failed to load.</div>`;
   dom.auditTrailList.innerHTML = `<div class="empty-copy">No audit data available because the dashboard failed to load.</div>`;
@@ -1502,6 +1709,67 @@ function renderAdminDiagnosticsNotice() {
   }
 
   setAdminNotice("", "info");
+}
+
+function renderAdminTodayTable() {
+  if (!dom.adminTodayTableBody) {
+    return;
+  }
+
+  const rows = state.admin.dashboard?.todayStudents || [];
+  if (!rows.length) {
+    dom.adminTodayTableBody.innerHTML = `<tr><td colspan="6" class="empty-copy">No student activity recorded yet today.</td></tr>`;
+    return;
+  }
+
+  dom.adminTodayTableBody.innerHTML = rows.map((row) => adminTodayRowMarkup(row)).join("");
+}
+
+function adminTodayRowMarkup(row) {
+  const status = String(row.status || "").toUpperCase();
+  const checkInLabel = row.checkInUtc ? formatTimeOnly(row.checkInUtc) : "—";
+  const checkOutLabel = row.checkOutUtc ? formatTimeOnly(row.checkOutUtc) : (row.isActive ? "Still active" : "—");
+  const tone = row.isActive
+    ? "info"
+    : ["COMPLETE", "BACKFILLED_COMPLETE", "COMPLETED"].includes(status)
+      ? "success"
+      : status === "EXCEPTION"
+        ? "danger"
+        : "warning";
+  const statusLabel = row.isActive
+    ? "Active"
+    : ["COMPLETE", "BACKFILLED_COMPLETE", "COMPLETED"].includes(status)
+      ? "Checked Out"
+      : status === "EXCEPTION"
+        ? "Exception"
+        : "Not Started";
+
+  return `
+    <tr>
+      <td>${escapeHtml(row.studentName || row.studentId || "Unknown")}</td>
+      <td>${escapeHtml(checkInLabel)}</td>
+      <td><span class="inline-badge" data-tone="${escapeHtml(tone)}">${escapeHtml(statusLabel)}</span></td>
+      <td>${escapeHtml(checkOutLabel)}</td>
+      <td>${escapeHtml(row.site || "—")}</td>
+      <td>${escapeHtml(formatHours(resolveTodayDurationHours(row)))}</td>
+    </tr>
+  `;
+}
+
+function resolveTodayDurationHours(row) {
+  if (Number.isFinite(Number(row.hoursDecimal))) {
+    return Number(row.hoursDecimal);
+  }
+  if (Number.isFinite(Number(row.durationMinutes))) {
+    return Number(row.durationMinutes) / 60;
+  }
+  if (row.isActive && row.checkInUtc) {
+    const checkInMs = new Date(row.checkInUtc).getTime();
+    if (Number.isFinite(checkInMs)) {
+      return Math.max(0, (Date.now() - checkInMs) / 3600000);
+    }
+  }
+  return 0;
 }
 
 function adminKpiMarkup(dashboard) {

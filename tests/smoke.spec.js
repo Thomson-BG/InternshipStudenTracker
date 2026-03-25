@@ -66,6 +66,10 @@ test("startup, student dashboard, admin dashboard smoke", async ({ page, baseURL
   await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await expect(page.locator("#clockView")).toHaveClass(/is-active/);
   await expect(page.locator("#studentIdInput")).toBeVisible();
+  await expect(page.locator("#locationMapCanvas")).toHaveClass(/leaflet-container/, { timeout: 15000 });
+  await expect(page.locator(".location-grid-dots")).toHaveCount(0);
+  await expect(page.locator(".location-ring")).toHaveCount(0);
+  await expect(page.locator(".location-core-glow")).toHaveCount(0);
   tracker.assertNone();
   await capture(page, "clock");
 
