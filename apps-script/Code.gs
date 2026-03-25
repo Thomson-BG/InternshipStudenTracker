@@ -857,6 +857,7 @@ function getAdminDashboardPayload_(derivedState, range, site) {
   const selectedRange = analytics.ranges[range];
   const filteredShifts = selectedRange.filteredShifts;
   const todaySummary = buildTodaySummary_(derivedState.shifts, site);
+  const todayStudents = buildTodayStudentRows_(derivedState.shifts, site);
 
   return {
     currentRange: range,
@@ -869,6 +870,7 @@ function getAdminDashboardPayload_(derivedState, range, site) {
       overall: analytics.ranges.overall.summary
     },
     today: todaySummary,
+    todayStudents: todayStudents,
     selected: selectedRange.summary,
     leaderboard: selectedRange.rankedList,
     students: buildAdminStudentRows_(analytics),
@@ -882,6 +884,35 @@ function getAdminDashboardPayload_(derivedState, range, site) {
       generatedAt: new Date().toISOString()
     }
   };
+}
+
+function buildTodayStudentRows_(allShifts, site) {
+  const today = formatLocalDate_(new Date());
+  return filterShiftsBySite_(allShifts, site).filter(function (shift) {
+    return shift.localDate === today;
+  }).sort(sortShiftsDesc_).map(function (shift) {
+    const status = shift.status || "NOT_STARTED";
+    const isActive = status === "OPEN";
+    let durationMinutes = Number(shift.durationMinutes || 0);
+    if (isActive && shift.checkInUtc) {
+      const checkInMs = new Date(shift.checkInUtc).getTime();
+      if (Number.isFinite(checkInMs)) {
+        durationMinutes = Math.max(0, Math.round((Date.now() - checkInMs) / 60000));
+      }
+    }
+    return {
+      studentId: shift.studentId,
+      studentName: shift.studentName,
+      status: status,
+      isActive: isActive,
+      checkInUtc: shift.checkInUtc || "",
+      checkOutUtc: shift.checkOutUtc || "",
+      site: shift.site || "",
+      durationMinutes: durationMinutes,
+      hoursDecimal: roundTo_(durationMinutes / 60, 2),
+      totalPoints: Number(shift.totalPoints || 0)
+    };
+  });
 }
 
 function getReportPayload_(derivedState, type, range, site, studentId) {

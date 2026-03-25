@@ -701,6 +701,41 @@ function buildTodaySummary(shifts, site) {
   };
 }
 
+function buildTodayStudents(shifts, site) {
+  const today = pacificToday();
+  return shifts.filter((shift) => {
+    if (shift.localDate !== today) {
+      return false;
+    }
+    if (!site || site === "all") {
+      return true;
+    }
+    return String(shift.site || "") === site;
+  }).sort(sortShiftsDesc).map((shift) => {
+    const status = String(shift.status || "NOT_STARTED").toUpperCase();
+    const isActive = status === "OPEN";
+    let durationMinutes = toNumber(shift.durationMinutes);
+    if (isActive && shift.checkInUtc) {
+      const checkInMs = Date.parse(shift.checkInUtc);
+      if (Number.isFinite(checkInMs)) {
+        durationMinutes = Math.max(0, Math.round((Date.now() - checkInMs) / 60000));
+      }
+    }
+    return {
+      studentId: shift.studentId,
+      studentName: shift.studentName,
+      status,
+      isActive,
+      checkInUtc: shift.checkInUtc || "",
+      checkOutUtc: shift.checkOutUtc || "",
+      site: shift.site || "",
+      durationMinutes,
+      hoursDecimal: round(durationMinutes / 60, 2),
+      totalPoints: toNumber(shift.totalPoints)
+    };
+  });
+}
+
 function buildSiteBreakdown(shifts) {
   const map = {};
   shifts.forEach((shift) => {
@@ -1027,6 +1062,7 @@ async function buildAdminDashboardFromSheet(range = "overall", site = "all", opt
       overall: rangeData.overall.summary
     },
     today: buildTodaySummary(shiftRows, site),
+    todayStudents: buildTodayStudents(shiftRows, site),
     selected: selectedRange.summary,
     leaderboard: selectedRange.rankedList,
     students,
