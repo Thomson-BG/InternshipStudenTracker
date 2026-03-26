@@ -1796,8 +1796,9 @@ function renderAdminTables() {
     return;
   }
   const filteredRows = getFilteredAdminRows();
+  const newestActivityDateKey = getNewestActivityDateKey(filteredRows);
   dom.adminStudentsTableBody.innerHTML = filteredRows.length
-    ? filteredRows.map((row) => adminStudentRowMarkup(row)).join("")
+    ? filteredRows.map((row) => adminStudentRowMarkup(row, newestActivityDateKey)).join("")
     : `<tr><td colspan="8" class="empty-copy">No students match the current filters.</td></tr>`;
 
   Array.from(dom.adminStudentsTableBody.querySelectorAll("[data-student-detail]")).forEach((button) => {
@@ -1854,10 +1855,52 @@ function getFilteredAdminRows() {
   });
 }
 
-function adminStudentRowMarkup(row) {
+function getAdminRowActivityDateKey(row) {
   const selected = row[state.admin.range] || row.overall;
+  const value = selected?.lastActivityUtc;
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return "";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === "year")?.value || "";
+  const month = parts.find((part) => part.type === "month")?.value || "";
+  const day = parts.find((part) => part.type === "day")?.value || "";
+  return year && month && day ? `${year}-${month}-${day}` : "";
+}
+
+function getNewestActivityDateKey(rows) {
+  if (!rows || rows.length < 2) {
+    return null;
+  }
+
+  const dateKeys = rows.map((row) => getAdminRowActivityDateKey(row)).filter(Boolean);
+  if (!dateKeys.length) {
+    return null;
+  }
+
+  const newest = dateKeys.reduce((latest, key) => key > latest ? key : latest, dateKeys[0]);
+  const hasOlderRow = dateKeys.some((key) => key < newest);
+  return hasOlderRow ? newest : null;
+}
+
+function adminStudentRowMarkup(row, newestActivityDateKey = null) {
+  const selected = row[state.admin.range] || row.overall;
+  const rowActivityDateKey = getAdminRowActivityDateKey(row);
+  const isOlderThanNewest = Boolean(newestActivityDateKey && rowActivityDateKey && rowActivityDateKey < newestActivityDateKey);
   return `
-    <tr>
+    <tr${isOlderThanNewest ? ' class="is-stale-activity"' : ""}>
       <td>
         <button class="table-link" data-student-detail="${escapeHtml(row.studentId)}">${escapeHtml(row.studentName)}</button>
         <div class="metric-copy">${escapeHtml(row.studentId)}</div>

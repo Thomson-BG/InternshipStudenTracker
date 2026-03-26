@@ -1274,6 +1274,23 @@ details[open] .chevron-icon {
   font-size: 0.86rem;
 }
 
+.ios-table tr.is-stale-activity td,
+.data-table tr.is-stale-activity td {
+  background: color-mix(in srgb, var(--danger) 6%, transparent);
+  border-top-color: color-mix(in srgb, var(--danger) 26%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--danger) 26%, transparent);
+}
+
+.ios-table tr.is-stale-activity td:first-child,
+.data-table tr.is-stale-activity td:first-child {
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--danger) 34%, transparent);
+}
+
+.ios-table tr.is-stale-activity td:last-child,
+.data-table tr.is-stale-activity td:last-child {
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--danger) 34%, transparent);
+}
+
 .table-chip,
 .inline-badge {
   display: inline-flex;
