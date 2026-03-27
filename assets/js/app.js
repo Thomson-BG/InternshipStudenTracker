@@ -2,7 +2,6 @@ import {
   ADMIN_SESSION_KEY,
   LOCAL_HISTORY_KEY,
   STUDENT_LOOKUP_DEBOUNCE_MS,
-  ROSTER_FALLBACK,
   SITES,
   ALLOWED_RADIUS_METERS,
   THEME_KEY
@@ -34,6 +33,7 @@ import "leaflet/dist/leaflet.css";
 
 const dom = {
   body: document.body,
+  appShell: document.getElementById("appShell"),
   themeToggle: document.getElementById("themeToggle"),
   themeIndicator: document.getElementById("themeIndicator"),
   topbarSummary: document.getElementById("topbarSummary"),
@@ -107,6 +107,8 @@ const dom = {
   reportPrintButton: document.getElementById("reportPrintButton"),
   reportPdfButton: document.getElementById("reportPdfButton"),
   reportCloseButton: document.getElementById("reportCloseButton"),
+  globalLoadingModal: document.getElementById("globalLoadingModal"),
+  globalLoadingMessage: document.getElementById("globalLoadingMessage"),
   toastRack: document.getElementById("toastRack")
 };
 
@@ -125,6 +127,132 @@ const locationMapState = {
   tileErrors: 0
 };
 
+const GLOBAL_LOADING_DELAY_MS = 120;
+const GLOBAL_LOADING_MIN_VISIBLE_MS = 250;
+const globalLoadingState = {
+  activeIds: new Set(),
+  nextId: 0,
+  visible: false,
+  shownAt: 0,
+  showTimer: null,
+  hideTimer: null
+};
+
+function startPerfTimer(name, metadata = {}) {
+  const startedAt = performance.now();
+  return (outcome = "ok", extra = {}) => {
+    const durationMs = round(performance.now() - startedAt, 1);
+    console.info(`[perf] ${name}`, {
+      durationMs,
+      outcome,
+      ...metadata,
+      ...extra
+    });
+    return durationMs;
+  };
+}
+
+function setBlockingBusyState(busy) {
+  dom.body.classList.toggle("is-busy", busy);
+  if (dom.appShell) {
+    dom.appShell.setAttribute("aria-busy", busy ? "true" : "false");
+  }
+  Object.values(dom.views).forEach((view) => {
+    if (view) {
+      view.setAttribute("aria-busy", busy && view.classList.contains("is-active") ? "true" : "false");
+    }
+  });
+}
+
+function setGlobalLoadingMessage(message) {
+  if (dom.globalLoadingMessage) {
+    dom.globalLoadingMessage.textContent = message || "Loading…";
+  }
+  if (dom.globalLoadingModal) {
+    dom.globalLoadingModal.setAttribute("aria-label", message || "Loading");
+  }
+}
+
+function openGlobalLoadingModal() {
+  if (!dom.globalLoadingModal) {
+    return;
+  }
+  dom.globalLoadingModal.classList.add("is-open");
+  dom.globalLoadingModal.setAttribute("aria-hidden", "false");
+  globalLoadingState.visible = true;
+  globalLoadingState.shownAt = Date.now();
+  setBlockingBusyState(true);
+}
+
+function closeGlobalLoadingModal() {
+  if (!dom.globalLoadingModal) {
+    return;
+  }
+  dom.globalLoadingModal.classList.remove("is-open");
+  dom.globalLoadingModal.setAttribute("aria-hidden", "true");
+  globalLoadingState.visible = false;
+  globalLoadingState.shownAt = 0;
+  setBlockingBusyState(false);
+}
+
+function beginBlockingLoad(message) {
+  const token = ++globalLoadingState.nextId;
+  globalLoadingState.activeIds.add(token);
+  setGlobalLoadingMessage(message);
+  clearTimeout(globalLoadingState.hideTimer);
+  globalLoadingState.hideTimer = null;
+
+  if (globalLoadingState.visible) {
+    setBlockingBusyState(true);
+    return token;
+  }
+
+  if (!globalLoadingState.showTimer) {
+    globalLoadingState.showTimer = window.setTimeout(() => {
+      globalLoadingState.showTimer = null;
+      if (globalLoadingState.activeIds.size > 0) {
+        openGlobalLoadingModal();
+      }
+    }, GLOBAL_LOADING_DELAY_MS);
+  }
+
+  return token;
+}
+
+function endBlockingLoad(token) {
+  if (!token) {
+    return;
+  }
+  globalLoadingState.activeIds.delete(token);
+  if (globalLoadingState.activeIds.size > 0) {
+    return;
+  }
+
+  if (globalLoadingState.showTimer) {
+    clearTimeout(globalLoadingState.showTimer);
+    globalLoadingState.showTimer = null;
+    setBlockingBusyState(false);
+    return;
+  }
+
+  if (!globalLoadingState.visible) {
+    setBlockingBusyState(false);
+    return;
+  }
+
+  const remainingMs = Math.max(0, GLOBAL_LOADING_MIN_VISIBLE_MS - (Date.now() - globalLoadingState.shownAt));
+  clearTimeout(globalLoadingState.hideTimer);
+  globalLoadingState.hideTimer = window.setTimeout(() => {
+    if (globalLoadingState.activeIds.size === 0) {
+      closeGlobalLoadingModal();
+    }
+  }, remainingMs);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 async function init() {
   applyTheme();
   restoreAdminSession();
@@ -138,19 +266,26 @@ async function init() {
   startLocationWatch();
   syncLocationMapFields();
 
+  const finishRosterPerf = startPerfTimer("roster_boot", { source: "apps_script_refresh" });
   state.rosterLoading = true;
-  try {
-    const response = await fetchRoster();
-    state.roster = response.data || {};
-  } catch (error) {
-    console.warn("Roster endpoint unavailable, using fallback roster.", error);
-    state.roster = ROSTER_FALLBACK;
-  } finally {
-    state.rosterLoading = false;
-    renderStudentIdentity();
-    renderClockView();
-    renderProgressView();
-  }
+  fetchRoster()
+    .then((response) => {
+      const nextRoster = response.data || {};
+      if (Object.keys(nextRoster).length > 0) {
+        state.roster = nextRoster;
+        renderStudentIdentity();
+        renderClockView();
+        renderProgressView();
+      }
+      finishRosterPerf("ok", { students: Object.keys(state.roster).length });
+    })
+    .catch((error) => {
+      console.warn("Roster endpoint unavailable, using fallback roster.", error);
+      finishRosterPerf("fallback", { students: Object.keys(state.roster).length });
+    })
+    .finally(() => {
+      state.rosterLoading = false;
+    });
 
   if (state.admin.token) {
     loadAdminDashboard();
@@ -238,10 +373,13 @@ function bindEvents() {
   }
   dom.reportPrintButton.addEventListener("click", () => openBrowserPrint());
   dom.reportPdfButton.addEventListener("click", async () => {
+    const loaderToken = beginBlockingLoad("Generating report…");
     try {
       await downloadReportPdf(dom.reportStage, reportFileName());
     } catch (error) {
       showToast(error.message || "Unable to generate PDF.", "danger");
+    } finally {
+      endBlockingLoad(loaderToken);
     }
   });
   dom.reportCloseButton.addEventListener("click", closeReportModal);
@@ -379,6 +517,8 @@ function setView(view) {
       });
     }
   }
+
+  setBlockingBusyState(dom.appShell?.getAttribute("aria-busy") === "true");
 }
 
 function handleStudentLookup() {
@@ -387,12 +527,6 @@ function handleStudentLookup() {
     if (state.student.id) {
       clearStudentSession(null, { preserveInput: true, preserveLocation: true });
     }
-    return;
-  }
-
-  // If roster is still loading, wait a bit and retry
-  if (state.rosterLoading) {
-    setTimeout(handleStudentLookup, 250);
     return;
   }
 
@@ -415,7 +549,6 @@ function handleStudentLookup() {
   state.student.name = studentName;
   state.student.loading = true;
   state.student.dashboard = null;
-  state.student.dashboardCache = {};
   
   renderStudentIdentity();
   renderStudentLoadingState();
@@ -452,6 +585,12 @@ async function loadStudentDashboard(range = state.student.range, options = {}) {
     state.student.activeRequestId = requestId;
   }
   let controller = null;
+  let loaderToken = null;
+  const finishPerf = startPerfTimer("student_dashboard_load", {
+    studentId: requestedStudentId,
+    range,
+    background
+  });
 
   if (!background) {
     abortStudentDashboardRequest();
@@ -462,6 +601,7 @@ async function loadStudentDashboard(range = state.student.range, options = {}) {
     renderClockMessage("Loading student progress...", "info");
     controller = new AbortController();
     state.student.requestController = controller;
+    loaderToken = beginBlockingLoad(state.student.name ? `Loading ${state.student.name}…` : "Loading student…");
   }
 
   try {
@@ -475,14 +615,23 @@ async function loadStudentDashboard(range = state.student.range, options = {}) {
     }
     cacheStore[cacheKey] = response.data;
     if (background) {
+      finishPerf("ok", {
+        source: response?.meta?.source || "unknown",
+        cached: false
+      });
       return response.data;
     }
     if (requestId !== state.student.activeRequestId) {
       return;
     }
     syncStudentDashboard(response.data);
+    finishPerf("ok", {
+      source: response?.meta?.source || "unknown",
+      cached: false
+    });
   } catch (error) {
     if (error?.name === "AbortError" || error?.code === "REQUEST_ABORTED") {
+      finishPerf("aborted");
       return;
     }
     if (!background) {
@@ -494,9 +643,15 @@ async function loadStudentDashboard(range = state.student.range, options = {}) {
       renderClockView();
       renderClockMessage(error.message || "Unable to load student progress.", "danger");
     }
+    finishPerf("error", {
+      code: error?.code || error?.name || "unknown"
+    });
   } finally {
     if (!background && state.student.requestController === controller) {
       state.student.requestController = null;
+    }
+    if (!background) {
+      endBlockingLoad(loaderToken);
     }
   }
 }
@@ -1383,22 +1538,41 @@ async function handleAttendanceAction(action) {
     clientTimestamp: new Date().toISOString(),
     userAgent: navigator.userAgent
   };
-
+  const finishPerf = startPerfTimer("attendance_submit", {
+    action,
+    studentId: state.student.id
+  });
+  const loaderToken = beginBlockingLoad(action === "Check In" ? "Checking in…" : "Checking out…");
   try {
     renderClockMessage(`Submitting ${action}…`, "info");
     const response = await submitAttendance(payload);
     const recordedSite = submissionSite || state.student.selectedSite?.name || "";
     rememberLocalAction(action, recordedSite);
+    if (response.dashboard) {
+      syncStudentDashboard(response.dashboard, { silent: true });
+    } else {
+      window.setTimeout(() => {
+        loadStudentDashboard(state.student.range, { force: true, background: true });
+      }, 0);
+    }
     renderClockMessage(`${action} accepted. +${response.pointsDelta} pts.`, "success");
     showToast(`${action} accepted for ${state.student.name}.`, "success");
-    await loadStudentDashboard(state.student.range, { force: true });
+    finishPerf("ok", {
+      pointsDelta: response.pointsDelta || 0,
+      dashboardIncluded: Boolean(response.dashboard)
+    });
   } catch (error) {
     const message = mapActionError(error, action);
     renderClockMessage(message, "danger");
     showToast(message, "danger");
+    finishPerf("error", {
+      code: error?.code || "unknown"
+    });
     if (error.code === "AUTH_REQUIRED") {
       clearAdminSession();
     }
+  } finally {
+    endBlockingLoad(loaderToken);
   }
 }
 
@@ -1446,7 +1620,6 @@ function clearStudentSession(message, options = {}) {
   state.student.name = preserveInput && state.roster[state.student.id] ? state.roster[state.student.id] : "";
   state.student.loading = false;
   state.student.dashboard = null;
-  state.student.dashboardCache = {};
   state.student.range = "week";
   state.student.requestController = null;
   if (!preserveLocation) {
@@ -1474,6 +1647,8 @@ async function handleAdminLogin() {
     return;
   }
 
+  const loaderToken = beginBlockingLoad("Signing in…");
+  const finishPerf = startPerfTimer("admin_login");
   try {
     const response = await adminAuth(password);
     state.admin.token = response.token;
@@ -1486,9 +1661,15 @@ async function handleAdminLogin() {
     renderAdminState();
     showToast("Admin session started.", "success");
     await loadAdminDashboard();
+    finishPerf("ok");
   } catch (error) {
+    finishPerf("error", {
+      code: error?.code || "unknown"
+    });
     showToast(error.message || "Admin sign-in failed.", "danger");
     renderAdminState();
+  } finally {
+    endBlockingLoad(loaderToken);
   }
 }
 
@@ -1529,42 +1710,69 @@ async function loadAdminDashboard(retries = 3) {
   state.admin.error = "";
   renderAdminLoadingState(retries < 3 ? "Retrying admin analytics…" : "Loading admin analytics…");
 
+  const loaderToken = beginBlockingLoad("Loading dashboard…");
+  const finishPerf = startPerfTimer("admin_dashboard_load", {
+    range: state.admin.range,
+    site: state.admin.site
+  });
+
   try {
-    const response = await fetchAdminDashboard({
-      token: state.admin.token,
-      range: state.admin.range,
-      site: state.admin.site
-    });
-    state.admin.dashboard = response.data;
-    state.admin.loading = false;
-    state.admin.error = "";
-    state.admin.dataSource = response?.meta?.source || response?.data?.source || "apps_script";
-    state.admin.dataQuality = response?.meta?.dataQuality || response?.data?.dataQuality || "ok";
-    populateAdminSiteSelect(response.data.sites || []);
-    renderAdminState();
-    renderAdminDashboard();
-    renderAdminDiagnosticsNotice();
-    if (state.admin.selectedStudent) {
-      openStudentDetail(state.admin.selectedStudent.studentId);
+    let attempt = 0;
+    while (attempt <= retries) {
+      try {
+        const response = await fetchAdminDashboard({
+          token: state.admin.token,
+          range: state.admin.range,
+          site: state.admin.site
+        });
+        state.admin.dashboard = response.data;
+        state.admin.loading = false;
+        state.admin.error = "";
+        state.admin.dataSource = response?.meta?.source || response?.data?.source || "apps_script";
+        state.admin.dataQuality = response?.meta?.dataQuality || response?.data?.dataQuality || "ok";
+        populateAdminSiteSelect(response.data.sites || []);
+        renderAdminState();
+        renderAdminDashboard();
+        renderAdminDiagnosticsNotice();
+        if (state.admin.selectedStudent) {
+          openStudentDetail(state.admin.selectedStudent.studentId);
+        }
+        finishPerf("ok", {
+          source: state.admin.dataSource,
+          dataQuality: state.admin.dataQuality,
+          attempts: attempt + 1
+        });
+        return;
+      } catch (error) {
+        if (error.code === "AUTH_REQUIRED") {
+          clearAdminSession();
+          showToast("Admin session expired. Sign in again.", "danger");
+          finishPerf("auth_required");
+          return;
+        }
+
+        if (attempt < retries) {
+          console.warn(`Admin dashboard load failed. Retrying... (${retries - attempt} left)`);
+          renderAdminLoadingState("Retrying admin analytics…");
+          await wait(1000);
+          attempt += 1;
+          continue;
+        }
+
+        throw error;
+      }
     }
   } catch (error) {
     state.admin.loading = false;
-    if (error.code === "AUTH_REQUIRED") {
-      clearAdminSession();
-      showToast("Admin session expired. Sign in again.", "danger");
-      return;
-    }
-    
-    if (retries > 0) {
-      console.warn(`Admin dashboard load failed. Retrying... (${retries} left)`);
-      setTimeout(() => loadAdminDashboard(retries - 1), 1000);
-      return;
-    }
-
     const message = error.message || "Unable to load admin dashboard.";
     state.admin.error = message;
     renderAdminErrorState(message);
     showToast(message, "danger");
+    finishPerf("error", {
+      code: error?.code || "unknown"
+    });
+  } finally {
+    endBlockingLoad(loaderToken);
   }
 }
 
@@ -2065,6 +2273,7 @@ async function openReport(type, options = {}) {
     return;
   }
 
+  const loaderToken = beginBlockingLoad(options.downloadPdfAfterOpen ? "Generating report…" : "Loading report…");
   try {
     const response = await fetchReportData({
       token: state.admin.token,
@@ -2085,6 +2294,8 @@ async function openReport(type, options = {}) {
       clearAdminSession();
     }
     showToast(error.message || "Unable to open report.", "danger");
+  } finally {
+    endBlockingLoad(loaderToken);
   }
 }
 

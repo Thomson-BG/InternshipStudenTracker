@@ -20,7 +20,7 @@
 </head>
 <body>
 
-  <div class="app-shell">
+  <div id="appShell" class="app-shell" aria-busy="false">
 
     <!-- ========== HEADER ========== -->
     <header class="app-header">
@@ -501,6 +501,14 @@
         </div>
       </div>
       <div id="reportStage" class="report-stage"></div>
+    </div>
+  </div>
+
+  <!-- ========== GLOBAL LOADING MODAL ========== -->
+  <div id="globalLoadingModal" class="global-loading-modal" aria-hidden="true">
+    <div class="global-loading-card" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="Loading">
+      <span class="loading-spinner global-loading-spinner" aria-hidden="true"></span>
+      <div id="globalLoadingMessage" class="global-loading-message" aria-live="polite">Loading…</div>
     </div>
   </div>
 

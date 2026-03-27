@@ -2,6 +2,7 @@ import {
   ADMIN_SESSION_KEY,
   LOCAL_HISTORY_KEY,
   RANGE_OPTIONS,
+  ROSTER_FALLBACK,
   STATUS_FILTER_OPTIONS,
   STUDENT_SESSION_TIMEOUT_MS,
   THEME_KEY
@@ -13,7 +14,7 @@ const persistedTheme = localStorage.getItem(THEME_KEY);
 export const state = {
   theme: persistedTheme || "dark",
   currentView: "clock",
-  roster: {},
+  roster: { ...ROSTER_FALLBACK },
   rosterLoading: false,
   localHistory: readJsonStorage(localStorage, LOCAL_HISTORY_KEY, []),
   student: {

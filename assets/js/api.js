@@ -4,6 +4,31 @@ const SHEET_CACHE_TTL_MS = 15000;
 const COMPLETE_STATUSES = new Set(["COMPLETE", "BACKFILLED_COMPLETE", "COMPLETED"]);
 const SHEET_CACHE = new Map();
 
+function isStudentDashboardPayloadUsable(data) {
+  const studentId = data?.student?.studentId || data?.student?.id;
+  return Boolean(studentId && data?.today && (data?.week || data?.summaries?.week));
+}
+
+function normalizeStudentDashboardPayload(data, range = "week") {
+  if (!data) {
+    return data;
+  }
+
+  const weekSummary = data.week || data.summaries?.week || {};
+  return {
+    ...data,
+    currentRange: data.currentRange || range,
+    student: {
+      ...data.student,
+      name: data?.student?.name || data?.student?.studentName || data?.student?.studentId || ""
+    },
+    week: {
+      totalPoints: Number(weekSummary.totalPoints ?? weekSummary.points ?? 0),
+      hoursDecimal: Number(weekSummary.hoursDecimal ?? weekSummary.hours ?? 0)
+    }
+  };
+}
+
 async function requestJson(url, options = {}) {
   const response = await fetch(url, options);
   let payload;
@@ -1123,17 +1148,45 @@ export async function adminAuth(password) {
 }
 
 export async function fetchStudentDashboard(studentId, range = "week", options = {}) {
+  let apiError = null;
+  try {
+    const response = await requestJson(API_ENDPOINTS.studentDashboard(studentId, range), options);
+    if (response?.data && isStudentDashboardPayloadUsable(response.data)) {
+      return {
+        ...response,
+        data: normalizeStudentDashboardPayload(response.data, range),
+        meta: {
+          ...(response.meta || {}),
+          source: response.meta?.source || "apps_script"
+        }
+      };
+    }
+    apiError = {
+      ok: false,
+      code: "UNUSABLE_RESPONSE",
+      message: "Student dashboard response was incomplete."
+    };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw error;
+    }
+    apiError = error;
+  }
+
   try {
     return {
       ok: true,
-      data: await buildStudentDashboardFromSheet(studentId, range, options)
+      data: normalizeStudentDashboardPayload(
+        await buildStudentDashboardFromSheet(studentId, range, options),
+        range
+      ),
+      meta: {
+        source: "sheet_fallback",
+        fallbackUsed: true
+      }
     };
   } catch (sheetError) {
-    const response = await requestJson(API_ENDPOINTS.studentDashboard(studentId, range), options);
-    if (response?.data) {
-      return response;
-    }
-    throw sheetError;
+    throw apiError || sheetError;
   }
 }
 

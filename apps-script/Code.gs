@@ -303,34 +303,27 @@ function handleAttendancePost_(e) {
     const action = stringify_(payload.action);
     const now = new Date();
     const localDate = formatLocalDate_(now);
-    const logs = listLogRecords_(context.logsSheet);
-    const todaysEvents = logs.filter(function (row) {
-      return row.studentId === studentId && row.localDate === localDate;
-    });
-    const checkInEvents = todaysEvents.filter(function (row) {
-      return row.action === "Check In";
-    });
-    const checkOutEvents = todaysEvents.filter(function (row) {
-      return row.action === "Check Out";
-    });
+    const baselines = getBaselineMap_(context.pointsSheet);
+    const shiftRecords = listShiftRecords_(context.shiftsSheet);
+    const existingShift = findShiftRecordForDay_(shiftRecords, studentId, localDate);
 
-    if (action === "Check In" && checkInEvents.length > 0) {
+    if (action === "Check In" && existingShift && existingShift.checkInUtc) {
       appendAudit_(context.auditSheet, buildStudentAuditFromPayload_(payload, RESPONSE_CODES.alreadyCheckedIn, "You already checked in today."));
       return errorResponse_(RESPONSE_CODES.alreadyCheckedIn, "You already checked in today.");
     }
 
     if (action === "Check Out") {
-      if (checkOutEvents.length > 0) {
+      if (existingShift && existingShift.checkOutUtc) {
         appendAudit_(context.auditSheet, buildStudentAuditFromPayload_(payload, RESPONSE_CODES.alreadyCheckedOut, "You already checked out today."));
         return errorResponse_(RESPONSE_CODES.alreadyCheckedOut, "You already checked out today.");
       }
 
-      if (checkInEvents.length === 0) {
+      if (!existingShift || !existingShift.checkInUtc) {
         appendAudit_(context.auditSheet, buildStudentAuditFromPayload_(payload, RESPONSE_CODES.checkinRequired, "You must check in first before checking out."));
         return errorResponse_(RESPONSE_CODES.checkinRequired, "You must check in first before checking out.");
       }
 
-      const checkInTime = checkInEvents[0].timestamp;
+      const checkInTime = new Date(existingShift.checkInUtc);
       const elapsedMs = now.getTime() - checkInTime.getTime();
       const minMs = CONFIG.minMinutesBetweenInOut * 60 * 1000;
       if (elapsedMs < minMs) {
@@ -366,20 +359,43 @@ function handleAttendancePost_(e) {
       source
     ]);
 
-    const freshness = ensureDerivedSheetsFresh_(context, { force: true });
-    const materialized = buildMaterializedState_(context, freshness.derivedState, {
-      includePoints: true
+    const updatedShift = buildLiveShiftRecord_(existingShift, {
+      action: action,
+      now: now,
+      localDate: localDate,
+      studentId: studentId,
+      studentName: studentName,
+      site: stringify_(payload.site),
+      source: source
     });
-    const pointsRow = findPointRow_(materialized.points, studentId);
+    upsertShiftRecord_(context.shiftsSheet, updatedShift, existingShift ? existingShift.rowNumber : 0);
+
+    const nextShiftRecords = upsertShiftCollection_(shiftRecords, updatedShift);
+    const pointRecords = listPointRecords_(context.pointsSheet);
+    const updatedPoint = buildPointRecordForStudent_(nextShiftRecords, baselines, roster, pointRecords, studentId, studentName);
+    upsertPointRecord_(context.pointsSheet, updatedPoint, findPointRow_(pointRecords, studentId));
+    const nextPointRecords = upsertPointCollection_(pointRecords, updatedPoint);
+    syncDerivedSignatureAndVersion_(context.logsSheet, baselines);
+
+    const materialized = {
+      logs: [],
+      audits: [],
+      shifts: nextShiftRecords,
+      points: nextPointRecords,
+      studentDirectory: buildStudentDirectory_(null, nextPointRecords, nextShiftRecords, roster),
+      sites: getAllSites_(nextShiftRecords, [])
+    };
     const pointsDelta = localDate >= CONFIG.goLiveDate ? CONFIG.pointsPerAction : 0;
+    const dashboard = getStudentDashboardPayload_(materialized, studentId, "week");
 
     return jsonResponse_({
       ok: true,
       code: RESPONSE_CODES.recorded,
       pointsDelta: pointsDelta,
-      totalPoints: pointsRow ? pointsRow.totalPoints : pointsDelta,
+      totalPoints: updatedPoint ? updatedPoint.totalPoints : pointsDelta,
       localDate: localDate,
-      action: action
+      action: action,
+      dashboard: dashboard
     });
   } catch (err) {
     if (context) {
@@ -405,6 +421,12 @@ function handleAttendancePost_(e) {
 
 function getActiveStudentsFromSheet_(context) {
   seedRosterIfEmpty_(context.rosterSheet);
+  const cache = CacheService.getScriptCache();
+  const cacheKey = "active_roster_v1";
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached);
+  }
   const values = context.rosterSheet.getDataRange().getValues();
   const index = buildHeaderIndex_(values[0].map(normalizeHeaderCell_));
   const roster = {};
@@ -419,6 +441,7 @@ function getActiveStudentsFromSheet_(context) {
       roster[id] = name;
     }
   }
+  cachePayloadSafely_(cache, cacheKey, roster);
   return roster;
 }
 
@@ -835,9 +858,14 @@ function getStudentDashboardPayload_(derivedState, studentId, range) {
   return {
     student: {
       studentId: studentId,
-      studentName: studentDirectory[studentId]
+      studentName: studentDirectory[studentId],
+      name: studentDirectory[studentId]
     },
     currentRange: range,
+    week: {
+      totalPoints: roundTo_(Number((summaries.week && summaries.week.points) || 0), 1),
+      hoursDecimal: roundTo_(Number((summaries.week && summaries.week.hours) || 0), 2)
+    },
     today: today,
     summaries: summaries,
     selected: selectedSummary,
@@ -1645,11 +1673,12 @@ function listShiftRecords_(shiftsSheet) {
     return [];
   }
 
-  return shiftsSheet.getRange(2, 1, shiftsSheet.getLastRow() - 1, SHIFT_HEADERS.length).getValues().map(function (row) {
+  return shiftsSheet.getRange(2, 1, shiftsSheet.getLastRow() - 1, SHIFT_HEADERS.length).getValues().map(function (row, index) {
     const localDate = normalizeLocalDateCell_(row[1]);
     const checkInUtc = normalizeUtcTimestampCell_(row[5]);
     const checkOutUtc = normalizeUtcTimestampCell_(row[6]);
     return {
+      rowNumber: index + 2,
       shiftId: stringify_(row[0]),
       localDate: localDate,
       studentId: normalizeStudentId_(row[2]),
@@ -1676,8 +1705,9 @@ function listPointRecords_(pointsSheet) {
     return [];
   }
 
-  return pointsSheet.getRange(2, 1, pointsSheet.getLastRow() - 1, POINT_HEADERS.length).getValues().map(function (row) {
+  return pointsSheet.getRange(2, 1, pointsSheet.getLastRow() - 1, POINT_HEADERS.length).getValues().map(function (row, index) {
     return {
+      rowNumber: index + 2,
       studentId: normalizeStudentId_(row[0]),
       studentName: stringify_(row[1]),
       baselinePoints: Number(row[2] || 0),
@@ -1768,6 +1798,177 @@ function computeSourceSignature_(logsSheet, baselineMap) {
     "GO_LIVE_DATE=" + String(CONFIG.goLiveDate),
     "MIN_MINUTES_IN_OUT=" + String(CONFIG.minMinutesBetweenInOut)
   ].join("\n---\n"));
+}
+
+function syncDerivedSignatureAndVersion_(logsSheet, baselineMap) {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  scriptProperties.setProperty("DERIVED_SOURCE_SIGNATURE", computeSourceSignature_(logsSheet, baselineMap));
+  scriptProperties.setProperty("DATA_VERSION", String(new Date().getTime()));
+}
+
+function findShiftRecordForDay_(shifts, studentId, localDate) {
+  for (let i = 0; i < shifts.length; i += 1) {
+    if (shifts[i].studentId === studentId && shifts[i].localDate === localDate) {
+      return shifts[i];
+    }
+  }
+  return null;
+}
+
+function buildLiveShiftRecord_(existingShift, options) {
+  const now = options.now;
+  const action = options.action;
+  const localDate = options.localDate;
+  const studentId = options.studentId;
+  const studentName = options.studentName;
+  const site = options.site || (existingShift && existingShift.site) || "";
+  const eligibleForPoints = localDate >= CONFIG.goLiveDate;
+  const nextShift = existingShift ? {
+    shiftId: existingShift.shiftId,
+    localDate: existingShift.localDate,
+    studentId: existingShift.studentId,
+    studentName: existingShift.studentName,
+    site: existingShift.site,
+    checkInUtc: existingShift.checkInUtc,
+    checkOutUtc: existingShift.checkOutUtc,
+    durationMinutes: Number(existingShift.durationMinutes || 0),
+    hoursDecimal: Number(existingShift.hoursDecimal || 0),
+    checkInPoints: Number(existingShift.checkInPoints || 0),
+    checkOutPoints: Number(existingShift.checkOutPoints || 0),
+    totalPoints: Number(existingShift.totalPoints || 0),
+    status: existingShift.status,
+    source: existingShift.source,
+    notes: existingShift.notes || ""
+  } : {
+    shiftId: studentId + "-" + localDate,
+    localDate: localDate,
+    studentId: studentId,
+    studentName: studentName,
+    site: site,
+    checkInUtc: "",
+    checkOutUtc: "",
+    durationMinutes: 0,
+    hoursDecimal: 0,
+    checkInPoints: 0,
+    checkOutPoints: 0,
+    totalPoints: 0,
+    status: "NOT_STARTED",
+    source: options.source || "web",
+    notes: ""
+  };
+
+  nextShift.studentName = studentName || nextShift.studentName || studentId;
+  nextShift.site = site;
+  nextShift.source = options.source || nextShift.source || "web";
+  nextShift.notes = "";
+
+  if (action === "Check In") {
+    nextShift.checkInUtc = now.toISOString();
+    nextShift.checkOutUtc = "";
+    nextShift.durationMinutes = 0;
+    nextShift.hoursDecimal = 0;
+    nextShift.checkInPoints = eligibleForPoints ? CONFIG.pointsPerAction : 0;
+    nextShift.checkOutPoints = 0;
+    nextShift.totalPoints = nextShift.checkInPoints;
+    nextShift.status = "OPEN";
+    return nextShift;
+  }
+
+  const checkInUtc = nextShift.checkInUtc || "";
+  const checkInDate = new Date(checkInUtc);
+  const durationMinutes = Math.max(0, Math.round((now.getTime() - checkInDate.getTime()) / 60000));
+  nextShift.checkOutUtc = now.toISOString();
+  nextShift.durationMinutes = durationMinutes;
+  nextShift.hoursDecimal = roundTo_(durationMinutes / 60, 2);
+  nextShift.checkOutPoints = eligibleForPoints ? CONFIG.pointsPerAction : 0;
+  nextShift.totalPoints = Number(nextShift.checkInPoints || 0) + Number(nextShift.checkOutPoints || 0);
+  nextShift.status = eligibleForPoints ? "COMPLETE" : "BACKFILLED_COMPLETE";
+  return nextShift;
+}
+
+function upsertShiftCollection_(shifts, updatedShift) {
+  const nextShifts = [];
+  let replaced = false;
+  for (let i = 0; i < shifts.length; i += 1) {
+    const row = shifts[i];
+    if (row.studentId === updatedShift.studentId && row.localDate === updatedShift.localDate) {
+      nextShifts.push(updatedShift);
+      replaced = true;
+    } else {
+      nextShifts.push(row);
+    }
+  }
+  if (!replaced) {
+    nextShifts.push(updatedShift);
+  }
+  return nextShifts;
+}
+
+function upsertShiftRecord_(shiftsSheet, shift, rowNumber) {
+  const values = [serializeShiftRow_(shift)];
+  if (rowNumber) {
+    shiftsSheet.getRange(rowNumber, 1, 1, SHIFT_HEADERS.length).setValues(values);
+    return;
+  }
+  shiftsSheet.appendRow(values[0]);
+}
+
+function buildPointRecordForStudent_(shifts, baselineMap, roster, currentPoints, studentId, studentName) {
+  const existing = findPointRow_(currentPoints || [], studentId);
+  const baselinePoints = Number(baselineMap[studentId] || (existing && existing.baselinePoints) || 0);
+  const relevantShifts = (shifts || []).filter(function (shift) {
+    return shift.studentId === studentId;
+  });
+  let earnedPoints = 0;
+  let lastUpdated = existing && existing.lastUpdated ? existing.lastUpdated : "";
+
+  relevantShifts.forEach(function (shift) {
+    earnedPoints += Number(shift.totalPoints || 0);
+    const latestShiftTimestamp = shift.checkOutUtc || shift.checkInUtc || "";
+    if (latestShiftTimestamp && (!lastUpdated || latestShiftTimestamp > lastUpdated)) {
+      lastUpdated = latestShiftTimestamp;
+    }
+  });
+
+  return {
+    studentId: studentId,
+    studentName: (roster && roster[studentId]) || studentName || (existing && existing.studentName) || studentId,
+    baselinePoints: baselinePoints,
+    earnedPoints: roundTo_(earnedPoints, 2),
+    totalPoints: roundTo_(baselinePoints + earnedPoints, 2),
+    lastUpdated: lastUpdated
+  };
+}
+
+function upsertPointCollection_(points, updatedPoint) {
+  const nextPoints = [];
+  let replaced = false;
+  (points || []).forEach(function (row) {
+    if (row.studentId === updatedPoint.studentId) {
+      nextPoints.push(updatedPoint);
+      replaced = true;
+    } else {
+      nextPoints.push(row);
+    }
+  });
+  if (!replaced) {
+    nextPoints.push(updatedPoint);
+  }
+  return nextPoints.sort(function (a, b) {
+    if (b.totalPoints !== a.totalPoints) {
+      return b.totalPoints - a.totalPoints;
+    }
+    return a.studentName < b.studentName ? -1 : 1;
+  });
+}
+
+function upsertPointRecord_(pointsSheet, pointRecord, existingPoint) {
+  const values = [serializePointRow_(pointRecord)];
+  if (existingPoint && existingPoint.rowNumber) {
+    pointsSheet.getRange(existingPoint.rowNumber, 1, 1, POINT_HEADERS.length).setValues(values);
+    return;
+  }
+  pointsSheet.appendRow(values[0]);
 }
 
 function writeSheetRows_(sheet, headers, rows) {

@@ -25,6 +25,11 @@ function createClientFailureTracker(page) {
   const consoleErrors = [];
   const pageErrors = [];
   const requestFailures = [];
+  const requestUrls = [];
+
+  page.on("request", (request) => {
+    requestUrls.push(request.url());
+  });
 
   page.on("console", (message) => {
     if (message.type() === "error") {
@@ -48,6 +53,9 @@ function createClientFailureTracker(page) {
       expect(consoleErrors, `Unexpected console errors: ${JSON.stringify(consoleErrors)}`).toEqual([]);
       expect(pageErrors, `Unexpected page errors: ${JSON.stringify(pageErrors)}`).toEqual([]);
       expect(requestFailures, `Unexpected request failures: ${JSON.stringify(requestFailures)}`).toEqual([]);
+    },
+    getRequests() {
+      return requestUrls.slice();
     }
   };
 }
@@ -61,6 +69,23 @@ async function capture(page, suffix) {
 }
 
 test("startup, student dashboard, admin dashboard smoke", async ({ page, baseURL }) => {
+  await page.route("**/*mode=student_dashboard*", async (route) => {
+    await page.waitForTimeout(300);
+    await route.continue();
+  });
+  await page.route("**/*mode=admin_auth*", async (route) => {
+    await page.waitForTimeout(250);
+    await route.continue();
+  });
+  await page.route("**/*mode=admin_dashboard*", async (route) => {
+    await page.waitForTimeout(300);
+    await route.continue();
+  });
+  await page.route("**/*mode=report_data*", async (route) => {
+    await page.waitForTimeout(300);
+    await route.continue();
+  });
+
   const tracker = createClientFailureTracker(page);
 
   await page.goto(baseURL, { waitUntil: "domcontentloaded" });
@@ -73,10 +98,19 @@ test("startup, student dashboard, admin dashboard smoke", async ({ page, baseURL
   tracker.assertNone();
   await capture(page, "clock");
 
+  const studentDashboardRequest = page.waitForResponse(
+    (response) => response.url().includes("mode=student_dashboard"),
+    { timeout: 20000 }
+  );
   await page.locator("#studentIdInput").fill(STUDENT_ID);
+  await expect(page.locator("#globalLoadingModal")).toHaveClass(/is-open/, { timeout: 10000 });
+  await studentDashboardRequest;
   await expect(page.locator("#studentNameValue")).toHaveText("Lenore Ditmore");
   await expect(page.locator("#studentNameCopy")).not.toContainText("loading latest progress", { timeout: 20000 });
   await expect(page.locator("#clockMessage")).toHaveText("Student progress loaded.", { timeout: 20000 });
+  await expect(page.locator("#globalLoadingModal")).not.toHaveClass(/is-open/, { timeout: 10000 });
+  const shiftCsvRequests = tracker.getRequests().filter((url) => url.includes("/gviz/tq") && url.includes("sheet=Shifts"));
+  expect(shiftCsvRequests, `Student lookup unexpectedly fetched sheet CSV: ${JSON.stringify(shiftCsvRequests)}`).toEqual([]);
   tracker.assertNone();
   await capture(page, "student");
 
@@ -104,11 +138,25 @@ test("startup, student dashboard, admin dashboard smoke", async ({ page, baseURL
 
   await page.locator("#adminPasswordInput").fill(ADMIN_PASSWORD);
   await page.locator("#adminLoginButton").click();
+  await expect(page.locator("#globalLoadingModal")).toHaveClass(/is-open/, { timeout: 10000 });
   await adminAuthRequest;
   await adminDashboardRequest;
   await expect(page.locator("#adminContent")).not.toHaveClass(/is-hidden/, { timeout: 30000 });
   await expect(page.locator("#adminLoginState")).toHaveClass(/is-hidden/, { timeout: 30000 });
   await expect(page.locator("#adminKpiGrid")).not.toBeEmpty({ timeout: 30000 });
+  await expect(page.locator("#globalLoadingModal")).not.toHaveClass(/is-open/, { timeout: 10000 });
   tracker.assertNone();
   await capture(page, "admin-dashboard");
+
+  const reportRequest = page.waitForResponse(
+    (response) => response.url().includes("mode=report_data"),
+    { timeout: 20000 }
+  );
+  await page.locator("#adminPrintCohortButton").click();
+  await expect(page.locator("#globalLoadingModal")).toHaveClass(/is-open/, { timeout: 10000 });
+  await reportRequest;
+  await expect(page.locator("#reportModal")).toHaveClass(/is-open/, { timeout: 20000 });
+  await expect(page.locator("#globalLoadingModal")).not.toHaveClass(/is-open/, { timeout: 10000 });
+  tracker.assertNone();
+  await capture(page, "report");
 });
