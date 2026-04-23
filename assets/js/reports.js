@@ -304,7 +304,9 @@ export function renderReportCharts(report) {
                 data: weeklyPoints.map((row) => row.value),
                 backgroundColor: "#4e79a7",
                 borderColor: "#4e79a7",
-                borderWidth: 1
+                borderWidth: 1.5,
+                borderRadius: 10,
+                maxBarThickness: 22
               },
               {
                 type: "line",
@@ -313,15 +315,46 @@ export function renderReportCharts(report) {
                 borderColor: "#f28e2b",
                 backgroundColor: "#f28e2b",
                 fill: false,
-                tension: 0.35
+                tension: 0.35,
+                pointRadius: 3,
+                pointHoverRadius: 4
               }
             ]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+              duration: 220
+            },
+            interaction: {
+              mode: "index",
+              intersect: false
+            },
             scales: {
+              x: {
+                grid: { display: false },
+                ticks: {
+                  color: "#333",
+                  maxTicksLimit: 7
+                }
+              },
               y: {
+                position: "left",
+                grid: { color: "#ddd" },
+                ticks: {
+                  color: "#333",
+                  maxTicksLimit: 4
+                },
+                beginAtZero: true
+              },
+              y1: {
+                position: "right",
+                grid: { drawOnChartArea: false },
+                ticks: {
+                  color: "#333",
+                  maxTicksLimit: 4
+                },
                 beginAtZero: true
               }
             }
@@ -343,7 +376,8 @@ export function renderReportCharts(report) {
                 borderColor: "#4e79a7",
                 backgroundColor: "rgba(78, 121, 167, 0.2)",
                 fill: true,
-                tension: 0.3
+                tension: 0.3,
+                pointRadius: 3
               },
               {
                 label: "Cumulative Hours",
@@ -351,15 +385,45 @@ export function renderReportCharts(report) {
                 borderColor: "#f28e2b",
                 backgroundColor: "rgba(242, 142, 43, 0.2)",
                 fill: false,
-                tension: 0.3
+                tension: 0.3,
+                pointRadius: 3
               }
             ]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+              duration: 220
+            },
+            interaction: {
+              mode: "index",
+              intersect: false
+            },
             scales: {
+              x: {
+                grid: { color: "#ddd" },
+                ticks: {
+                  color: "#333",
+                  maxTicksLimit: 6
+                }
+              },
               y: {
+                position: "left",
+                grid: { color: "#ddd" },
+                ticks: {
+                  color: "#333",
+                  maxTicksLimit: 5
+                },
+                beginAtZero: true
+              },
+              y1: {
+                position: "right",
+                grid: { drawOnChartArea: false },
+                ticks: {
+                  color: "#333",
+                  maxTicksLimit: 5
+                },
                 beginAtZero: true
               }
             }
@@ -387,7 +451,8 @@ export function renderReportCharts(report) {
                 borderColor: "#4e79a7",
                 backgroundColor: "rgba(78, 121, 167, 0.2)",
                 fill: true,
-                tension: 0.3
+                tension: 0.3,
+                pointRadius: 3
               },
               {
                 label: "Hours",
@@ -395,15 +460,45 @@ export function renderReportCharts(report) {
                 borderColor: "#f28e2b",
                 backgroundColor: "rgba(242, 142, 43, 0.2)",
                 fill: false,
-                tension: 0.3
+                tension: 0.3,
+                pointRadius: 3
               }
             ]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+              duration: 220
+            },
+            interaction: {
+              mode: "index",
+              intersect: false
+            },
             scales: {
+              x: {
+                grid: { color: "#ddd" },
+                ticks: {
+                  color: "#333",
+                  maxTicksLimit: 6
+                }
+              },
               y: {
+                position: "left",
+                grid: { color: "#ddd" },
+                ticks: {
+                  color: "#333",
+                  maxTicksLimit: 5
+                },
+                beginAtZero: true
+              },
+              y1: {
+                position: "right",
+                grid: { drawOnChartArea: false },
+                ticks: {
+                  color: "#333",
+                  maxTicksLimit: 5
+                },
                 beginAtZero: true
               }
             }
