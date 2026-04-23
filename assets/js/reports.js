@@ -285,11 +285,12 @@ export function renderReportCharts(report) {
   }
 
   // Destroy existing charts before rendering new ones
-  if (window.Chart && window.Chart.registry) {
-    Object.keys(window.Chart.registry.controllers).forEach((key) => {
-      const chart = window.Chart.registry.getChart(key);
-      if (chart) {
-        chart.destroy();
+  if (window.Chart) {
+    const chartIds = ["studentWeeklyActivityChart", "studentCumulativeChart", "adminOverviewTrendChart"];
+    chartIds.forEach((chartId) => {
+      const canvas = document.getElementById(chartId);
+      if (canvas && canvas.chart) {
+        canvas.chart.destroy();
       }
     });
   }
@@ -304,7 +305,7 @@ export function renderReportCharts(report) {
       // Render weekly activity chart
       const weeklyActivityCtx = document.getElementById("studentWeeklyActivityChart");
       if (weeklyActivityCtx) {
-        new window.Chart(weeklyActivityCtx, {
+        const weeklyActivityChart = new window.Chart(weeklyActivityCtx, {
           type: "bar",
           data: {
             labels: weeklyPoints.map((row) => row.label),
@@ -375,7 +376,7 @@ export function renderReportCharts(report) {
       // Render cumulative chart
       const cumulativeCtx = document.getElementById("studentCumulativeChart");
       if (cumulativeCtx) {
-        new window.Chart(cumulativeCtx, {
+        const cumulativeChart = new window.Chart(cumulativeCtx, {
           type: "line",
           data: {
             labels: cumulative.map((row) => row.label),
@@ -454,7 +455,7 @@ export function renderReportCharts(report) {
         if (trendCtx.chart) {
           trendCtx.chart.destroy();
         }
-        new window.Chart(trendCtx, {
+        const trendChart = new window.Chart(trendCtx, {
           type: "line",
           data: {
             labels: pointsTrend.map((row) => row.label),
