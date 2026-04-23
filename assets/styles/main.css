@@ -519,8 +519,8 @@ textarea {
 
 .ios-button.accent,
 .ios-button.destructive {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--secondary) 92%, white), var(--secondary));
-  color: var(--on-primary);
+  background: linear-gradient(180deg, color-mix(in srgb, #FFD700 92%, white), #FFD700);
+  color: #000000;
 }
 
 .link-button {
