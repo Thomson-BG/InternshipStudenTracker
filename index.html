@@ -257,15 +257,83 @@
         <div id="adminContent" class="admin-layout is-hidden">
           <div id="adminStateNotice" class="info-banner is-hidden" style="margin-bottom: 8px;"></div>
 
-          <!-- Google Sheet Button -->
-          <div class="glass-card" style="padding: 14px 16px;">
-            <a class="ios-button primary"
-               href="https://docs.google.com/spreadsheets/d/1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY/edit?usp=sharing"
-               target="_blank" rel="noreferrer"
-               style="width: 100%; justify-content: center; gap: 8px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-              Open Google Sheet
-            </a>
+          <!-- Student Records -->
+          <div class="glass-card admin-records-card">
+            <button id="adminOpenRecordsButton"
+                    class="ios-button primary"
+                    type="button"
+                    style="width: 100%; justify-content: center; gap: 8px;">
+              <span class="material-symbols-outlined">table_view</span>
+              Open Student Records
+            </button>
+            <div id="adminStudentRecordsSection" class="admin-records-section is-hidden">
+              <div class="admin-records-filter-grid">
+                <div class="filter-item">
+                  <label class="stat-label" for="adminRecordsStartDate">Start Date</label>
+                  <input id="adminRecordsStartDate" class="ios-input" type="date">
+                </div>
+                <div class="filter-item">
+                  <label class="stat-label" for="adminRecordsEndDate">End Date</label>
+                  <input id="adminRecordsEndDate" class="ios-input" type="date">
+                </div>
+                <div class="filter-item">
+                  <label class="stat-label" for="adminRecordsInternSearch">Intern Name / ID</label>
+                  <input id="adminRecordsInternSearch" class="ios-input" type="search" list="adminRecordsInternList" placeholder="Search intern">
+                  <datalist id="adminRecordsInternList"></datalist>
+                </div>
+                <div class="filter-item">
+                  <label class="stat-label" for="adminRecordsSiteSelect">Site</label>
+                  <select id="adminRecordsSiteSelect" class="ios-select">
+                    <option value="all">All Sites</option>
+                  </select>
+                </div>
+                <div class="filter-item">
+                  <label class="stat-label" for="adminRecordsLocationModeSelect">Location Filter</label>
+                  <select id="adminRecordsLocationModeSelect" class="ios-select">
+                    <option value="all">All Records</option>
+                    <option value="has_checkin">Has Check-In Map</option>
+                    <option value="has_checkout">Has Check-Out Map</option>
+                    <option value="has_both">Has Both Maps</option>
+                    <option value="missing_any">Missing Any Map</option>
+                  </select>
+                </div>
+              </div>
+              <div class="admin-records-filter-actions">
+                <button id="adminRecordsApplyButton" class="ios-button secondary" type="button">Apply Filters</button>
+                <button id="adminRecordsResetButton" class="ios-button secondary" type="button">Reset</button>
+              </div>
+              <div id="adminStudentRecordsSummary" class="metric-copy admin-records-summary">No records loaded yet.</div>
+              <div class="table-scroll">
+                <table class="ios-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>ID</th>
+                      <th>Date</th>
+                      <th>Site</th>
+                      <th>Check In</th>
+                      <th>Check Out</th>
+                      <th>Map (Check In)</th>
+                      <th>Map (Check Out)</th>
+                      <th>Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminStudentRecordsTableBody">
+                    <tr>
+                      <td colspan="9" class="empty-copy">Open Student Records to load data.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="admin-records-footer">
+                <div class="admin-records-attribution">Maps © OpenStreetMap contributors</div>
+                <div class="admin-records-pagination">
+                  <button id="adminRecordsPrevPageButton" class="ios-button secondary" type="button">Prev</button>
+                  <span id="adminRecordsPageInfo" class="metric-copy">Page 1 of 1</span>
+                  <button id="adminRecordsNextPageButton" class="ios-button secondary" type="button">Next</button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Filters -->
@@ -303,6 +371,15 @@
                 <input id="adminSearchInput" class="ios-input" type="search" placeholder="Name or ID">
               </div>
             </div>
+            <div class="admin-intern-launcher">
+              <div class="filter-item">
+                <label class="stat-label" for="adminInternLookupInput">Intern Insights</label>
+                <input id="adminInternLookupInput" class="ios-input" type="search" list="adminInternLookupList" placeholder="Search intern name or ID">
+                <datalist id="adminInternLookupList"></datalist>
+              </div>
+              <button id="adminOpenInternInsightsButton" class="ios-button accent" type="button">Open Insights</button>
+            </div>
+            <div id="adminInternLookupHint" class="metric-copy">Open a specific intern to view detailed stats and charts.</div>
             <div class="admin-actions-row">
               <button id="adminRefreshButton" class="ios-button secondary" type="button">Refresh</button>
               <button id="adminPrintCohortButton" class="ios-button secondary" type="button">Print</button>
@@ -450,10 +527,6 @@
         <span class="material-symbols-outlined tab-icon">admin_panel_settings</span>
         <span>ADMIN</span>
       </button>
-      <button class="tab-item" type="button">
-        <span class="material-symbols-outlined tab-icon">person</span>
-        <span>PROFILE</span>
-      </button>
     </nav>
   </div>
 
@@ -501,6 +574,25 @@
         </div>
       </div>
       <div id="reportStage" class="report-stage"></div>
+    </div>
+  </div>
+
+  <!-- ========== DATABASE TRANSITION NOTICE ========== -->
+  <div id="migrationNoticeModal" class="announcement-modal-overlay" aria-hidden="true">
+    <div class="announcement-modal-card" role="dialog" aria-modal="true" aria-labelledby="migrationNoticeTitle" aria-describedby="migrationNoticeBody">
+      <div class="section-label">System Update</div>
+      <h3 id="migrationNoticeTitle" class="card-title">Database Upgrade Complete</h3>
+      <div id="migrationNoticeBody" class="announcement-modal-body">
+        <p>
+          Intern Track has successfully transitioned to a database server. Load times should now be significantly faster.
+        </p>
+        <p>
+          Thank you for helping pilot this app and improve it for future internship students.
+        </p>
+      </div>
+      <button id="migrationNoticeCloseButton" class="ios-button accent announcement-modal-close" type="button">
+        Continue
+      </button>
     </div>
   </div>
 

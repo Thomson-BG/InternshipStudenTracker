@@ -1,35 +1,64 @@
-// This URL is used by a public browser client, so it is not a secret. Vercel can
-// override it with VITE_APPS_SCRIPT_URL, but production should still boot if that
-// environment variable is missing.
-const FALLBACK_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3GBhNTbtaOlSVBL6r9SJqXX1CuTgSNP0DOnp8jxH0zvTofzyZkmK_OWruVqq9Fbs/exec";
+// API base URL for the backend. Defaults to local Vercel/preview function route.
+// This value is public in the browser and is not a secret.
+const FALLBACK_API_BASE_URL = "/api/exec";
 
-function resolveAppsScriptUrl() {
-  const envUrl = String(import.meta.env?.VITE_APPS_SCRIPT_URL || "").trim();
+function resolveApiBaseUrl() {
+  const envUrl = String(import.meta.env?.VITE_API_BASE_URL || "").trim();
   if (envUrl) {
     return envUrl;
   }
 
   const windowUrl = typeof window !== "undefined"
-    ? String(window.APPS_SCRIPT_URL || "").trim()
+    ? String(window.API_BASE_URL || window.APPS_SCRIPT_URL || "").trim()
     : "";
   if (windowUrl) {
     return windowUrl;
   }
 
-  console.warn("VITE_APPS_SCRIPT_URL is not set. Falling back to the default Apps Script URL.");
-  return FALLBACK_APPS_SCRIPT_URL;
+  return FALLBACK_API_BASE_URL;
 }
 
-export const APPS_SCRIPT_URL = resolveAppsScriptUrl();
+export const API_BASE_URL = resolveApiBaseUrl();
 export const GOOGLE_SHEET_ID = "1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY";
 
 export const API_ENDPOINTS = {
-  submit: APPS_SCRIPT_URL,
-  adminAuth: `${APPS_SCRIPT_URL}?mode=admin_auth`,
+  submit: API_BASE_URL,
+  adminAuth: `${API_BASE_URL}?mode=admin_auth`,
   studentDashboard: (studentId, range = "week") =>
-    `${APPS_SCRIPT_URL}?mode=student_dashboard&studentId=${encodeURIComponent(studentId)}&range=${encodeURIComponent(range)}`,
+    `${API_BASE_URL}?mode=student_dashboard&studentId=${encodeURIComponent(studentId)}&range=${encodeURIComponent(range)}`,
   adminDashboard: (token, range = "overall", site = "all") =>
-    `${APPS_SCRIPT_URL}?mode=admin_dashboard&token=${encodeURIComponent(token)}&range=${encodeURIComponent(range)}&site=${encodeURIComponent(site)}`,
+    `${API_BASE_URL}?mode=admin_dashboard&token=${encodeURIComponent(token)}&range=${encodeURIComponent(range)}&site=${encodeURIComponent(site)}`,
+  studentRecords: ({
+    token,
+    range = "overall",
+    site = "all",
+    startDate = "",
+    endDate = "",
+    query = "",
+    locationMode = "all",
+    page = 1,
+    pageSize = 12
+  }) => {
+    const parts = [
+      `mode=student_records`,
+      `token=${encodeURIComponent(token || "")}`,
+      `range=${encodeURIComponent(range)}`,
+      `site=${encodeURIComponent(site)}`,
+      `locationMode=${encodeURIComponent(locationMode)}`,
+      `page=${encodeURIComponent(String(page))}`,
+      `pageSize=${encodeURIComponent(String(pageSize))}`
+    ];
+    if (startDate) {
+      parts.push(`startDate=${encodeURIComponent(startDate)}`);
+    }
+    if (endDate) {
+      parts.push(`endDate=${encodeURIComponent(endDate)}`);
+    }
+    if (query) {
+      parts.push(`query=${encodeURIComponent(query)}`);
+    }
+    return `${API_BASE_URL}?${parts.join("&")}`;
+  },
   reportData: ({ token, type, range = "overall", site = "all", studentId = "" }) => {
     const parts = [
       `mode=report_data`,
@@ -41,11 +70,11 @@ export const API_ENDPOINTS = {
     if (studentId) {
       parts.push(`studentId=${encodeURIComponent(studentId)}`);
     }
-    return `${APPS_SCRIPT_URL}?${parts.join("&")}`;
+    return `${API_BASE_URL}?${parts.join("&")}`;
   },
-  logs: (token) => `${APPS_SCRIPT_URL}?mode=logs&token=${encodeURIComponent(token)}`,
-  points: (token) => `${APPS_SCRIPT_URL}?mode=points&token=${encodeURIComponent(token)}`,
-  getRoster: () => `${APPS_SCRIPT_URL}?mode=get_roster`
+  logs: (token) => `${API_BASE_URL}?mode=logs&token=${encodeURIComponent(token)}`,
+  points: (token) => `${API_BASE_URL}?mode=points&token=${encodeURIComponent(token)}`,
+  getRoster: () => `${API_BASE_URL}?mode=get_roster`
 };
 
 export const ACTION_COOLDOWN_MS = 60 * 60 * 1000;
@@ -55,6 +84,8 @@ export const STUDENT_DASHBOARD_PREFETCH_DELAY_MS = 180;
 export const LOCAL_HISTORY_KEY = "intern-track-local-history";
 export const ADMIN_SESSION_KEY = "intern-track-admin-session";
 export const THEME_KEY = "intern-track-theme";
+export const DB_MIGRATION_NOTICE_START_ISO = "2026-04-22T08:00:00-07:00";
+export const DB_MIGRATION_NOTICE_WINDOW_DAYS = 7;
 
 export const RANGE_OPTIONS = ["week", "month", "overall"];
 export const STATUS_FILTER_OPTIONS = ["all", "complete", "open", "exception"];

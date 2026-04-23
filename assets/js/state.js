@@ -38,6 +38,25 @@ export const state = {
     token: "",
     expiresAt: "",
     dashboard: null,
+    studentRecords: [],
+    studentRecordsMeta: null,
+    recordsSiteOptions: ["all"],
+    recordsInternOptions: [],
+    recordsFilters: {
+      startDate: "",
+      endDate: "",
+      query: "",
+      site: "all",
+      locationMode: "all"
+    },
+    recordsPagination: {
+      page: 1,
+      pageSize: 12,
+      totalRows: 0,
+      totalPages: 1
+    },
+    studentRecordsVisible: false,
+    studentRecordsLoading: false,
     loading: false,
     error: "",
     dataSource: "",

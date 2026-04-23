@@ -411,39 +411,305 @@ export function renderAdminCharts(dashboard) {
 export function renderDetailCharts(detail) {
   if (!detail || !detail.charts) return;
   const weeklyPoints = detail.charts.weeklyPoints || [];
+  const weeklyHours = detail.charts.weeklyHours || [];
   const cumulative = detail.charts.cumulative || [];
+  const recentShifts = Array.isArray(detail.recentShifts) ? detail.recentShifts : [];
+  const exceptions = Array.isArray(detail.exceptions) ? detail.exceptions : [];
+  const recentActivity = recentShifts.slice(0, 8).reverse();
 
-  upsertChart("detailWeeklyPointsChart", {
+  // Clean up legacy chart ids after switching detail layout.
+  destroyChart("detailWeeklyPointsChart");
+
+  upsertChart("detailRecentActivityChart", {
+    type: "bar",
+    data: {
+      labels: recentActivity.map((row) => row.localDate || "—"),
+      datasets: [
+        {
+          label: "Points",
+          data: recentActivity.map((row) => Number(row.totalPoints || 0)),
+          backgroundColor: CHART_COLORS.brandSoft,
+          borderColor: CHART_COLORS.brand,
+          borderWidth: 1.5,
+          borderRadius: 8,
+          maxBarThickness: 18
+        },
+        {
+          label: "Hours",
+          data: recentActivity.map((row) => Number(row.hoursDecimal || 0)),
+          backgroundColor: CHART_COLORS.accentSoft,
+          borderColor: CHART_COLORS.accent,
+          borderWidth: 1.5,
+          borderRadius: 8,
+          maxBarThickness: 18
+        }
+      ]
+    },
+    options: {
+      ...baseOptions(),
+      indexAxis: "y",
+      plugins: {
+        ...baseOptions().plugins,
+        tooltip: {
+          ...baseOptions().plugins.tooltip,
+          callbacks: {
+            title(items) {
+              const index = items?.[0]?.dataIndex ?? 0;
+              const row = recentActivity[index];
+              if (!row) {
+                return "Recent activity";
+              }
+              return `${row.localDate || "—"} · ${row.site || "Unknown site"}`;
+            },
+            label(context) {
+              const row = recentActivity[context.dataIndex] || {};
+              const label = context.dataset.label || "Value";
+              const value = Number(context.raw || 0);
+              const formatted = label === "Hours" ? value.toFixed(2) : value.toFixed(1);
+              return `${label}: ${formatted}${label === "Hours" ? " hrs" : " pts"}`;
+            },
+            afterBody(items) {
+              const index = items?.[0]?.dataIndex ?? 0;
+              const row = recentActivity[index];
+              if (!row) {
+                return [];
+              }
+              return [`Status: ${String(row.status || "UNKNOWN").replace(/_/g, " ")}`];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: CHART_COLORS.grid },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
+        },
+        y: {
+          grid: { display: false },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 8
+          }
+        }
+      }
+    }
+  });
+
+  upsertChart("detailWeeklyComboChart", {
     type: "bar",
     data: {
       labels: weeklyPoints.map((row) => row.label),
-      datasets: [{
-        label: "Points",
-        data: weeklyPoints.map((row) => row.value),
-        backgroundColor: CHART_COLORS.brandSoft,
-        borderColor: CHART_COLORS.brand,
-        borderWidth: 1.5,
-        borderRadius: 10
-      }]
+      datasets: [
+        {
+          label: "Points",
+          data: weeklyPoints.map((row) => row.value),
+          backgroundColor: CHART_COLORS.brandSoft,
+          borderColor: CHART_COLORS.brand,
+          borderWidth: 1.5,
+          borderRadius: 10,
+          maxBarThickness: 26
+        },
+        {
+          type: "line",
+          label: "Hours",
+          data: weeklyHours.map((row) => row.value),
+          borderColor: CHART_COLORS.accent,
+          backgroundColor: CHART_COLORS.accentSoft,
+          fill: false,
+          tension: 0.32,
+          pointRadius: 3,
+          pointHoverRadius: 4,
+          yAxisID: "y1"
+        }
+      ]
     },
-    options: baseOptions()
+    options: {
+      ...baseOptions(),
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 7
+          }
+        },
+        y: {
+          position: "left",
+          grid: { color: CHART_COLORS.grid },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
+        },
+        y1: {
+          position: "right",
+          grid: { drawOnChartArea: false },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
+        }
+      }
+    }
   });
 
   upsertChart("detailCumulativeChart", {
     type: "line",
     data: {
       labels: cumulative.map((row) => row.label),
+      datasets: [
+        {
+          label: "Cumulative Points",
+          data: cumulative.map((row) => row.points),
+          borderColor: CHART_COLORS.brand,
+          backgroundColor: CHART_COLORS.brandSoft,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3
+        },
+        {
+          label: "Cumulative Hours",
+          data: cumulative.map((row) => row.hours),
+          borderColor: CHART_COLORS.accent,
+          backgroundColor: CHART_COLORS.accentSoft,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 3,
+          yAxisID: "y1"
+        }
+      ]
+    },
+    options: {
+      ...baseOptions(),
+      scales: {
+        x: {
+          grid: { color: CHART_COLORS.grid },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 6
+          }
+        },
+        y: {
+          position: "left",
+          grid: { color: CHART_COLORS.grid },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
+        },
+        y1: {
+          position: "right",
+          grid: { drawOnChartArea: false },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+
+  const siteRows = Object.entries(recentShifts.reduce((acc, shift) => {
+    const site = String(shift?.site || "Unknown site");
+    if (!acc[site]) {
+      acc[site] = { points: 0, hours: 0 };
+    }
+    acc[site].points += Number(shift?.totalPoints || 0);
+    acc[site].hours += Number(shift?.hoursDecimal || 0);
+    return acc;
+  }, {}))
+    .map(([site, value]) => ({ site, points: value.points, hours: value.hours }))
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 6);
+
+  const siteLabels = siteRows.length ? siteRows.map((row) => row.site) : ["No site data"];
+  const sitePoints = siteRows.length ? siteRows.map((row) => row.points) : [0];
+  const siteHours = siteRows.length ? siteRows.map((row) => row.hours) : [0];
+
+  upsertChart("detailSiteBreakdownChart", {
+    type: "bar",
+    data: {
+      labels: siteLabels,
+      datasets: [
+        {
+          label: "Points",
+          data: sitePoints,
+          backgroundColor: CHART_COLORS.brandSoft,
+          borderColor: CHART_COLORS.brand,
+          borderWidth: 1.5,
+          borderRadius: 8
+        },
+        {
+          label: "Hours",
+          data: siteHours,
+          backgroundColor: CHART_COLORS.accentSoft,
+          borderColor: CHART_COLORS.accent,
+          borderWidth: 1.5,
+          borderRadius: 8
+        }
+      ]
+    },
+    options: {
+      ...baseOptions(),
+      indexAxis: "y",
+      scales: {
+        x: {
+          grid: { color: CHART_COLORS.grid },
+          ticks: {
+            color: CHART_COLORS.text,
+            maxTicksLimit: 5
+          },
+          beginAtZero: true
+        },
+        y: {
+          grid: { display: false },
+          ticks: {
+            color: CHART_COLORS.text
+          }
+        }
+      }
+    }
+  });
+
+  const statusCounts = recentShifts.reduce((acc, shift) => {
+    const status = String(shift?.status || "").toUpperCase();
+    if (["COMPLETE", "BACKFILLED_COMPLETE", "COMPLETED"].includes(status)) {
+      acc.complete += 1;
+    } else if (["OPEN", "CHECKED_IN"].includes(status)) {
+      acc.open += 1;
+    } else if (status === "EXCEPTION") {
+      acc.exception += 1;
+    }
+    return acc;
+  }, { complete: 0, open: 0, exception: 0 });
+
+  if (exceptions.length) {
+    statusCounts.exception = Math.max(statusCounts.exception, exceptions.length);
+  }
+
+  upsertChart("detailStatusMixChart", {
+    type: "doughnut",
+    data: {
+      labels: ["Complete", "Open", "Exception"],
       datasets: [{
-        label: "Cumulative Points",
-        data: cumulative.map((row) => row.points),
-        borderColor: CHART_COLORS.brand,
-        backgroundColor: CHART_COLORS.brandSoft,
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3
+        data: [statusCounts.complete, statusCounts.open, statusCounts.exception],
+        backgroundColor: [CHART_COLORS.success, CHART_COLORS.warning, CHART_COLORS.danger],
+        borderWidth: 0
       }]
     },
-    options: baseOptions()
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: baseOptions().plugins
+    }
   });
 }
 

@@ -1,12 +1,22 @@
 import {
   ADMIN_SESSION_KEY,
+  DB_MIGRATION_NOTICE_START_ISO,
+  DB_MIGRATION_NOTICE_WINDOW_DAYS,
   LOCAL_HISTORY_KEY,
   STUDENT_LOOKUP_DEBOUNCE_MS,
   SITES,
   ALLOWED_RADIUS_METERS,
   THEME_KEY
 } from "./config.js";
-import { adminAuth, fetchAdminDashboard, fetchReportData, fetchRoster, fetchStudentDashboard, submitAttendance } from "./api.js";
+import {
+  adminAuth,
+  fetchAdminDashboard,
+  fetchReportData,
+  fetchRoster,
+  fetchStudentDashboard,
+  fetchStudentRecords,
+  submitAttendance
+} from "./api.js";
 import { renderAdminCharts, renderDetailCharts } from "./charts.js";
 import { downloadReportPdf, openBrowserPrint, renderReportMarkup } from "./reports.js";
 import { restoreAdminSession, state } from "./state.js";
@@ -79,6 +89,21 @@ const dom = {
   adminContent: document.getElementById("adminContent"),
   adminPasswordInput: document.getElementById("adminPasswordInput"),
   adminLoginButton: document.getElementById("adminLoginButton"),
+  adminOpenRecordsButton: document.getElementById("adminOpenRecordsButton"),
+  adminStudentRecordsSection: document.getElementById("adminStudentRecordsSection"),
+  adminStudentRecordsSummary: document.getElementById("adminStudentRecordsSummary"),
+  adminStudentRecordsTableBody: document.getElementById("adminStudentRecordsTableBody"),
+  adminRecordsStartDate: document.getElementById("adminRecordsStartDate"),
+  adminRecordsEndDate: document.getElementById("adminRecordsEndDate"),
+  adminRecordsInternSearch: document.getElementById("adminRecordsInternSearch"),
+  adminRecordsInternList: document.getElementById("adminRecordsInternList"),
+  adminRecordsSiteSelect: document.getElementById("adminRecordsSiteSelect"),
+  adminRecordsLocationModeSelect: document.getElementById("adminRecordsLocationModeSelect"),
+  adminRecordsApplyButton: document.getElementById("adminRecordsApplyButton"),
+  adminRecordsResetButton: document.getElementById("adminRecordsResetButton"),
+  adminRecordsPrevPageButton: document.getElementById("adminRecordsPrevPageButton"),
+  adminRecordsNextPageButton: document.getElementById("adminRecordsNextPageButton"),
+  adminRecordsPageInfo: document.getElementById("adminRecordsPageInfo"),
   adminRefreshButton: document.getElementById("adminRefreshButton"),
   adminPrintCohortButton: document.getElementById("adminPrintCohortButton"),
   adminPdfCohortButton: document.getElementById("adminPdfCohortButton"),
@@ -88,6 +113,10 @@ const dom = {
   adminSiteSelect: document.getElementById("adminSiteSelect"),
   adminStatusSelect: document.getElementById("adminStatusSelect"),
   adminSearchInput: document.getElementById("adminSearchInput"),
+  adminInternLookupInput: document.getElementById("adminInternLookupInput"),
+  adminInternLookupList: document.getElementById("adminInternLookupList"),
+  adminOpenInternInsightsButton: document.getElementById("adminOpenInternInsightsButton"),
+  adminInternLookupHint: document.getElementById("adminInternLookupHint"),
   adminStateNotice: document.getElementById("adminStateNotice"),
   adminKpiGrid: document.getElementById("adminKpiGrid"),
   adminTodayTableBody: document.getElementById("adminTodayTableBody"),
@@ -107,6 +136,8 @@ const dom = {
   reportPrintButton: document.getElementById("reportPrintButton"),
   reportPdfButton: document.getElementById("reportPdfButton"),
   reportCloseButton: document.getElementById("reportCloseButton"),
+  migrationNoticeModal: document.getElementById("migrationNoticeModal"),
+  migrationNoticeCloseButton: document.getElementById("migrationNoticeCloseButton"),
   globalLoadingModal: document.getElementById("globalLoadingModal"),
   globalLoadingMessage: document.getElementById("globalLoadingMessage"),
   toastRack: document.getElementById("toastRack")
@@ -115,6 +146,7 @@ const dom = {
 let locationWatchId = null;
 let shiftTimerId = null;
 let reportContext = null;
+let migrationNoticeTimerId = null;
 const locationMapState = {
   map: null,
   marker: null,
@@ -125,6 +157,10 @@ const locationMapState = {
   basemapUnavailable: false,
   unavailable: false,
   tileErrors: 0
+};
+const adminRecordsMapState = {
+  maps: new Map(),
+  observer: null
 };
 
 const GLOBAL_LOADING_DELAY_MS = 120;
@@ -137,6 +173,10 @@ const globalLoadingState = {
   showTimer: null,
   hideTimer: null
 };
+
+const reducedMotionQuery = typeof window !== "undefined" && typeof window.matchMedia === "function"
+  ? window.matchMedia("(prefers-reduced-motion: reduce)")
+  : null;
 
 function startPerfTimer(name, metadata = {}) {
   const startedAt = performance.now();
@@ -253,6 +293,87 @@ function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function isDbMigrationNoticeWindowActive(now = Date.now()) {
+  const startMs = Date.parse(DB_MIGRATION_NOTICE_START_ISO);
+  if (!Number.isFinite(startMs)) {
+    return false;
+  }
+  const durationMs = Math.max(0, Number(DB_MIGRATION_NOTICE_WINDOW_DAYS) || 0) * 24 * 60 * 60 * 1000;
+  const endMs = startMs + durationMs;
+  return now >= startMs && now < endMs;
+}
+
+function shouldShowDbMigrationNotice() {
+  if (!dom.migrationNoticeModal || !dom.migrationNoticeCloseButton) {
+    return false;
+  }
+  return isDbMigrationNoticeWindowActive();
+}
+
+function openDbMigrationNoticeModal() {
+  if (!dom.migrationNoticeModal) {
+    return;
+  }
+  clearTimeout(migrationNoticeTimerId);
+  dom.migrationNoticeModal.classList.add("is-open");
+  dom.migrationNoticeModal.setAttribute("aria-hidden", "false");
+  dom.body.classList.add("has-announcement-modal-open");
+  migrationNoticeTimerId = window.setTimeout(() => {
+    closeDbMigrationNoticeModal();
+  }, 8000);
+}
+
+function closeDbMigrationNoticeModal() {
+  if (!dom.migrationNoticeModal) {
+    return;
+  }
+  clearTimeout(migrationNoticeTimerId);
+  migrationNoticeTimerId = null;
+  dom.migrationNoticeModal.classList.remove("is-open");
+  dom.migrationNoticeModal.setAttribute("aria-hidden", "true");
+  dom.body.classList.remove("has-announcement-modal-open");
+}
+
+function maybeShowDbMigrationNoticeModal() {
+  if (!shouldShowDbMigrationNotice()) {
+    return;
+  }
+  openDbMigrationNoticeModal();
+}
+
+function prefersReducedMotion() {
+  return Boolean(reducedMotionQuery?.matches);
+}
+
+function runWithViewTransition(updateFn) {
+  if (typeof updateFn !== "function") {
+    return;
+  }
+  if (prefersReducedMotion() || typeof document.startViewTransition !== "function") {
+    updateFn();
+    return;
+  }
+  document.startViewTransition(updateFn);
+}
+
+function animateViewEntrance(viewKey) {
+  if (prefersReducedMotion()) {
+    return;
+  }
+  const container = dom.views?.[viewKey];
+  if (!container) {
+    return;
+  }
+  const revealNodes = Array.from(container.querySelectorAll(".glass-card, .chart-card, .summary-card, .surface, .history-day-row")).slice(0, 24);
+  revealNodes.forEach((node, index) => {
+    node.style.setProperty("--enter-seq", String(index));
+    node.classList.remove("app-reveal-enter");
+    // Force restart so animation retriggers when switching views.
+    void node.offsetWidth;
+    node.classList.add("app-reveal-enter");
+  });
+}
+
 async function init() {
   applyTheme();
   restoreAdminSession();
@@ -265,8 +386,10 @@ async function init() {
   initializeLocationMap();
   startLocationWatch();
   syncLocationMapFields();
+  maybeShowDbMigrationNoticeModal();
+  animateViewEntrance(state.currentView);
 
-  const finishRosterPerf = startPerfTimer("roster_boot", { source: "apps_script_refresh" });
+  const finishRosterPerf = startPerfTimer("roster_boot", { source: "backend_refresh" });
   state.rosterLoading = true;
   fetchRoster()
     .then((response) => {
@@ -332,6 +455,86 @@ function bindEvents() {
       handleAdminLogin();
     }
   });
+  if (dom.adminOpenRecordsButton) {
+    dom.adminOpenRecordsButton.addEventListener("click", toggleAdminStudentRecordsSection);
+  }
+  const applyAdminRecordsFilters = () => {
+    state.admin.recordsPagination.page = 1;
+    if (state.admin.studentRecordsVisible) {
+      loadAdminStudentRecords();
+    }
+  };
+  const applyAdminRecordsFiltersDebounced = debounce(applyAdminRecordsFilters, 260);
+  if (dom.adminRecordsApplyButton) {
+    dom.adminRecordsApplyButton.addEventListener("click", () => {
+      syncAdminRecordsFiltersFromDom();
+      applyAdminRecordsFilters();
+    });
+  }
+  if (dom.adminRecordsResetButton) {
+    dom.adminRecordsResetButton.addEventListener("click", () => {
+      resetAdminRecordsFilters();
+      if (state.admin.studentRecordsVisible) {
+        loadAdminStudentRecords();
+      }
+    });
+  }
+  if (dom.adminRecordsStartDate) {
+    dom.adminRecordsStartDate.addEventListener("change", () => {
+      syncAdminRecordsFiltersFromDom();
+      applyAdminRecordsFilters();
+    });
+  }
+  if (dom.adminRecordsEndDate) {
+    dom.adminRecordsEndDate.addEventListener("change", () => {
+      syncAdminRecordsFiltersFromDom();
+      applyAdminRecordsFilters();
+    });
+  }
+  if (dom.adminRecordsSiteSelect) {
+    dom.adminRecordsSiteSelect.addEventListener("change", () => {
+      syncAdminRecordsFiltersFromDom();
+      applyAdminRecordsFilters();
+    });
+  }
+  if (dom.adminRecordsLocationModeSelect) {
+    dom.adminRecordsLocationModeSelect.addEventListener("change", () => {
+      syncAdminRecordsFiltersFromDom();
+      applyAdminRecordsFilters();
+    });
+  }
+  if (dom.adminRecordsInternSearch) {
+    dom.adminRecordsInternSearch.addEventListener("input", () => {
+      syncAdminRecordsFiltersFromDom();
+      applyAdminRecordsFiltersDebounced();
+    });
+    dom.adminRecordsInternSearch.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        syncAdminRecordsFiltersFromDom();
+        applyAdminRecordsFilters();
+      }
+    });
+  }
+  if (dom.adminRecordsPrevPageButton) {
+    dom.adminRecordsPrevPageButton.addEventListener("click", () => {
+      const currentPage = Number(state.admin.recordsPagination.page || 1);
+      if (currentPage <= 1) {
+        return;
+      }
+      loadAdminStudentRecords({ page: currentPage - 1 });
+    });
+  }
+  if (dom.adminRecordsNextPageButton) {
+    dom.adminRecordsNextPageButton.addEventListener("click", () => {
+      const currentPage = Number(state.admin.recordsPagination.page || 1);
+      const totalPages = Number(state.admin.recordsPagination.totalPages || 1);
+      if (currentPage >= totalPages) {
+        return;
+      }
+      loadAdminStudentRecords({ page: currentPage + 1 });
+    });
+  }
   dom.adminRefreshButton.addEventListener("click", loadAdminDashboard);
   dom.adminRangeSelect.addEventListener("change", () => {
     state.admin.range = dom.adminRangeSelect.value;
@@ -349,6 +552,17 @@ function bindEvents() {
     state.admin.search = dom.adminSearchInput.value.trim().toLowerCase();
     renderAdminTables();
   });
+  if (dom.adminOpenInternInsightsButton) {
+    dom.adminOpenInternInsightsButton.addEventListener("click", openInternInsightsFromLookup);
+  }
+  if (dom.adminInternLookupInput) {
+    dom.adminInternLookupInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        openInternInsightsFromLookup();
+      }
+    });
+  }
   dom.adminCsvButton.addEventListener("click", exportAdminCsv);
   dom.adminLogoutButton.addEventListener("click", () => {
     clearAdminSession();
@@ -388,6 +602,18 @@ function bindEvents() {
       closeReportModal();
     }
   });
+  if (dom.migrationNoticeCloseButton) {
+    dom.migrationNoticeCloseButton.addEventListener("click", () => {
+      closeDbMigrationNoticeModal();
+    });
+  }
+  if (dom.migrationNoticeModal) {
+    dom.migrationNoticeModal.addEventListener("click", (event) => {
+      if (event.target === dom.migrationNoticeModal) {
+        closeDbMigrationNoticeModal();
+      }
+    });
+  }
 
   ["click", "keydown", "touchstart"].forEach((eventName) => {
     document.addEventListener(eventName, () => {
@@ -481,13 +707,24 @@ function syncStudentDashboard(data, options = {}) {
 }
 
 function setView(view) {
-  state.currentView = view;
-  Object.entries(dom.views).forEach(([key, element]) => {
-    element.classList.toggle("is-active", key === view);
-  });
-  dom.navButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.viewButton === view);
-  });
+  if (!view || !dom.views?.[view]) {
+    return;
+  }
+  if (state.currentView === view) {
+    return;
+  }
+
+  const applyViewChange = () => {
+    state.currentView = view;
+    Object.entries(dom.views).forEach(([key, element]) => {
+      element.classList.toggle("is-active", key === view);
+    });
+    dom.navButtons.forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.viewButton === view);
+    });
+  };
+
+  runWithViewTransition(applyViewChange);
 
   // Scroll content to top on view switch
   const appContent = document.querySelector(".app-content");
@@ -507,7 +744,7 @@ function setView(view) {
   } else if (view === "progress") {
     dom.topbarSummary.textContent = "My Week shows the active student's weekly points, hours, and the last 7 days of attendance.";
   } else {
-    dom.topbarSummary.textContent = "Admin Dashboard shows cohort analytics, exceptions, reports, and printable visuals tied to the Google Sheet backend.";
+    dom.topbarSummary.textContent = "Admin Dashboard shows cohort analytics, exceptions, reports, and printable visuals from the Neon backend.";
     if (state.admin.dashboard) {
       window.requestAnimationFrame(() => {
         renderAdminCharts(state.admin.dashboard);
@@ -518,6 +755,7 @@ function setView(view) {
     }
   }
 
+  animateViewEntrance(view);
   setBlockingBusyState(dom.appShell?.getAttribute("aria-busy") === "true");
 }
 
@@ -662,7 +900,7 @@ function renderStudentIdentity() {
   dom.studentNameValue.textContent = hasName ? state.student.name : hasId ? "ID not found" : "-";
   dom.studentNameCopy.textContent = hasName
     ? state.student.loading
-      ? `Student ID ${state.student.id} is loading latest progress.`
+      ? `Student ID ${state.student.id} is fetching attendance data.`
       : `Student ID ${state.student.id}`
     : hasId
       ? "That ID is not in the active student roster."
@@ -1674,9 +1912,29 @@ async function handleAdminLogin() {
 }
 
 function clearAdminSession() {
+  destroyAdminRecordsMiniMaps();
   state.admin.token = "";
   state.admin.expiresAt = "";
   state.admin.dashboard = null;
+  state.admin.studentRecords = [];
+  state.admin.studentRecordsMeta = null;
+  state.admin.recordsSiteOptions = ["all"];
+  state.admin.recordsInternOptions = [];
+  state.admin.recordsFilters = {
+    startDate: "",
+    endDate: "",
+    query: "",
+    site: "all",
+    locationMode: "all"
+  };
+  state.admin.recordsPagination = {
+    page: 1,
+    pageSize: 12,
+    totalRows: 0,
+    totalPages: 1
+  };
+  state.admin.studentRecordsVisible = false;
+  state.admin.studentRecordsLoading = false;
   state.admin.loading = false;
   state.admin.error = "";
   state.admin.dataSource = "";
@@ -1692,11 +1950,402 @@ function renderAdminState() {
   dom.adminAuthBadge.dataset.tone = authenticated ? "success" : "warning";
   dom.adminLoginState.classList.toggle("is-hidden", authenticated);
   dom.adminContent.classList.toggle("is-hidden", !authenticated);
+  syncAdminRecordsFilterControls();
+  updateAdminRecordsButton();
+  if (dom.adminStudentRecordsSection) {
+    dom.adminStudentRecordsSection.classList.toggle("is-hidden", !state.admin.studentRecordsVisible || !authenticated);
+  }
+  if (authenticated && state.admin.studentRecordsVisible) {
+    renderAdminStudentRecords();
+  } else {
+    destroyAdminRecordsMiniMaps();
+  }
   if (!authenticated) {
     setAdminNotice("", "info");
+    if (dom.adminInternLookupInput) {
+      dom.adminInternLookupInput.value = "";
+    }
+    if (dom.adminInternLookupList) {
+      dom.adminInternLookupList.innerHTML = "";
+    }
+    if (dom.adminInternLookupHint) {
+      dom.adminInternLookupHint.textContent = "Open a specific intern to view detailed stats and charts.";
+    }
   }
   if (!authenticated) {
     closeDetailDrawer();
+  } else if (dom.adminInternLookupHint && !state.admin.selectedStudent) {
+    dom.adminInternLookupHint.textContent = "Open a specific intern to view detailed stats and charts.";
+  }
+}
+
+function updateAdminRecordsButton() {
+  if (!dom.adminOpenRecordsButton) {
+    return;
+  }
+  const label = state.admin.studentRecordsVisible ? "Hide Student Records" : "Open Student Records";
+  dom.adminOpenRecordsButton.innerHTML = `
+    <span class="material-symbols-outlined">table_view</span>
+    <span>${escapeHtml(label)}</span>
+  `;
+}
+
+function syncAdminRecordsFiltersFromDom() {
+  const filters = state.admin.recordsFilters;
+  if (dom.adminRecordsStartDate) {
+    filters.startDate = dom.adminRecordsStartDate.value || "";
+  }
+  if (dom.adminRecordsEndDate) {
+    filters.endDate = dom.adminRecordsEndDate.value || "";
+  }
+  if (dom.adminRecordsInternSearch) {
+    filters.query = dom.adminRecordsInternSearch.value.trim();
+  }
+  if (dom.adminRecordsSiteSelect) {
+    filters.site = dom.adminRecordsSiteSelect.value || "all";
+  }
+  if (dom.adminRecordsLocationModeSelect) {
+    filters.locationMode = dom.adminRecordsLocationModeSelect.value || "all";
+  }
+
+  if (filters.startDate && filters.endDate && filters.startDate > filters.endDate) {
+    const currentStart = filters.startDate;
+    filters.startDate = filters.endDate;
+    filters.endDate = currentStart;
+  }
+}
+
+function syncAdminRecordsFilterControls() {
+  const filters = state.admin.recordsFilters;
+  const siteOptions = Array.isArray(state.admin.recordsSiteOptions) && state.admin.recordsSiteOptions.length
+    ? state.admin.recordsSiteOptions
+    : ["all"];
+  const internOptions = Array.isArray(state.admin.recordsInternOptions)
+    ? state.admin.recordsInternOptions
+    : [];
+
+  if (dom.adminRecordsSiteSelect) {
+    const nextMarkup = siteOptions.map((site) => `
+      <option value="${escapeHtml(site)}">${escapeHtml(site === "all" ? "All Sites" : site)}</option>
+    `).join("");
+    if (dom.adminRecordsSiteSelect.innerHTML !== nextMarkup) {
+      dom.adminRecordsSiteSelect.innerHTML = nextMarkup;
+    }
+    if (!siteOptions.includes(filters.site)) {
+      filters.site = "all";
+    }
+    dom.adminRecordsSiteSelect.value = filters.site;
+  }
+
+  if (dom.adminRecordsInternList) {
+    dom.adminRecordsInternList.innerHTML = internOptions.map((name) => `
+      <option value="${escapeHtml(name)}"></option>
+    `).join("");
+  }
+
+  if (dom.adminRecordsStartDate) {
+    dom.adminRecordsStartDate.value = filters.startDate || "";
+  }
+  if (dom.adminRecordsEndDate) {
+    dom.adminRecordsEndDate.value = filters.endDate || "";
+  }
+  if (dom.adminRecordsInternSearch) {
+    dom.adminRecordsInternSearch.value = filters.query || "";
+  }
+  if (dom.adminRecordsLocationModeSelect) {
+    dom.adminRecordsLocationModeSelect.value = filters.locationMode || "all";
+  }
+}
+
+function resetAdminRecordsFilters() {
+  state.admin.recordsFilters = {
+    startDate: "",
+    endDate: "",
+    query: "",
+    site: "all",
+    locationMode: "all"
+  };
+  state.admin.recordsPagination.page = 1;
+  syncAdminRecordsFilterControls();
+}
+
+function destroyAdminRecordsMiniMaps() {
+  if (adminRecordsMapState.observer) {
+    adminRecordsMapState.observer.disconnect();
+    adminRecordsMapState.observer = null;
+  }
+  adminRecordsMapState.maps.forEach((mapInstance) => {
+    try {
+      mapInstance.remove();
+    } catch {
+      // Ignore cleanup failures for stale map nodes.
+    }
+  });
+  adminRecordsMapState.maps.clear();
+}
+
+function initializeAdminRecordsMiniMap(node) {
+  if (!node || node.dataset.mapReady === "1") {
+    return;
+  }
+  const lat = Number(node.dataset.lat);
+  const lng = Number(node.dataset.lng);
+  const mapId = String(node.dataset.mapId || "");
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !mapId) {
+    return;
+  }
+  if (adminRecordsMapState.maps.has(mapId)) {
+    return;
+  }
+
+  try {
+    const map = L.map(node, {
+      attributionControl: false,
+      zoomControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      keyboard: false,
+      tap: false,
+      touchZoom: false,
+      inertia: false,
+      zoomSnap: 0.5
+    });
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19
+    }).addTo(map);
+    L.circleMarker([lat, lng], {
+      radius: 6,
+      color: "#ffffff",
+      weight: 2,
+      fillColor: "#ff4b2b",
+      fillOpacity: 1
+    }).addTo(map);
+    map.setView([lat, lng], 14);
+    node.dataset.mapReady = "1";
+    node.classList.add("is-ready");
+    adminRecordsMapState.maps.set(mapId, map);
+    window.requestAnimationFrame(() => {
+      map.invalidateSize(false);
+    });
+  } catch (error) {
+    console.warn("Unable to initialize student records mini map.", error);
+  }
+}
+
+function setupAdminRecordsMiniMaps() {
+  if (!state.admin.studentRecordsVisible || !dom.adminStudentRecordsSection || dom.adminStudentRecordsSection.classList.contains("is-hidden")) {
+    return;
+  }
+  const mapNodes = Array.from(document.querySelectorAll(".records-mini-map"));
+  if (!mapNodes.length) {
+    return;
+  }
+
+  if (!("IntersectionObserver" in window)) {
+    mapNodes.forEach((node) => initializeAdminRecordsMiniMap(node));
+    return;
+  }
+
+  if (adminRecordsMapState.observer) {
+    adminRecordsMapState.observer.disconnect();
+  }
+  adminRecordsMapState.observer = new IntersectionObserver((entries, observer) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) {
+        return;
+      }
+      initializeAdminRecordsMiniMap(entry.target);
+      observer.unobserve(entry.target);
+    });
+  }, {
+    root: null,
+    rootMargin: "120px 0px",
+    threshold: 0.01
+  });
+  mapNodes.forEach((node) => adminRecordsMapState.observer.observe(node));
+}
+
+function buildAdminRecordsMapCell(lat, lng, mapIdPrefix, label) {
+  const latValue = Number(lat);
+  const lngValue = Number(lng);
+  if (!Number.isFinite(latValue) || !Number.isFinite(lngValue)) {
+    return `<span class="records-empty-note">No location logged</span>`;
+  }
+  const safeMapId = String(mapIdPrefix || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latValue},${lngValue}`)}`;
+  return `
+    <div class="records-map-stack">
+      <div class="records-mini-map" data-map-id="${escapeHtml(safeMapId)}" data-lat="${escapeHtml(String(latValue))}" data-lng="${escapeHtml(String(lngValue))}" aria-label="${escapeHtml(label)}"></div>
+      <a class="table-link records-map-link" href="${escapeHtml(mapLink)}" target="_blank" rel="noopener noreferrer">Open Map</a>
+    </div>
+  `;
+}
+
+function renderAdminStudentRecords() {
+  if (!dom.adminStudentRecordsTableBody || !dom.adminStudentRecordsSummary || !dom.adminRecordsPageInfo) {
+    return;
+  }
+
+  destroyAdminRecordsMiniMaps();
+  const records = state.admin.studentRecords || [];
+  const meta = state.admin.studentRecordsMeta || {};
+  const rangeLabel = toRangeLabel(meta.currentRange || "overall");
+  const siteLabel = (meta.currentSite || state.admin.recordsFilters.site || "all") === "all"
+    ? "All Sites"
+    : (meta.currentSite || state.admin.recordsFilters.site);
+  const totalRows = Number(state.admin.recordsPagination.totalRows || records.length || 0);
+  const page = Number(state.admin.recordsPagination.page || 1);
+  const totalPages = Number(state.admin.recordsPagination.totalPages || 1);
+  const hasDateRange = Boolean(meta.currentStartDate || meta.currentEndDate);
+  const dateLabel = hasDateRange
+    ? `${meta.currentStartDate || "Start"} to ${meta.currentEndDate || "Today"}`
+    : rangeLabel;
+
+  const queryLabel = state.admin.recordsFilters.query ? state.admin.recordsFilters.query : "Any";
+  const locationLabels = {
+    all: "All records",
+    has_checkin: "Check-in map",
+    has_checkout: "Check-out map",
+    has_both: "Both maps",
+    missing_any: "Missing any map"
+  };
+  const locationLabel = locationLabels[state.admin.recordsFilters.locationMode || "all"] || "All records";
+
+  dom.adminStudentRecordsSummary.innerHTML = `
+    <div class="records-summary-stack">
+      <div class="records-summary-meta">
+        Showing <strong>${escapeHtml(String(records.length))}</strong> of <strong>${escapeHtml(String(totalRows))}</strong> record(s) across <strong>${escapeHtml(dateLabel)}</strong>.
+      </div>
+      <div class="records-filter-chip-row">
+        <span class="records-filter-chip"><strong>Range</strong>${escapeHtml(rangeLabel)}</span>
+        <span class="records-filter-chip"><strong>Site</strong>${escapeHtml(siteLabel)}</span>
+        <span class="records-filter-chip"><strong>Search</strong>${escapeHtml(queryLabel)}</span>
+        <span class="records-filter-chip"><strong>Location</strong>${escapeHtml(locationLabel)}</span>
+        <span class="records-filter-chip"><strong>Page</strong>${escapeHtml(`${page} / ${totalPages}`)}</span>
+      </div>
+    </div>
+  `;
+  dom.adminRecordsPageInfo.textContent = `Page ${page} of ${totalPages}`;
+  if (dom.adminRecordsPrevPageButton) {
+    dom.adminRecordsPrevPageButton.disabled = page <= 1 || state.admin.studentRecordsLoading;
+  }
+  if (dom.adminRecordsNextPageButton) {
+    dom.adminRecordsNextPageButton.disabled = page >= totalPages || state.admin.studentRecordsLoading;
+  }
+
+  if (state.admin.studentRecordsLoading) {
+    dom.adminStudentRecordsTableBody.innerHTML = `<tr><td colspan="9" class="empty-copy">Loading student records…</td></tr>`;
+    return;
+  }
+
+  if (!records.length) {
+    dom.adminStudentRecordsTableBody.innerHTML = `<tr><td colspan="9" class="empty-copy">No student records found for the selected filters.</td></tr>`;
+    return;
+  }
+
+  dom.adminStudentRecordsTableBody.innerHTML = records.map((row, rowIndex) => {
+    const baseMapId = row.shiftId || `${row.studentId || "student"}-${row.localDate || "date"}-${rowIndex}`;
+    return `
+    <tr>
+      <td>${escapeHtml(row.studentName || "—")}</td>
+      <td>${escapeHtml(row.studentId || "—")}</td>
+      <td>${escapeHtml(formatDate(row.localDate || ""))}</td>
+      <td>${escapeHtml(row.site || "—")}</td>
+      <td>${escapeHtml(row.checkInUtc ? formatTimeOnly(row.checkInUtc) : "—")}</td>
+      <td>${escapeHtml(row.checkOutUtc ? formatTimeOnly(row.checkOutUtc) : "—")}</td>
+      <td>${buildAdminRecordsMapCell(row.checkInLat, row.checkInLng, `${baseMapId}-in`, "Check-in location map")}</td>
+      <td>${buildAdminRecordsMapCell(row.checkOutLat, row.checkOutLng, `${baseMapId}-out`, "Check-out location map")}</td>
+      <td>${escapeHtml(formatHours(row.hoursDecimal || 0))}</td>
+    </tr>
+  `;
+  }).join("");
+  setupAdminRecordsMiniMaps();
+}
+
+async function loadAdminStudentRecords(options = {}) {
+  const {
+    silent = false,
+    page = null,
+    ...requestOptions
+  } = options;
+  if (!state.admin.token) {
+    return;
+  }
+
+  if (Number.isFinite(Number(page)) && Number(page) > 0) {
+    state.admin.recordsPagination.page = Math.floor(Number(page));
+  }
+  syncAdminRecordsFiltersFromDom();
+
+  state.admin.studentRecordsLoading = true;
+  renderAdminStudentRecords();
+
+  try {
+    const response = await fetchStudentRecords({
+      token: state.admin.token,
+      range: "overall",
+      site: state.admin.recordsFilters.site || "all",
+      startDate: state.admin.recordsFilters.startDate || "",
+      endDate: state.admin.recordsFilters.endDate || "",
+      query: state.admin.recordsFilters.query || "",
+      locationMode: state.admin.recordsFilters.locationMode || "all",
+      page: state.admin.recordsPagination.page || 1,
+      pageSize: state.admin.recordsPagination.pageSize || 12
+    }, requestOptions);
+    state.admin.studentRecordsMeta = response.data || null;
+    state.admin.studentRecords = response.data?.rows || [];
+    state.admin.recordsPagination.page = Number(response.data?.page || 1);
+    state.admin.recordsPagination.pageSize = Number(response.data?.pageSize || state.admin.recordsPagination.pageSize || 12);
+    state.admin.recordsPagination.totalRows = Number(response.data?.totalRows || 0);
+    state.admin.recordsPagination.totalPages = Number(response.data?.totalPages || 1);
+    state.admin.recordsSiteOptions = response.data?.filterOptions?.sites || state.admin.recordsSiteOptions;
+    state.admin.recordsInternOptions = response.data?.filterOptions?.interns || state.admin.recordsInternOptions;
+    state.admin.recordsFilters.site = response.data?.currentSite || state.admin.recordsFilters.site;
+    state.admin.recordsFilters.startDate = response.data?.currentStartDate || "";
+    state.admin.recordsFilters.endDate = response.data?.currentEndDate || "";
+    state.admin.recordsFilters.query = response.data?.currentQuery || state.admin.recordsFilters.query;
+    state.admin.recordsFilters.locationMode = response.data?.currentLocationMode || state.admin.recordsFilters.locationMode;
+    syncAdminRecordsFilterControls();
+  } catch (error) {
+    if (error?.code === "AUTH_REQUIRED") {
+      clearAdminSession();
+      showToast("Admin session expired. Sign in again.", "danger");
+      return;
+    }
+    state.admin.studentRecordsMeta = {
+      currentRange: "overall",
+      currentSite: state.admin.recordsFilters.site || "all"
+    };
+    state.admin.studentRecords = [];
+    state.admin.recordsPagination.totalRows = 0;
+    state.admin.recordsPagination.totalPages = 1;
+    if (!silent) {
+      showToast(error.message || "Unable to load student records.", "danger");
+    }
+  } finally {
+    state.admin.studentRecordsLoading = false;
+    renderAdminStudentRecords();
+  }
+}
+
+async function toggleAdminStudentRecordsSection() {
+  if (!state.admin.token) {
+    showToast("Admin sign-in is required for records.", "danger");
+    return;
+  }
+
+  state.admin.studentRecordsVisible = !state.admin.studentRecordsVisible;
+  updateAdminRecordsButton();
+  if (dom.adminStudentRecordsSection) {
+    dom.adminStudentRecordsSection.classList.toggle("is-hidden", !state.admin.studentRecordsVisible);
+  }
+
+  if (state.admin.studentRecordsVisible) {
+    await loadAdminStudentRecords();
+  } else {
+    destroyAdminRecordsMiniMaps();
   }
 }
 
@@ -1728,7 +2377,7 @@ async function loadAdminDashboard(retries = 3) {
         state.admin.dashboard = response.data;
         state.admin.loading = false;
         state.admin.error = "";
-        state.admin.dataSource = response?.meta?.source || response?.data?.source || "apps_script";
+        state.admin.dataSource = response?.meta?.source || response?.data?.source || "backend";
         state.admin.dataQuality = response?.meta?.dataQuality || response?.data?.dataQuality || "ok";
         populateAdminSiteSelect(response.data.sites || []);
         renderAdminState();
@@ -1736,6 +2385,9 @@ async function loadAdminDashboard(retries = 3) {
         renderAdminDiagnosticsNotice();
         if (state.admin.selectedStudent) {
           openStudentDetail(state.admin.selectedStudent.studentId);
+        }
+        if (state.admin.studentRecordsVisible) {
+          await loadAdminStudentRecords({ silent: true });
         }
         finishPerf("ok", {
           source: state.admin.dataSource,
@@ -1787,6 +2439,67 @@ function populateAdminSiteSelect(sites) {
   }
 }
 
+function populateAdminInternLookupOptions() {
+  if (!dom.adminInternLookupList) {
+    return;
+  }
+  const rows = Array.isArray(state.admin.dashboard?.students) ? state.admin.dashboard.students.slice() : [];
+  rows.sort((a, b) => String(a.studentName || "").localeCompare(String(b.studentName || "")));
+  dom.adminInternLookupList.innerHTML = rows.map((row) => {
+    const studentId = String(row.studentId || "").trim();
+    const studentName = String(row.studentName || "").trim();
+    const value = studentId ? `${studentName} (${studentId})` : studentName;
+    return `<option value="${escapeHtml(value)}"></option>`;
+  }).join("");
+}
+
+function resolveAdminInternLookupStudentId(rawValue) {
+  const value = String(rawValue || "").trim();
+  if (!value) {
+    return "";
+  }
+  const rows = Array.isArray(state.admin.dashboard?.students) ? state.admin.dashboard.students : [];
+  const normalized = value.toLowerCase();
+
+  const embeddedIdMatch = value.match(/\b\d{4,}\b/);
+  if (embeddedIdMatch) {
+    const byEmbeddedId = rows.find((row) => String(row.studentId || "") === embeddedIdMatch[0]);
+    if (byEmbeddedId?.studentId) {
+      return String(byEmbeddedId.studentId);
+    }
+  }
+
+  const byExactId = rows.find((row) => String(row.studentId || "") === value);
+  if (byExactId?.studentId) {
+    return String(byExactId.studentId);
+  }
+
+  const byExactName = rows.find((row) => String(row.studentName || "").trim().toLowerCase() === normalized);
+  if (byExactName?.studentId) {
+    return String(byExactName.studentId);
+  }
+
+  const byPartial = rows.find((row) => {
+    const haystack = `${String(row.studentName || "")} ${String(row.studentId || "")}`.toLowerCase();
+    return haystack.includes(normalized);
+  });
+  return byPartial?.studentId ? String(byPartial.studentId) : "";
+}
+
+function openInternInsightsFromLookup() {
+  if (!state.admin.token) {
+    showToast("Admin sign-in is required for intern insights.", "danger");
+    return;
+  }
+  const typed = dom.adminInternLookupInput?.value || "";
+  const studentId = resolveAdminInternLookupStudentId(typed);
+  if (!studentId) {
+    showToast("No matching intern found. Try full name or student ID.", "warning");
+    return;
+  }
+  openStudentDetail(studentId);
+}
+
 function renderAdminDashboard() {
   if (!state.admin.dashboard) {
     return;
@@ -1797,11 +2510,13 @@ function renderAdminDashboard() {
   dom.adminStatusSelect.value = state.admin.statusFilter;
   dom.adminSearchInput.value = state.admin.search;
   dom.adminKpiGrid.innerHTML = adminKpiMarkup(state.admin.dashboard);
+  populateAdminInternLookupOptions();
   renderAdminTodayTable();
   renderAdminTables();
   renderHeatmap(dom.adminHeatmap, dom.adminHeatmapLegend, state.admin.dashboard.charts.heatmap || [], "activeStudents");
   if (state.currentView === "admin") {
     renderAdminCharts(state.admin.dashboard);
+    animateViewEntrance("admin");
   }
   if (!adminDashboardHasActivity(state.admin.dashboard)) {
     renderAdminNoDataState("No analytics data for the current filters yet. Try Overall and All Sites.");
@@ -1888,7 +2603,7 @@ function renderAdminDiagnosticsNotice() {
     return;
   }
 
-  const source = state.admin.dataSource || state.admin.dashboard?.source || "apps_script";
+  const source = state.admin.dataSource || state.admin.dashboard?.source || "backend";
   const quality = state.admin.dataQuality || state.admin.dashboard?.dataQuality || "ok";
   const diagnostics = state.admin.dashboard?.diagnostics || {};
   const shiftRows = Number(diagnostics.shiftRows || 0);
@@ -1907,7 +2622,7 @@ function renderAdminDiagnosticsNotice() {
   }
 
   if (quality === "suspect_zeroed_backend") {
-    setAdminNotice("Apps Script returned a zeroed payload while sheet rows exist. Refresh after redeploying Apps Script.", "danger");
+    setAdminNotice("Backend returned a zeroed payload while fallback sheet rows exist. Verify API deployment and refresh.", "danger");
     return;
   }
 
@@ -2132,6 +2847,20 @@ function filterAdminExceptions() {
   }).slice(0, 12);
 }
 
+function normalizeShiftStatus(status) {
+  const value = String(status || "").toUpperCase();
+  if (["COMPLETE", "BACKFILLED_COMPLETE", "COMPLETED"].includes(value)) {
+    return "COMPLETE";
+  }
+  if (["OPEN", "CHECKED_IN"].includes(value)) {
+    return "OPEN";
+  }
+  if (value === "EXCEPTION") {
+    return "EXCEPTION";
+  }
+  return "NOT_STARTED";
+}
+
 async function openStudentDetail(studentId) {
   state.admin.selectedStudent = { studentId };
   dom.detailDrawer.classList.add("is-open");
@@ -2144,8 +2873,20 @@ async function openStudentDetail(studentId) {
     const response = await fetchStudentDashboard(studentId, state.admin.range);
     const detail = response.data;
     state.admin.selectedStudent = detail.student;
+    if (dom.adminInternLookupInput) {
+      const name = String(detail?.student?.studentName || "");
+      const id = String(detail?.student?.studentId || studentId || "");
+      dom.adminInternLookupInput.value = id ? `${name} (${id})` : name;
+    }
+    if (dom.adminInternLookupHint) {
+      const todayStatus = detail?.today?.status || "NOT_STARTED";
+      dom.adminInternLookupHint.textContent = `Showing insights for ${detail.student.studentName} (${detail.student.studentId}) • Today: ${todayStatus}.`;
+    }
     dom.detailDrawerTitle.textContent = detail.student.studentName;
     dom.detailDrawerContent.innerHTML = detailDrawerMarkup(detail);
+    dom.detailDrawerContent.classList.remove("app-reveal-enter");
+    void dom.detailDrawerContent.offsetWidth;
+    dom.detailDrawerContent.classList.add("app-reveal-enter");
     dom.detailDrawerContent.querySelector("[data-detail-print]")?.addEventListener("click", () => openReport("student", { studentId }));
     dom.detailDrawerContent.querySelector("[data-detail-pdf]")?.addEventListener("click", async () => {
       await openReport("student", { studentId, downloadPdfAfterOpen: true });
@@ -2159,25 +2900,101 @@ async function openStudentDetail(studentId) {
 
 function detailDrawerMarkup(detail) {
   const selected = detail.selected || {};
+  const month = detail.summaries?.month || {};
+  const overall = detail.summaries?.overall || {};
+  const shifts = Array.isArray(detail.recentShifts) ? detail.recentShifts : [];
+  const exceptions = Array.isArray(detail.exceptions) ? detail.exceptions : [];
+  const counts = { complete: 0, open: 0, exception: 0 };
+  const siteMap = {};
+  const days = new Set();
+
+  shifts.forEach((shift) => {
+    const status = normalizeShiftStatus(shift.status);
+    if (status === "COMPLETE") counts.complete += 1;
+    if (status === "OPEN") counts.open += 1;
+    if (status === "EXCEPTION") counts.exception += 1;
+    if (shift.localDate) {
+      days.add(shift.localDate);
+    }
+    const site = String(shift.site || "Unknown site");
+    if (!siteMap[site]) {
+      siteMap[site] = { shifts: 0, points: 0, hours: 0 };
+    }
+    siteMap[site].shifts += 1;
+    siteMap[site].points += Number(shift.totalPoints || 0);
+    siteMap[site].hours += Number(shift.hoursDecimal || 0);
+  });
+
+  if (exceptions.length) {
+    counts.exception = Math.max(counts.exception, exceptions.length);
+  }
+
+  const rankedSites = Object.entries(siteMap)
+    .map(([site, values]) => ({ site, ...values }))
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.hours !== a.hours) return b.hours - a.hours;
+      return b.shifts - a.shifts;
+    });
+  const denominator = counts.complete + counts.open + counts.exception;
+  const completionRate = denominator > 0 ? round((counts.complete / denominator) * 100, 1) : 0;
+  const recentHours = round(rankedSites.reduce((sum, row) => sum + Number(row.hours || 0), 0), 2);
+  const lastSite = shifts[0]?.site || "";
+  const topSite = rankedSites[0]?.site || "";
+
   return `
-    <div class="summary-grid">
+    <div class="summary-grid summary-grid-3">
       <div class="summary-card"><div class="stat-label">${escapeHtml(toRangeLabel(detail.currentRange))} Points</div><div class="metric-value">${escapeHtml(formatPoints(selected.points || 0))}</div></div>
       <div class="summary-card"><div class="stat-label">${escapeHtml(toRangeLabel(detail.currentRange))} Hours</div><div class="metric-value">${escapeHtml(formatHours(selected.hours || 0))}</div></div>
+      <div class="summary-card"><div class="stat-label">This Month</div><div class="metric-value">${escapeHtml(formatPoints(month.points || 0))} · ${escapeHtml(formatHours(month.hours || 0))}</div></div>
+      <div class="summary-card"><div class="stat-label">Overall</div><div class="metric-value">${escapeHtml(formatPoints(overall.points || 0))} · ${escapeHtml(formatHours(overall.hours || 0))}</div></div>
       <div class="summary-card"><div class="stat-label">Percentile</div><div class="metric-value">${escapeHtml(formatPercent(selected.percentile || 0))}</div></div>
       <div class="summary-card"><div class="stat-label">Today</div><div class="metric-value">${escapeHtml(detail.today.status || "NOT_STARTED")}</div></div>
+      <div class="summary-card"><div class="stat-label">Active Days</div><div class="metric-value">${escapeHtml(String(days.size || 0))}</div></div>
+      <div class="summary-card"><div class="stat-label">Completion Rate</div><div class="metric-value">${escapeHtml(formatPercent(completionRate || 0))}</div></div>
+      <div class="summary-card"><div class="stat-label">Status Mix</div><div class="metric-value">${escapeHtml(String(counts.complete))}C / ${escapeHtml(String(counts.open))}O / ${escapeHtml(String(counts.exception))}E</div></div>
+    </div>
+    <div class="insight-chip-row">
+      <span class="insight-chip">Last Site: ${escapeHtml(lastSite || "—")}</span>
+      <span class="insight-chip">Top Site: ${escapeHtml(topSite || "—")}</span>
+      <span class="insight-chip">Recent Logged Hours: ${escapeHtml(formatHours(recentHours || 0))}</span>
     </div>
     <div class="button-row">
       <button class="button is-secondary" data-detail-print type="button">Print Student Report</button>
       <button class="button is-accent" data-detail-pdf type="button">Download Student PDF</button>
     </div>
-    <section class="chart-card is-short">
-      <div class="card-header"><div><div class="card-label">Week</div><h3 class="card-title">Weekly points</h3></div></div>
-      <canvas id="detailWeeklyPointsChart"></canvas>
-    </section>
-    <section class="chart-card is-short">
-      <div class="card-header"><div><div class="card-label">Current range</div><h3 class="card-title">Cumulative points</h3></div></div>
-      <canvas id="detailCumulativeChart"></canvas>
-    </section>
+    <div class="detail-chart-grid">
+      <section class="chart-card is-short">
+        <div class="card-header"><div><div class="card-label">Recent work</div><h3 class="card-title">Activity Pulse</h3></div></div>
+        <div class="chart-frame chart-frame-sm">
+          <canvas id="detailRecentActivityChart" role="img" aria-label="Recent student activity by shift"></canvas>
+        </div>
+      </section>
+      <section class="chart-card is-short">
+        <div class="card-header"><div><div class="card-label">Week</div><h3 class="card-title">Weekly Activity</h3></div></div>
+        <div class="chart-frame chart-frame-md">
+          <canvas id="detailWeeklyComboChart" role="img" aria-label="Weekly intern points and hours"></canvas>
+        </div>
+      </section>
+      <section class="chart-card is-short">
+        <div class="card-header"><div><div class="card-label">Current range</div><h3 class="card-title">Cumulative Trend</h3></div></div>
+        <div class="chart-frame chart-frame-md">
+          <canvas id="detailCumulativeChart" role="img" aria-label="Cumulative points and hours"></canvas>
+        </div>
+      </section>
+      <section class="chart-card is-short">
+        <div class="card-header"><div><div class="card-label">By Site</div><h3 class="card-title">Site Performance</h3></div></div>
+        <div class="chart-frame chart-frame-md">
+          <canvas id="detailSiteBreakdownChart" role="img" aria-label="Intern performance by site"></canvas>
+        </div>
+      </section>
+      <section class="chart-card is-short">
+        <div class="card-header"><div><div class="card-label">Shift Status</div><h3 class="card-title">Status Distribution</h3></div></div>
+        <div class="chart-frame chart-frame-md">
+          <canvas id="detailStatusMixChart" role="img" aria-label="Intern status distribution"></canvas>
+        </div>
+      </section>
+    </div>
     <section class="surface">
       <div class="card-header"><div><div class="card-label">Recent Shifts</div><h3 class="card-title">Detail log</h3></div></div>
       <div class="data-table-wrap">

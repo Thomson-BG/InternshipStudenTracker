@@ -933,7 +933,7 @@ function withAdminDiagnostics(data, meta) {
   const diagnostics = meta?.diagnostics || {};
   return {
     ...(data || {}),
-    source: meta?.source || "apps_script",
+    source: meta?.source || "backend",
     dataQuality: meta?.dataQuality || "ok",
     diagnostics
   };
@@ -942,7 +942,7 @@ function withAdminDiagnostics(data, meta) {
 async function reconcileAdminPayloadQuality(serverData, range, site, options = {}) {
   if (hasAnyDashboardActivity(serverData)) {
     const meta = {
-      source: "apps_script",
+      source: "backend",
       dataQuality: "ok",
       fallbackUsed: false,
       diagnostics: {}
@@ -956,7 +956,7 @@ async function reconcileAdminPayloadQuality(serverData, range, site, options = {
   const sourceProbe = await probeShiftSourceQuality(options);
   if (!sourceProbe.ok || !sourceProbe.hasRows) {
     const meta = {
-      source: "apps_script",
+      source: "backend",
       dataQuality: "empty_dataset",
       fallbackUsed: false,
       diagnostics: {
@@ -987,7 +987,7 @@ async function reconcileAdminPayloadQuality(serverData, range, site, options = {
     };
   } catch (fallbackError) {
     const meta = {
-      source: "apps_script",
+      source: "backend",
       dataQuality: "suspect_zeroed_backend",
       fallbackUsed: false,
       diagnostics: {
@@ -1148,7 +1148,6 @@ export async function adminAuth(password) {
 }
 
 export async function fetchStudentDashboard(studentId, range = "week", options = {}) {
-  let apiError = null;
   try {
     const response = await requestJson(API_ENDPOINTS.studentDashboard(studentId, range), options);
     if (response?.data && isStudentDashboardPayloadUsable(response.data)) {
@@ -1157,11 +1156,11 @@ export async function fetchStudentDashboard(studentId, range = "week", options =
         data: normalizeStudentDashboardPayload(response.data, range),
         meta: {
           ...(response.meta || {}),
-          source: response.meta?.source || "apps_script"
+          source: response.meta?.source || "backend"
         }
       };
     }
-    apiError = {
+    throw {
       ok: false,
       code: "UNUSABLE_RESPONSE",
       message: "Student dashboard response was incomplete."
@@ -1170,23 +1169,7 @@ export async function fetchStudentDashboard(studentId, range = "week", options =
     if (error?.name === "AbortError") {
       throw error;
     }
-    apiError = error;
-  }
-
-  try {
-    return {
-      ok: true,
-      data: normalizeStudentDashboardPayload(
-        await buildStudentDashboardFromSheet(studentId, range, options),
-        range
-      ),
-      meta: {
-        source: "sheet_fallback",
-        fallbackUsed: true
-      }
-    };
-  } catch (sheetError) {
-    throw apiError || sheetError;
+    throw error;
   }
 }
 
@@ -1196,31 +1179,50 @@ export async function fetchAdminDashboard({ token, range, site }, options = {}) 
   try {
     const response = await requestJson(API_ENDPOINTS.adminDashboard(token, normalizedRange, normalizedSite), options);
     if (response?.data) {
-      const reconciled = await reconcileAdminPayloadQuality(response.data, normalizedRange, normalizedSite, options);
       return {
         ok: true,
-        data: reconciled.data,
-        meta: reconciled.meta
+        data: response.data,
+        meta: {
+          ...(response.meta || {}),
+          source: response.meta?.source || "backend"
+        }
       };
     }
+    throw {
+      ok: false,
+      code: "UNUSABLE_RESPONSE",
+      message: "Admin dashboard response was incomplete."
+    };
   } catch (error) {
     if (error?.code === "AUTH_REQUIRED") {
       throw error;
     }
+    throw error;
   }
+}
 
-  const fallbackData = await buildAdminDashboardFromSheet(normalizedRange, normalizedSite, options);
-  const fallbackMeta = {
-    source: "sheet_fallback",
-    dataQuality: hasAnyDashboardActivity(fallbackData) ? "backend_unavailable_recovered" : "backend_unavailable_empty",
-    fallbackUsed: true,
-    diagnostics: {}
-  };
-  return {
-    ok: true,
-    data: withAdminDiagnostics(fallbackData, fallbackMeta),
-    meta: fallbackMeta
-  };
+export async function fetchStudentRecords({
+  token,
+  range = "overall",
+  site = "all",
+  startDate = "",
+  endDate = "",
+  query = "",
+  locationMode = "all",
+  page = 1,
+  pageSize = 12
+}, options = {}) {
+  return requestJson(API_ENDPOINTS.studentRecords({
+    token,
+    range,
+    site,
+    startDate,
+    endDate,
+    query,
+    locationMode,
+    page,
+    pageSize
+  }), options);
 }
 
 export async function fetchReportData({ token, type, range, site, studentId }) {
