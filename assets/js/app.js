@@ -3106,7 +3106,7 @@ async function openReport(type, options = {}) {
     dom.reportModal.classList.add("is-open");
     if (options.downloadPdfAfterOpen) {
       // Wait for charts to render before generating PDF
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       await downloadReportPdf(dom.reportStage, reportFileName());
     }
   } catch (error) {

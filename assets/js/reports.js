@@ -284,6 +284,16 @@ export function renderReportCharts(report) {
     return;
   }
 
+  // Destroy existing charts before rendering new ones
+  if (window.Chart && window.Chart.registry) {
+    Object.keys(window.Chart.registry.controllers).forEach((key) => {
+      const chart = window.Chart.registry.getChart(key);
+      if (chart) {
+        chart.destroy();
+      }
+    });
+  }
+
   if (report.type === "student") {
     const charts = report.payload.charts;
     if (charts.weeklyPoints && charts.weeklyHours && charts.cumulative) {
@@ -440,6 +450,10 @@ export function renderReportCharts(report) {
       // Render trend chart
       const trendCtx = document.getElementById("adminOverviewTrendChart");
       if (trendCtx) {
+        // Destroy existing chart if it exists
+        if (trendCtx.chart) {
+          trendCtx.chart.destroy();
+        }
         new window.Chart(trendCtx, {
           type: "line",
           data: {
