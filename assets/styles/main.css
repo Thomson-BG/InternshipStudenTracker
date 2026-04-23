@@ -1975,6 +1975,77 @@ body.has-announcement-modal-open {
   background: var(--secondary);
 }
 
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+
+  .report-grid {
+    display: block;
+  }
+
+  .report-card {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 20px;
+  }
+
+  .report-chart-container canvas {
+    height: 200px !important;
+  }
+
+  .report-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .report-table th,
+  .report-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+  }
+
+  .report-table th {
+    background-color: #f2f2f2;
+  }
+
+  .report-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+
+  .report-header {
+    margin-bottom: 20px;
+    page-break-after: avoid;
+  }
+
+  .report-section-header {
+    margin-bottom: 10px;
+    page-break-after: avoid;
+  }
+
+  .report-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+  }
+
+  .report-stat {
+    background: #f9f9f9;
+    padding: 10px;
+    border-radius: 4px;
+  }
+
+  .report-chart-grid {
+    display: block;
+  }
+
+  .report-chart-container {
+    margin-bottom: 20px;
+    page-break-inside: avoid;
+  }
+}
+
 .toast {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
