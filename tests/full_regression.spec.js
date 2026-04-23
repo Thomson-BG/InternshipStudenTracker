@@ -12,7 +12,7 @@ const ROSTER_FALLBACK_TEST = {
 
 async function loadApp(page) {
   // Mock roster fetch to fail initially, forcing fallback
-  await page.route('**/macros/s/**?mode=get_roster', async route => {
+  await page.route('**/api/v1/roster', async route => {
     await route.fulfill({
       status: 200, // Should be 200 to return the fallback as data
       contentType: 'application/json',
@@ -21,7 +21,7 @@ async function loadApp(page) {
   });
 
   // Mock student dashboard fetch
-  await page.route('**/macros/s/**?mode=student_dashboard*', async route => {
+  await page.route('**/api/v1/dashboard/student**', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -39,7 +39,7 @@ async function loadApp(page) {
   });
 
   // Mock admin auth
-  await page.route('**/macros/s/**?mode=admin_auth', async route => {
+  await page.route('**/api/v1/admin/auth/login', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

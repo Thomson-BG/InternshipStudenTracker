@@ -1,20 +1,24 @@
 {
   "name": "auto-intern-tracker",
   "version": "2.0.0",
-  "description": "Auto Intern Tracker frontend with Neon Postgres + Vercel API backend.",
+  "description": "Auto Intern Tracker frontend with Neon PostgreSQL backend.",
   "main": "index.html",
   "scripts": {
     "start": "vite preview --host 127.0.0.1 --port 4173",
     "dev": "vite --host 127.0.0.1 --port 4173",
+    "dev:api": "node server/dev-api.js",
+    "dev:full": "node server/scripts/dev-full.js",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "db:init": "node scripts/init-neon-schema.js",
-    "db:migrate:sheet": "node scripts/migrate-sheet-to-neon.js",
     "test": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_SMOKE_LABEL=local playwright test tests/smoke.spec.js",
     "test:full": "playwright test tests/full_regression.spec.js",
     "smoke": "playwright test tests/smoke.spec.js",
     "smoke:local": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_SMOKE_LABEL=local playwright test tests/smoke.spec.js",
-    "smoke:live": "PLAYWRIGHT_BASE_URL=https://internship-studen-tracker.vercel.app PLAYWRIGHT_SMOKE_LABEL=production playwright test tests/smoke.spec.js"
+    "smoke:live": "PLAYWRIGHT_BASE_URL=https://internship-studen-tracker.vercel.app PLAYWRIGHT_SMOKE_LABEL=production playwright test tests/smoke.spec.js",
+    "init:db": "node server/scripts/init-db.js",
+    "import:sheet-json": "node server/scripts/import-sheet-json.js",
+    "migrate:sheet": "node server/scripts/migrate-from-google-sheet.js",
+    "parity:check": "node server/scripts/parity-check.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",
@@ -27,6 +31,6 @@
   },
   "dependencies": {
     "leaflet": "^1.9.4",
-    "postgres": "^3.4.7"
+    "pg": "^8.20.0"
   }
 }
