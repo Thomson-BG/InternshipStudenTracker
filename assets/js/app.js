@@ -140,7 +140,9 @@ const dom = {
   migrationNoticeCloseButton: document.getElementById("migrationNoticeCloseButton"),
   globalLoadingModal: document.getElementById("globalLoadingModal"),
   globalLoadingMessage: document.getElementById("globalLoadingMessage"),
-  toastRack: document.getElementById("toastRack")
+  toastRack: document.getElementById("toastRack"),
+  splashScreen: document.getElementById("splashScreen"),
+  logoSplashWordmark: document.getElementById("logoSplashWordmark")
 };
 
 let locationWatchId = null;
@@ -293,6 +295,56 @@ function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function shouldHoldSplashForPreview() {
+  const query = new URLSearchParams(window.location.search);
+  return query.get("splashPreview") === "1";
+}
+
+function finishSplashSequence() {
+  if (dom.splashScreen) {
+    dom.splashScreen.classList.remove("is-preview-lock");
+    dom.splashScreen.classList.add("is-fading");
+    window.setTimeout(() => {
+      if (!dom.splashScreen) {
+        return;
+      }
+      dom.splashScreen.classList.remove("is-fading");
+      dom.splashScreen.classList.remove("is-active");
+      dom.splashScreen.setAttribute("aria-hidden", "true");
+    }, 380);
+  }
+  dom.body.classList.remove("has-splash-screen-open");
+  dom.body.classList.remove("reduced-motion");
+}
+
+async function runSplashSequence() {
+  if (!dom.splashScreen) {
+    return true;
+  }
+
+  dom.body.classList.toggle("reduced-motion", prefersReducedMotion());
+  dom.body.classList.add("has-splash-screen-open");
+  dom.splashScreen.classList.add("is-active");
+  dom.splashScreen.setAttribute("aria-hidden", "false");
+
+  if (dom.logoSplashWordmark) {
+    const label = dom.logoSplashWordmark.getAttribute("aria-label");
+    if (!label || !label.trim()) {
+      dom.logoSplashWordmark.setAttribute("aria-label", "Bulldog Garage logo");
+    }
+  }
+
+  if (shouldHoldSplashForPreview()) {
+    dom.splashScreen.classList.add("is-preview-lock");
+    return false;
+  }
+
+  const durationMs = prefersReducedMotion() ? 900 : 3000;
+  await wait(durationMs);
+  finishSplashSequence();
+  return true;
+}
+
 function isDbMigrationNoticeWindowActive(now = Date.now()) {
   const startMs = Date.parse(DB_MIGRATION_NOTICE_START_ISO);
   if (!Number.isFinite(startMs)) {
@@ -386,8 +438,13 @@ async function init() {
   initializeLocationMap();
   startLocationWatch();
   syncLocationMapFields();
-  maybeShowDbMigrationNoticeModal();
   animateViewEntrance(state.currentView);
+  const splashPromise = runSplashSequence();
+  splashPromise.then((shouldShowModal) => {
+    if (shouldShowModal) {
+      maybeShowDbMigrationNoticeModal();
+    }
+  });
 
   const finishRosterPerf = startPerfTimer("roster_boot", { source: "backend_refresh" });
   state.rosterLoading = true;
@@ -2863,6 +2920,8 @@ function normalizeShiftStatus(status) {
 
 async function openStudentDetail(studentId) {
   state.admin.selectedStudent = { studentId };
+  state.admin.selectedStudentDetail = null;
+  state.admin.selectedStudentHistoryScope = "recent";
   dom.detailDrawer.classList.add("is-open");
   const overlay = document.getElementById("drawerOverlay");
   if (overlay) overlay.classList.add("is-active");
@@ -2882,27 +2941,66 @@ async function openStudentDetail(studentId) {
       const todayStatus = detail?.today?.status || "NOT_STARTED";
       dom.adminInternLookupHint.textContent = `Showing insights for ${detail.student.studentName} (${detail.student.studentId}) • Today: ${todayStatus}.`;
     }
+    state.admin.selectedStudentDetail = detail;
+    state.admin.selectedStudentHistoryScope = "recent";
     dom.detailDrawerTitle.textContent = detail.student.studentName;
-    dom.detailDrawerContent.innerHTML = detailDrawerMarkup(detail);
+    dom.detailDrawerContent.innerHTML = detailDrawerMarkup(detail, "recent");
     dom.detailDrawerContent.classList.remove("app-reveal-enter");
     void dom.detailDrawerContent.offsetWidth;
     dom.detailDrawerContent.classList.add("app-reveal-enter");
-    dom.detailDrawerContent.querySelector("[data-detail-print]")?.addEventListener("click", () => openReport("student", { studentId }));
-    dom.detailDrawerContent.querySelector("[data-detail-pdf]")?.addEventListener("click", async () => {
-      await openReport("student", { studentId, downloadPdfAfterOpen: true });
-    });
-    renderDetailCharts(detail);
+    bindStudentDetailActions(detail);
+    renderDetailCharts(detail, "recent");
   } catch (error) {
     dom.detailDrawerTitle.textContent = "Student detail unavailable";
     dom.detailDrawerContent.innerHTML = `<div class="empty-copy">${escapeHtml(error.message || "Unable to load student detail.")}</div>`;
   }
 }
 
-function detailDrawerMarkup(detail) {
+function bindStudentDetailActions(detail) {
+  const studentId = detail?.student?.studentId || state.admin.selectedStudent?.studentId || "";
+  dom.detailDrawerContent.querySelector("[data-detail-print]")?.addEventListener("click", () => {
+    openReport("student", {
+      studentId,
+      historyScope: state.admin.selectedStudentHistoryScope || "recent"
+    });
+  });
+  dom.detailDrawerContent.querySelector("[data-detail-pdf]")?.addEventListener("click", async () => {
+    await openReport("student", {
+      studentId,
+      historyScope: state.admin.selectedStudentHistoryScope || "recent",
+      downloadPdfAfterOpen: true
+    });
+  });
+  dom.detailDrawerContent.querySelector("[data-detail-print-all]")?.addEventListener("click", () => {
+    openReport("student", {
+      studentId,
+      historyScope: "all"
+    });
+  });
+  dom.detailDrawerContent.querySelector("[data-detail-history-scope='recent']")?.addEventListener("click", () => {
+    setStudentDetailHistoryScope(detail, "recent");
+  });
+  dom.detailDrawerContent.querySelector("[data-detail-history-scope='all']")?.addEventListener("click", () => {
+    setStudentDetailHistoryScope(detail, "all");
+  });
+}
+
+function setStudentDetailHistoryScope(detail, scope) {
+  const normalizedScope = scope === "all" ? "all" : "recent";
+  state.admin.selectedStudentDetail = detail;
+  state.admin.selectedStudentHistoryScope = normalizedScope;
+  dom.detailDrawerContent.innerHTML = detailDrawerMarkup(detail, normalizedScope);
+  bindStudentDetailActions(detail);
+  renderDetailCharts(detail, normalizedScope);
+}
+
+function detailDrawerMarkup(detail, historyScope = "recent") {
   const selected = detail.selected || {};
   const month = detail.summaries?.month || {};
   const overall = detail.summaries?.overall || {};
-  const shifts = Array.isArray(detail.recentShifts) ? detail.recentShifts : [];
+  const shifts = historyScope === "all"
+    ? (Array.isArray(detail.shiftHistory) ? detail.shiftHistory : [])
+    : (Array.isArray(detail.recentShifts) ? detail.recentShifts : []);
   const exceptions = Array.isArray(detail.exceptions) ? detail.exceptions : [];
   const counts = { complete: 0, open: 0, exception: 0 };
   const siteMap = {};
@@ -2957,12 +3055,21 @@ function detailDrawerMarkup(detail) {
     <div class="insight-chip-row">
       <span class="insight-chip">Last Site: ${escapeHtml(lastSite || "—")}</span>
       <span class="insight-chip">Top Site: ${escapeHtml(topSite || "—")}</span>
-      <span class="insight-chip">Recent Logged Hours: ${escapeHtml(formatHours(recentHours || 0))}</span>
+      <span class="insight-chip">${escapeHtml(historyScope === "all" ? "All Logged Hours" : "Recent Logged Hours")}: ${escapeHtml(formatHours(recentHours || 0))}</span>
     </div>
     <div class="button-row">
       <button class="button is-secondary" data-detail-print type="button">Print Student Report</button>
+      <button class="button is-secondary" data-detail-print-all type="button">Print All Shifts</button>
       <button class="button is-accent" data-detail-pdf type="button">Download Student PDF</button>
     </div>
+    <div class="detail-history-toggle-row">
+      <span class="stat-label">Shifts</span>
+      <div class="detail-history-toggle-group">
+        <button class="ios-button secondary detail-history-toggle${historyScope === "recent" ? " is-active" : ""}" data-detail-history-scope="recent" type="button">Recent</button>
+        <button class="ios-button secondary detail-history-toggle${historyScope === "all" ? " is-active" : ""}" data-detail-history-scope="all" type="button">All Shifts</button>
+      </div>
+    </div>
+    <div class="metric-copy">${escapeHtml(historyScope === "all" ? "Showing every shift ever logged for this student." : "Showing the most recent shifts for quick review.")}</div>
     <div class="detail-chart-grid">
       <section class="chart-card is-short">
         <div class="card-header"><div><div class="card-label">Recent work</div><h3 class="card-title">Activity Pulse</h3></div></div>
@@ -3000,7 +3107,7 @@ function detailDrawerMarkup(detail) {
       <div class="data-table-wrap">
         <table class="data-table">
           <thead><tr><th>Date</th><th>Site</th><th>Status</th><th>Hours</th><th>Points</th></tr></thead>
-          <tbody>${renderRecentShiftsRows(detail.recentShifts || [])}</tbody>
+          <tbody>${renderRecentShiftsRows(shifts)}</tbody>
         </table>
       </div>
     </section>
@@ -3015,6 +3122,8 @@ function closeDetailDrawer() {
   dom.detailDrawer.classList.remove("is-open");
   const overlay = document.getElementById("drawerOverlay");
   if (overlay) overlay.classList.remove("is-active");
+  state.admin.selectedStudentDetail = null;
+  state.admin.selectedStudentHistoryScope = "recent";
 }
 
 function renderHeatmap(container, legend, series, valueKey) {
@@ -3097,16 +3206,25 @@ async function openReport(type, options = {}) {
       type,
       range: state.admin.range,
       site: state.admin.site,
-      studentId: options.studentId || ""
+      studentId: options.studentId || "",
+      historyScope: options.historyScope || ""
     });
-    reportContext = response.data;
+    reportContext = {
+      ...response.data,
+      historyScope: options.historyScope || "recent"
+    };
     dom.reportTitleText.textContent = `${response.data.reportTitle} - ${response.data.reportSubtitle}`;
-    dom.reportStage.innerHTML = renderReportMarkup(response.data);
-    renderReportCharts(response.data);
+    dom.reportStage.innerHTML = renderReportMarkup(reportContext);
+    renderReportCharts(reportContext);
     dom.reportModal.classList.add("is-open");
     if (options.downloadPdfAfterOpen) {
       // Wait for charts to render before generating PDF
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(resolve);
+        });
+      });
+      await wait(120);
       await downloadReportPdf(dom.reportStage, reportFileName());
     }
   } catch (error) {
@@ -3127,7 +3245,8 @@ function reportFileName() {
   if (!reportContext) {
     return "intern-track-report.pdf";
   }
-  const base = `${reportContext.type}-${state.admin.range}-${state.admin.site}`.replace(/\s+/g, "-").toLowerCase();
+  const scopeSuffix = reportContext.historyScope === "all" ? "-all-shifts" : "";
+  const base = `${reportContext.type}-${state.admin.range}-${state.admin.site}${scopeSuffix}`.replace(/\s+/g, "-").toLowerCase();
   return `${base}.pdf`;
 }
 

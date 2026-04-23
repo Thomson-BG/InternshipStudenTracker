@@ -20,6 +20,56 @@
 </head>
 <body>
 
+  <div id="splashScreen" class="splash-screen" aria-hidden="true">
+    <div class="logo-splash-stage" aria-hidden="true">
+      <div class="logo-splash-grid"></div>
+      <div class="logo-splash-glow"></div>
+      <div class="logo-splash-spotlight"></div>
+      <div class="logo-splash-shine"></div>
+      <svg id="logoSplashWordmark" class="logo-splash-mark" viewBox="0 0 1080 420" role="img" aria-label="Bulldog Garage logo" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="logoSplashChrome" x1="90" y1="140" x2="930" y2="300" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#fff8eb" />
+            <stop offset="0.22" stop-color="#ffd27d" />
+            <stop offset="0.45" stop-color="#ff8c3a" />
+            <stop offset="0.68" stop-color="#d64222" />
+            <stop offset="1" stop-color="#6d1212" />
+          </linearGradient>
+          <linearGradient id="logoSplashMetal" x1="180" y1="90" x2="880" y2="328" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#ffffff" />
+            <stop offset="0.36" stop-color="#c9d3e3" />
+            <stop offset="0.58" stop-color="#ffeec7" />
+            <stop offset="1" stop-color="#969fb0" />
+          </linearGradient>
+          <filter id="logoSplashOuterGlow" x="-30%" y="-30%" width="160%" height="180%">
+            <feGaussianBlur stdDeviation="8" result="glow" />
+            <feMerge>
+              <feMergeNode in="glow" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <g class="logo-splash-frame">
+          <rect x="80" y="62" width="920" height="296" rx="34" fill="rgba(8, 10, 14, 0.46)" stroke="rgba(255, 162, 78, 0.42)" stroke-width="4"></rect>
+          <rect x="95" y="78" width="890" height="264" rx="24" fill="rgba(5, 8, 11, 0.64)" stroke="rgba(255, 218, 158, 0.26)" stroke-width="2"></rect>
+        </g>
+        <g class="logo-splash-text" filter="url(#logoSplashOuterGlow)">
+          <text class="logo-splash-fill logo-splash-bulldog" x="540" y="192">BULLDOG</text>
+          <text class="logo-splash-fill logo-splash-garage" x="540" y="287">GARAGE</text>
+          <text class="logo-splash-stroke logo-splash-bulldog" x="540" y="192">BULLDOG</text>
+          <text class="logo-splash-stroke logo-splash-garage" x="540" y="287">GARAGE</text>
+          <text class="logo-splash-metal logo-splash-bulldog" x="540" y="192">BULLDOG</text>
+          <text class="logo-splash-metal logo-splash-garage" x="540" y="287">GARAGE</text>
+        </g>
+        <g class="logo-splash-underlines">
+          <line x1="168" y1="106" x2="914" y2="106" />
+          <line x1="168" y1="316" x2="914" y2="316" />
+        </g>
+      </svg>
+      <p class="logo-splash-subline">AUTOMOTIVE INTERNSHIP TRACKER</p>
+    </div>
+  </div>
+
   <div id="appShell" class="app-shell" aria-busy="false">
 
     <!-- ========== HEADER ========== -->

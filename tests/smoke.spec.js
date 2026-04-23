@@ -86,9 +86,22 @@ test("startup, student dashboard, admin dashboard smoke", async ({ page, baseURL
     await route.continue();
   });
 
-  const tracker = createClientFailureTracker(page);
+  const splashPreviewUrl = new URL(baseURL);
+  splashPreviewUrl.searchParams.set("splashPreview", "1");
+
+  await page.goto(splashPreviewUrl.toString(), { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#splashScreen")).toHaveClass(/is-active/);
+  await expect(page.locator("#logoSplashWordmark")).toBeVisible();
+  await capture(page, "splash-logo-mobile");
+
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await expect(page.locator("#logoSplashWordmark")).toBeVisible();
+  await capture(page, "splash-logo-desktop");
+
+  await page.setViewportSize({ width: 390, height: 844 });
 
   await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  const tracker = createClientFailureTracker(page);
   await expect(page.locator("#clockView")).toHaveClass(/is-active/);
   await expect(page.locator("#studentIdInput")).toBeVisible();
   await expect(page.locator("#locationMapCanvas")).toHaveClass(/leaflet-container/, { timeout: 15000 });

@@ -719,6 +719,7 @@ function getStudentDashboardPayload(state, studentId, range) {
 
   const selectedSummary = summaries[range];
   const studentShifts = state.shifts.filter((shift) => shift.studentId === normalizedStudentId);
+  const shiftHistory = studentShifts.slice().sort(sortShiftsDesc);
   const today = getStudentTodayStatus(studentShifts);
 
   return {
@@ -736,7 +737,8 @@ function getStudentDashboardPayload(state, studentId, range) {
     summaries,
     selected: selectedSummary,
     charts: buildStudentCharts(studentShifts, range),
-    recentShifts: studentShifts.slice().sort(sortShiftsDesc).slice(0, 10),
+    recentShifts: shiftHistory.slice(0, 10),
+    shiftHistory,
     exceptions: buildStudentExceptions(studentShifts),
     benchmark: {
       topPoints: selectedSummary.topPoints,

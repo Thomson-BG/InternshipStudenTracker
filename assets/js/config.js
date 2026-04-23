@@ -59,7 +59,7 @@ export const API_ENDPOINTS = {
     }
     return `${API_BASE_URL}?${parts.join("&")}`;
   },
-  reportData: ({ token, type, range = "overall", site = "all", studentId = "" }) => {
+  reportData: ({ token, type, range = "overall", site = "all", studentId = "", historyScope = "" }) => {
     const parts = [
       `mode=report_data`,
       `token=${encodeURIComponent(token)}`,
@@ -69,6 +69,9 @@ export const API_ENDPOINTS = {
     ];
     if (studentId) {
       parts.push(`studentId=${encodeURIComponent(studentId)}`);
+    }
+    if (historyScope) {
+      parts.push(`historyScope=${encodeURIComponent(historyScope)}`);
     }
     return `${API_BASE_URL}?${parts.join("&")}`;
   },

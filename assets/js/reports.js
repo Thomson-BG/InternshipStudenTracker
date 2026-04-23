@@ -24,7 +24,10 @@ function studentReportMarkup(report) {
   const payload = report.payload;
   const selected = payload.selected || {};
   const summaries = payload.summaries || {};
-  const recentShifts = payload.recentShifts || [];
+  const historyScope = report.historyScope === "all" ? "all" : "recent";
+  const shiftRows = historyScope === "all"
+    ? (payload.shiftHistory || payload.recentShifts || [])
+    : (payload.recentShifts || []);
   const exceptions = payload.exceptions || [];
   const charts = payload.charts || {};
 
@@ -104,16 +107,16 @@ function studentReportMarkup(report) {
         <div class="report-kicker">Activity Charts</div>
         <div class="report-chart-grid">
           <div class="report-chart-container">
-            <canvas id="studentWeeklyActivityChart"></canvas>
+            <canvas id="reportStudentWeeklyActivityChart"></canvas>
           </div>
           <div class="report-chart-container">
-            <canvas id="studentCumulativeChart"></canvas>
+            <canvas id="reportStudentCumulativeChart"></canvas>
           </div>
         </div>
       </section>
 
       <section class="report-card" style="grid-column: span 8;">
-        <div class="report-kicker">Recent Shifts</div>
+        <div class="report-kicker">${historyScope === "all" ? "All Shifts" : "Recent Shifts"}</div>
         <table class="report-table">
           <thead>
             <tr>
@@ -125,7 +128,7 @@ function studentReportMarkup(report) {
             </tr>
           </thead>
           <tbody>
-            ${(recentShifts.length ? recentShifts : [{ localDate: "-", site: "No shifts yet", status: "-", hoursDecimal: 0, totalPoints: 0 }]).map((row) => `
+            ${(shiftRows.length ? shiftRows : [{ localDate: "-", site: "No shifts yet", status: "-", hoursDecimal: 0, totalPoints: 0 }]).map((row) => `
               <tr>
                 <td>${escapeHtml(formatDate(row.localDate))}</td>
                 <td>${escapeHtml(row.site || "-")}</td>
@@ -193,7 +196,7 @@ function cohortReportMarkup(report) {
         <div class="report-kicker">Trend Charts</div>
         <div class="report-chart-grid">
           <div class="report-chart-container">
-            <canvas id="adminOverviewTrendChart"></canvas>
+            <canvas id="reportAdminOverviewTrendChart"></canvas>
           </div>
         </div>
       </section>
@@ -284,17 +287,6 @@ export function renderReportCharts(report) {
     return;
   }
 
-  // Destroy existing charts before rendering new ones
-  if (window.Chart) {
-    const chartIds = ["studentWeeklyActivityChart", "studentCumulativeChart", "adminOverviewTrendChart"];
-    chartIds.forEach((chartId) => {
-      const canvas = document.getElementById(chartId);
-      if (canvas && canvas.chart) {
-        canvas.chart.destroy();
-      }
-    });
-  }
-
   if (report.type === "student") {
     const charts = report.payload.charts;
     if (charts.weeklyPoints && charts.weeklyHours && charts.cumulative) {
@@ -303,8 +295,12 @@ export function renderReportCharts(report) {
       const cumulative = charts.cumulative || [];
 
       // Render weekly activity chart
-      const weeklyActivityCtx = document.getElementById("studentWeeklyActivityChart");
+      const weeklyActivityCtx = document.getElementById("reportStudentWeeklyActivityChart");
       if (weeklyActivityCtx) {
+        const existing = window.Chart?.getChart?.(weeklyActivityCtx);
+        if (existing) {
+          existing.destroy();
+        }
         const weeklyActivityChart = new window.Chart(weeklyActivityCtx, {
           type: "bar",
           data: {
@@ -374,8 +370,12 @@ export function renderReportCharts(report) {
       }
 
       // Render cumulative chart
-      const cumulativeCtx = document.getElementById("studentCumulativeChart");
+      const cumulativeCtx = document.getElementById("reportStudentCumulativeChart");
       if (cumulativeCtx) {
+        const existing = window.Chart?.getChart?.(cumulativeCtx);
+        if (existing) {
+          existing.destroy();
+        }
         const cumulativeChart = new window.Chart(cumulativeCtx, {
           type: "line",
           data: {
@@ -449,11 +449,11 @@ export function renderReportCharts(report) {
       const hoursTrend = charts.hoursTrend || [];
 
       // Render trend chart
-      const trendCtx = document.getElementById("adminOverviewTrendChart");
+      const trendCtx = document.getElementById("reportAdminOverviewTrendChart");
       if (trendCtx) {
-        // Destroy existing chart if it exists
-        if (trendCtx.chart) {
-          trendCtx.chart.destroy();
+        const existing = window.Chart?.getChart?.(trendCtx);
+        if (existing) {
+          existing.destroy();
         }
         const trendChart = new window.Chart(trendCtx, {
           type: "line",
@@ -632,7 +632,9 @@ export function createTestReport() {
 }
 
 export function openBrowserPrint() {
-  window.print();
+  window.requestAnimationFrame(() => {
+    window.print();
+  });
 }
 
 export async function downloadReportPdf(reportElement, filename) {

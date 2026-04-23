@@ -408,12 +408,14 @@ export function renderAdminCharts(dashboard) {
   });
 }
 
-export function renderDetailCharts(detail) {
+export function renderDetailCharts(detail, historyScope = "recent") {
   if (!detail || !detail.charts) return;
   const weeklyPoints = detail.charts.weeklyPoints || [];
   const weeklyHours = detail.charts.weeklyHours || [];
   const cumulative = detail.charts.cumulative || [];
-  const recentShifts = Array.isArray(detail.recentShifts) ? detail.recentShifts : [];
+  const recentShifts = historyScope === "all"
+    ? (Array.isArray(detail.shiftHistory) ? detail.shiftHistory : Array.isArray(detail.recentShifts) ? detail.recentShifts : [])
+    : (Array.isArray(detail.recentShifts) ? detail.recentShifts : []);
   const exceptions = Array.isArray(detail.exceptions) ? detail.exceptions : [];
   const recentActivity = recentShifts.slice(0, 8).reverse();
 

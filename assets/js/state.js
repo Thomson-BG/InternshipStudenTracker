@@ -65,7 +65,9 @@ export const state = {
     site: "all",
     statusFilter: STATUS_FILTER_OPTIONS[0],
     search: "",
-    selectedStudent: null
+    selectedStudent: null,
+    selectedStudentDetail: null,
+    selectedStudentHistoryScope: "recent"
   }
 };
 

@@ -1225,8 +1225,8 @@ export async function fetchStudentRecords({
   }), options);
 }
 
-export async function fetchReportData({ token, type, range, site, studentId }) {
-  return requestJson(API_ENDPOINTS.reportData({ token, type, range, site, studentId }));
+export async function fetchReportData({ token, type, range, site, studentId, historyScope }) {
+  return requestJson(API_ENDPOINTS.reportData({ token, type, range, site, studentId, historyScope }));
 }
 
 export async function fetchLogs(token) {
