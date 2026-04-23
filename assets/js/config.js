@@ -1,34 +1,68 @@
+// API base URL for the backend. Defaults to local Vercel/preview function route.
+// This value is public in the browser and is not a secret.
+const FALLBACK_API_BASE_URL = "/api/exec";
+
 function resolveApiBaseUrl() {
   const envUrl = String(import.meta.env?.VITE_API_BASE_URL || "").trim();
   if (envUrl) {
-    return envUrl.replace(/\/+$/, "");
+    return envUrl;
   }
 
-  if (typeof window !== "undefined") {
-    const windowUrl = String(window.API_BASE_URL || "").trim();
-    if (windowUrl) {
-      return windowUrl.replace(/\/+$/, "");
-    }
-
-    if (window.location?.origin) {
-      return `${window.location.origin}/api/v1`;
-    }
+  const windowUrl = typeof window !== "undefined"
+    ? String(window.API_BASE_URL || window.APPS_SCRIPT_URL || "").trim()
+    : "";
+  if (windowUrl) {
+    return windowUrl;
   }
 
-  return "/api/v1";
+  return FALLBACK_API_BASE_URL;
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
+export const GOOGLE_SHEET_ID = "1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY";
 
 export const API_ENDPOINTS = {
-  submit: `${API_BASE_URL}/attendance`,
-  adminAuth: `${API_BASE_URL}/admin/auth/login`,
+  submit: API_BASE_URL,
+  adminAuth: `${API_BASE_URL}?mode=admin_auth`,
   studentDashboard: (studentId, range = "week") =>
-    `${API_BASE_URL}/dashboard/student?studentId=${encodeURIComponent(studentId)}&range=${encodeURIComponent(range)}`,
-  adminDashboard: (range = "overall", site = "all") =>
-    `${API_BASE_URL}/dashboard/admin?range=${encodeURIComponent(range)}&site=${encodeURIComponent(site)}`,
-  reportData: ({ type, range = "overall", site = "all", studentId = "" }) => {
+    `${API_BASE_URL}?mode=student_dashboard&studentId=${encodeURIComponent(studentId)}&range=${encodeURIComponent(range)}`,
+  adminDashboard: (token, range = "overall", site = "all") =>
+    `${API_BASE_URL}?mode=admin_dashboard&token=${encodeURIComponent(token)}&range=${encodeURIComponent(range)}&site=${encodeURIComponent(site)}`,
+  studentRecords: ({
+    token,
+    range = "overall",
+    site = "all",
+    startDate = "",
+    endDate = "",
+    query = "",
+    locationMode = "all",
+    page = 1,
+    pageSize = 12
+  }) => {
     const parts = [
+      `mode=student_records`,
+      `token=${encodeURIComponent(token || "")}`,
+      `range=${encodeURIComponent(range)}`,
+      `site=${encodeURIComponent(site)}`,
+      `locationMode=${encodeURIComponent(locationMode)}`,
+      `page=${encodeURIComponent(String(page))}`,
+      `pageSize=${encodeURIComponent(String(pageSize))}`
+    ];
+    if (startDate) {
+      parts.push(`startDate=${encodeURIComponent(startDate)}`);
+    }
+    if (endDate) {
+      parts.push(`endDate=${encodeURIComponent(endDate)}`);
+    }
+    if (query) {
+      parts.push(`query=${encodeURIComponent(query)}`);
+    }
+    return `${API_BASE_URL}?${parts.join("&")}`;
+  },
+  reportData: ({ token, type, range = "overall", site = "all", studentId = "" }) => {
+    const parts = [
+      `mode=report_data`,
+      `token=${encodeURIComponent(token)}`,
       `type=${encodeURIComponent(type)}`,
       `range=${encodeURIComponent(range)}`,
       `site=${encodeURIComponent(site)}`
@@ -36,11 +70,11 @@ export const API_ENDPOINTS = {
     if (studentId) {
       parts.push(`studentId=${encodeURIComponent(studentId)}`);
     }
-    return `${API_BASE_URL}/reports?${parts.join("&")}`;
+    return `${API_BASE_URL}?${parts.join("&")}`;
   },
-  logs: () => `${API_BASE_URL}/admin/logs`,
-  points: () => `${API_BASE_URL}/admin/points`,
-  getRoster: () => `${API_BASE_URL}/roster`
+  logs: (token) => `${API_BASE_URL}?mode=logs&token=${encodeURIComponent(token)}`,
+  points: (token) => `${API_BASE_URL}?mode=points&token=${encodeURIComponent(token)}`,
+  getRoster: () => `${API_BASE_URL}?mode=get_roster`
 };
 
 export const ACTION_COOLDOWN_MS = 60 * 60 * 1000;
@@ -50,6 +84,8 @@ export const STUDENT_DASHBOARD_PREFETCH_DELAY_MS = 180;
 export const LOCAL_HISTORY_KEY = "intern-track-local-history";
 export const ADMIN_SESSION_KEY = "intern-track-admin-session";
 export const THEME_KEY = "intern-track-theme";
+export const DB_MIGRATION_NOTICE_START_ISO = "2026-04-22T08:00:00-07:00";
+export const DB_MIGRATION_NOTICE_WINDOW_DAYS = 7;
 
 export const RANGE_OPTIONS = ["week", "month", "overall"];
 export const STATUS_FILTER_OPTIONS = ["all", "complete", "open", "exception"];

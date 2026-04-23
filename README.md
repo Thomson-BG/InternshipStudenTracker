@@ -1,172 +1,125 @@
-# Intern Track v2
+# Intern Track — User Guide
 
-Intern Track v2 is a static frontend with a Neon PostgreSQL backend exposed through REST API routes under `api/v1`.
+Intern Track is used to log internship attendance, verify location, and review student progress for both interns and admins.
 
-## Runtime Architecture
+## What This App Does
+- Records **Check-In** and **Check-Out** events.
+- Verifies attendance by location.
+- Shows student history and performance.
+- Gives admins a full dashboard with records, charts, exports, and audit visibility.
 
-- `index.html` - app shell for `Student Clock`, `My Progress`, and `Admin Dashboard`
-- `assets/js/config.js` - API base URL and frontend constants
-- `assets/js/api.js` - REST API client helpers
-- `assets/js/app.js` - state, rendering, interaction flows
-- `api/v1/*` - serverless API route handlers (attendance, dashboards, auth, reports)
-- `server/lib/*` - backend services (rules, auth, analytics, DB access)
-- `server/sql/schema.sql` - Neon schema
-- `server/scripts/init-db.js` - schema + seed setup script
-- `server/scripts/import-sheet-json.js` - migration helper for JSON exports
-- `server/scripts/migrate-from-google-sheet.js` - pulls live Google Sheet CSV data into Neon
-- `server/scripts/parity-check.js` - compares Apps Script payloads vs Neon payloads
-- `server/dev-api.js` - local API runner for development
+---
 
-## Core Attendance Rules
+## Student Workflow
 
-- `Check In` = `+5` points
-- `Check Out` = `+5` points
-- Max `1` accepted check-in and `1` accepted check-out per student per local day
-- Max `10` points per student per day
-- `Check Out` requires a same-day `Check In`
-- Minimum `60` minutes between accepted check-in and accepted check-out
-- Timezone: `America/Los_Angeles`
-- Points go-live: `2026-02-24`
+### 1) Dashboard tab (Clock In/Out)
+1. Enter your 6-digit Student ID.
+2. Confirm your name appears.
+3. Wait for location verification.
+4. Tap **Check-In** at arrival.
+5. Tap **Check-Out** when leaving.
 
-## REST API
+### Dashboard Features
+- **Student ID lookup**: confirms active student.
+- **Check-In / Check-Out buttons**: attendance actions.
+- **Current Status panel**: shows next action and shift timer.
+- **Location Verification map**: displays live GPS and matched site.
+- **Site selector**: appears if multiple nearby sites are detected.
+- **My Stats button**: opens quick stats modal.
+- **Reset Session**: clears current student session.
 
-### `POST /api/v1/attendance`
+### Important Behavior
+- Location permission is required for attendance actions.
+- If session is idle for privacy, you may need to re-enter your ID.
+- If rules are not met (for example, invalid timing/order), the app shows a clear message.
 
-Submit attendance payload:
+---
 
-```json
-{
-  "studentId": "131923",
-  "studentName": "Jordan Belvin",
-  "action": "Check In",
-  "site": "Alliance Diesel",
-  "lat": 33.76,
-  "lng": -116.96,
-  "clientTimestamp": "2026-03-08T23:17:00.000Z"
-}
-```
+## Student History tab
+Use this tab to review recent performance after loading a student.
 
-### `POST /api/v1/admin/auth/login`
+### Features
+- **Week points and hours** summary cards.
+- **Last 7 days list** with check-in/check-out activity.
+- **View Stats** modal with:
+  - Today status
+  - Week / Month / Overall points and hours
+  - Today’s shift details
 
-```json
-{
-  "password": "..."
-}
-```
+---
 
-Returns `{ ok, token, expiresAt }`.
+## Admin Workflow
 
-### `GET /api/v1/dashboard/student?studentId=<id>&range=week|month|overall`
+### 1) Sign in
+- Open **Admin** tab.
+- Enter admin password.
+- Use **Sign Out** when done.
 
-Returns student identity, today status, summaries, charts, recent shifts, and benchmark metrics.
+### 2) Student Records section
+Tap **Open Student Records** to access full record history.
 
-### `GET /api/v1/dashboard/admin?range=week|month|overall&site=all|<site>`
+#### Filters available
+- Start Date / End Date
+- Intern Name or ID
+- Site
+- Location map completeness (check-in/check-out map availability)
 
-Auth required via `Authorization: Bearer <token>`.
+#### Records tools
+- **Apply Filters** / **Reset**
+- Paginated table
+- Mini maps for check-in and check-out locations
 
-Returns KPI summaries, leaderboard, student rows, charts, exceptions, audit trail, and printable metadata.
+### 3) Filters & Tools (Dashboard scope)
+- Range: Week / Month / Overall
+- Site filter
+- Status filter
+- Search (name/ID)
+- **Intern Insights** lookup + **Open Insights**
+- Actions: **Refresh**, **Print**, **PDF**, **CSV**
 
-### `GET /api/v1/reports?type=student|cohort&range=...&site=...&studentId=...`
+### 4) Admin analytics panels
+- **Cohort Health** KPI cards
+- **Today’s Student Activity** table
+- Charts:
+  - Cohort Trend
+  - Leaderboard
+  - Points vs Hours
+  - Status Mix
+  - Sites Breakdown
+  - Attendance Heatmap
 
-Auth required via bearer token.
+### 5) Student Analysis & Detail drawer
+- Click any student name (or use Intern Insights) to open detailed intern analytics.
+- Detail view includes:
+  - Expanded summary cards
+  - Insight chips (last site, top site, recent hours)
+  - Weekly Activity chart
+  - Cumulative Trend chart
+  - Site Performance chart
+  - Status Distribution chart
+  - Recent shifts table
+  - Exceptions list
+  - Student report print/PDF shortcuts
 
-Returns structured report payload for browser print/PDF.
+---
 
-### Additional endpoints
+## Reports & Exports
+- **Print**: browser print view for reporting.
+- **PDF**: generates downloadable report snapshots.
+- **CSV**: exports student analysis rows for spreadsheet use.
 
-- `GET /api/v1/roster`
-- `GET /api/v1/admin/logs` (auth required)
-- `GET /api/v1/admin/points` (auth required)
-- `GET /api/v1/health`
+---
 
-## Database Setup
+## Visual/Usability Notes
+- Theme toggle supports light/dark viewing.
+- Motion effects are subtle and optimized for readability.
+- Reduced-motion device preferences are respected.
 
-1. Set `NEON_DATABASE_URL`.
-2. Run:
+---
 
-```bash
-npm run init:db
-```
+## Troubleshooting
+- If data looks stale, use **Refresh** in Admin.
+- If check-in/check-out is unavailable, confirm GPS permission and site match.
+- If charts do not appear after an update, perform a hard refresh.
 
-This applies schema and seeds default roster/sites.
-
-## Data Migration from Sheets
-
-### Option A: Live import from Google Sheet (recommended)
-
-```bash
-npm run migrate:sheet
-```
-
-Environment:
-
-- `NEON_DATABASE_URL` (required)
-- `GOOGLE_SHEET_ID` (optional, defaults to current production sheet id)
-- `MIGRATE_TRUNCATE` (optional, default `true`)
-
-### Option B: Import from pre-exported JSON files
-
-1. Export JSON files to a folder (`logs.json`, `shifts.json`, `points.json`, `audit.json`, `roster.json`).
-2. Run:
-
-```bash
-npm run import:sheet-json -- ./path-to-export-folder
-```
-
-## Local Run
-
-Run frontend + local API together:
-
-```bash
-npm run dev:full
-```
-
-Or run only API:
-
-```bash
-npm run dev:api
-```
-
-Production preview (static bundle):
-
-```bash
-npm run build
-npm run preview
-```
-
-Open `http://localhost:4173/index.html`.
-
-## Environment Variables
-
-See `.env.example`.
-
-Required for backend:
-
-- `NEON_DATABASE_URL`
-
-Optional overrides:
-
-- `ADMIN_PASSWORD_HASH`
-- `APP_TIMEZONE`
-- `POINTS_GO_LIVE_DATE`
-- `POINTS_PER_ACTION`
-- `MIN_MINUTES_BETWEEN_IN_OUT`
-- `ADMIN_SESSION_HOURS`
-- `VITE_API_BASE_URL`
-- `GOOGLE_SHEET_ID`
-- `APPS_SCRIPT_URL`
-- `ADMIN_PASSWORD`
-
-## Parity Check (old backend vs Neon)
-
-```bash
-npm run parity:check
-```
-
-Environment:
-
-- `NEON_DATABASE_URL` (required)
-- `ADMIN_PASSWORD` (required)
-- `APPS_SCRIPT_URL` (optional, defaults to prior production Apps Script URL)
-- `PARITY_STUDENT_IDS` (optional, comma-separated)
-- `PARITY_SITE` (optional, includes an additional site besides `all`)
+For contributor/developer standards, see `AGENTS.md`.
