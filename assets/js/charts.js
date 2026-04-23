@@ -28,11 +28,11 @@ function clearChartFallback(canvas) {
 }
 
 function destroyChart(key) {
-  const existing = registry.get(key);
+  const existing = registry.get(key) || (window.Chart?.getChart?.(getCanvas(key)) ?? null);
   if (existing) {
     existing.destroy();
-    registry.delete(key);
   }
+  registry.delete(key);
 }
 
 function upsertChart(key, config) {

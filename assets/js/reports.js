@@ -637,6 +637,99 @@ export function openBrowserPrint() {
   });
 }
 
+const UNSUPPORTED_COLOR_FUNCTION_RE = /\b(color-mix|oklab|oklch|lab|lch|hwb|color)\s*\(/i;
+
+function fallbackColorForProperty(propertyName) {
+  const name = String(propertyName || "").toLowerCase();
+  if (name.includes("shadow")) {
+    return "none";
+  }
+  if (name.includes("background")) {
+    return "#ffffff";
+  }
+  if (name.includes("border") || name.includes("outline")) {
+    return "#d8dee9";
+  }
+  if (name.includes("color") || name.includes("fill") || name.includes("stroke")) {
+    return "#10131b";
+  }
+  return null;
+}
+
+function sanitizeStyleDeclarationColors(style) {
+  if (!style) return;
+  const properties = Array.from(style);
+  properties.forEach((propertyName) => {
+    const value = style.getPropertyValue(propertyName);
+    if (!UNSUPPORTED_COLOR_FUNCTION_RE.test(value)) {
+      return;
+    }
+    const fallback = fallbackColorForProperty(propertyName);
+    if (fallback === null) {
+      style.removeProperty(propertyName);
+      return;
+    }
+    style.setProperty(propertyName, fallback, style.getPropertyPriority(propertyName));
+  });
+}
+
+function sanitizeStyleRuleColors(rule) {
+  if (!rule) return;
+  if (rule.cssRules && rule.cssRules.length) {
+    Array.from(rule.cssRules).forEach((childRule) => sanitizeStyleRuleColors(childRule));
+    return;
+  }
+  if (rule.style) {
+    sanitizeStyleDeclarationColors(rule.style);
+  }
+}
+
+function sanitizeUnsupportedColorsInClone(clonedDocument) {
+  if (!clonedDocument) return;
+  Array.from(clonedDocument.styleSheets || []).forEach((sheet) => {
+    let rules = null;
+    try {
+      rules = sheet.cssRules;
+    } catch (_error) {
+      rules = null;
+    }
+    if (!rules) return;
+    Array.from(rules).forEach((rule) => sanitizeStyleRuleColors(rule));
+  });
+  clonedDocument.querySelectorAll("[style]").forEach((element) => {
+    sanitizeStyleDeclarationColors(element.style);
+  });
+}
+
+function replaceCloneCanvasesWithImages(sourceRoot, clonedDocument) {
+  if (!sourceRoot || !clonedDocument) return;
+  const sourceCanvases = Array.from(sourceRoot.querySelectorAll("canvas"));
+  const clonedCanvases = Array.from(clonedDocument.querySelectorAll("canvas"));
+  clonedCanvases.forEach((cloneCanvas, index) => {
+    const sourceCanvas = sourceCanvases[index];
+    if (!sourceCanvas || !cloneCanvas || !cloneCanvas.parentNode) {
+      return;
+    }
+    let imageData = "";
+    try {
+      imageData = sourceCanvas.toDataURL("image/png");
+    } catch (_error) {
+      imageData = "";
+    }
+    if (!imageData) {
+      return;
+    }
+    const replacementImage = clonedDocument.createElement("img");
+    replacementImage.src = imageData;
+    replacementImage.alt = "Report chart image";
+    replacementImage.style.display = "block";
+    replacementImage.style.width = "100%";
+    replacementImage.style.height = "100%";
+    replacementImage.style.objectFit = "contain";
+    cloneCanvas.parentNode.replaceChild(replacementImage, cloneCanvas);
+  });
+}
+
 export async function downloadReportPdf(reportElement, filename) {
   if (!reportElement) {
     throw new Error("Report preview is not ready.");
@@ -646,10 +739,27 @@ export async function downloadReportPdf(reportElement, filename) {
     throw new Error("PDF libraries are unavailable. Reload the app and try again.");
   }
 
+  const captureWidth = Math.max(reportElement.scrollWidth, reportElement.clientWidth, 1);
   const canvas = await window.html2canvas(reportElement, {
     scale: 2,
     backgroundColor: "#ffffff",
-    useCORS: true
+    useCORS: true,
+    logging: false,
+    windowWidth: captureWidth,
+    onclone: (clonedDocument) => {
+      const clonedBody = clonedDocument.body;
+      if (clonedBody) {
+        clonedBody.style.background = "#ffffff";
+        clonedBody.style.color = "#10131b";
+      }
+      const clonedReportStage = clonedDocument.getElementById("reportStage");
+      if (clonedReportStage) {
+        clonedReportStage.style.background = "#ffffff";
+        clonedReportStage.style.color = "#10131b";
+      }
+      replaceCloneCanvasesWithImages(reportElement, clonedDocument);
+      sanitizeUnsupportedColorsInClone(clonedDocument);
+    }
   });
 
   const pdf = new window.jspdf.jsPDF("p", "pt", "letter");
