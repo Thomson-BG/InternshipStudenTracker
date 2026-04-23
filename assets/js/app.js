@@ -18,7 +18,7 @@ import {
   submitAttendance
 } from "./api.js";
 import { renderAdminCharts, renderDetailCharts } from "./charts.js";
-import { downloadReportPdf, openBrowserPrint, renderReportMarkup } from "./reports.js";
+import { downloadReportPdf, openBrowserPrint, renderReportCharts, renderReportMarkup } from "./reports.js";
 import { restoreAdminSession, state } from "./state.js";
 import {
   debounce,
@@ -3102,6 +3102,7 @@ async function openReport(type, options = {}) {
     reportContext = response.data;
     dom.reportTitleText.textContent = `${response.data.reportTitle} - ${response.data.reportSubtitle}`;
     dom.reportStage.innerHTML = renderReportMarkup(response.data);
+    renderReportCharts(response.data);
     dom.reportModal.classList.add("is-open");
     if (options.downloadPdfAfterOpen) {
       await downloadReportPdf(dom.reportStage, reportFileName());

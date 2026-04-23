@@ -26,6 +26,7 @@ function studentReportMarkup(report) {
   const summaries = payload.summaries || {};
   const recentShifts = payload.recentShifts || [];
   const exceptions = payload.exceptions || [];
+  const charts = payload.charts || {};
 
   return `
     <div class="report-header">
@@ -96,6 +97,18 @@ function studentReportMarkup(report) {
               <div class="report-meta">${escapeHtml(formatPercent(summary.pointsPctOfTop || 0))} of top points / ${escapeHtml(formatPercent(summary.hoursPctOfTop || 0))} of top hours</div>
             </div>
           `).join("")}
+        </div>
+      </section>
+
+      <section class="report-card" style="grid-column: span 12;">
+        <div class="report-kicker">Activity Charts</div>
+        <div class="report-chart-grid">
+          <div class="report-chart-container">
+            <canvas id="studentWeeklyActivityChart"></canvas>
+          </div>
+          <div class="report-chart-container">
+            <canvas id="studentCumulativeChart"></canvas>
+          </div>
         </div>
       </section>
 
@@ -173,6 +186,15 @@ function cohortReportMarkup(report) {
           <div class="report-stat"><div class="card-label">Completed Shifts</div><div class="metric-value">${escapeHtml(String(selected.completedShifts || 0))}</div></div>
           <div class="report-stat"><div class="card-label">Open Shifts</div><div class="metric-value">${escapeHtml(String(selected.openShifts || 0))}</div></div>
           <div class="report-stat"><div class="card-label">Exceptions</div><div class="metric-value">${escapeHtml(String(selected.exceptionCount || 0))}</div></div>
+        </div>
+      </section>
+
+      <section class="report-card" style="grid-column: span 12;">
+        <div class="report-kicker">Trend Charts</div>
+        <div class="report-chart-grid">
+          <div class="report-chart-container">
+            <canvas id="adminOverviewTrendChart"></canvas>
+          </div>
         </div>
       </section>
 
@@ -255,6 +277,248 @@ export function renderReportMarkup(report) {
     return studentReportMarkup(report);
   }
   return cohortReportMarkup(report);
+}
+
+export function renderReportCharts(report) {
+  if (!report || !report.payload || !report.payload.charts) {
+    return;
+  }
+
+  if (report.type === "student") {
+    const charts = report.payload.charts;
+    if (charts.weeklyPoints && charts.weeklyHours && charts.cumulative) {
+      const weeklyPoints = charts.weeklyPoints || [];
+      const weeklyHours = charts.weeklyHours || [];
+      const cumulative = charts.cumulative || [];
+
+      // Render weekly activity chart
+      const weeklyActivityCtx = document.getElementById("studentWeeklyActivityChart");
+      if (weeklyActivityCtx) {
+        new window.Chart(weeklyActivityCtx, {
+          type: "bar",
+          data: {
+            labels: weeklyPoints.map((row) => row.label),
+            datasets: [
+              {
+                label: "Points",
+                data: weeklyPoints.map((row) => row.value),
+                backgroundColor: "#4e79a7",
+                borderColor: "#4e79a7",
+                borderWidth: 1
+              },
+              {
+                type: "line",
+                label: "Hours",
+                data: weeklyHours.map((row) => row.value),
+                borderColor: "#f28e2b",
+                backgroundColor: "#f28e2b",
+                fill: false,
+                tension: 0.35
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      }
+
+      // Render cumulative chart
+      const cumulativeCtx = document.getElementById("studentCumulativeChart");
+      if (cumulativeCtx) {
+        new window.Chart(cumulativeCtx, {
+          type: "line",
+          data: {
+            labels: cumulative.map((row) => row.label),
+            datasets: [
+              {
+                label: "Cumulative Points",
+                data: cumulative.map((row) => row.points),
+                borderColor: "#4e79a7",
+                backgroundColor: "rgba(78, 121, 167, 0.2)",
+                fill: true,
+                tension: 0.3
+              },
+              {
+                label: "Cumulative Hours",
+                data: cumulative.map((row) => row.hours),
+                borderColor: "#f28e2b",
+                backgroundColor: "rgba(242, 142, 43, 0.2)",
+                fill: false,
+                tension: 0.3
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      }
+    }
+  } else if (report.type === "cohort") {
+    const charts = report.payload.charts;
+    if (charts.pointsTrend && charts.hoursTrend) {
+      const pointsTrend = charts.pointsTrend || [];
+      const hoursTrend = charts.hoursTrend || [];
+
+      // Render trend chart
+      const trendCtx = document.getElementById("adminOverviewTrendChart");
+      if (trendCtx) {
+        new window.Chart(trendCtx, {
+          type: "line",
+          data: {
+            labels: pointsTrend.map((row) => row.label),
+            datasets: [
+              {
+                label: "Points",
+                data: pointsTrend.map((row) => row.value),
+                borderColor: "#4e79a7",
+                backgroundColor: "rgba(78, 121, 167, 0.2)",
+                fill: true,
+                tension: 0.3
+              },
+              {
+                label: "Hours",
+                data: hoursTrend.map((row) => row.value),
+                borderColor: "#f28e2b",
+                backgroundColor: "rgba(242, 142, 43, 0.2)",
+                fill: false,
+                tension: 0.3
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      }
+    }
+  }
+}
+
+export function validateReportData(report) {
+  if (!report) {
+    return { valid: false, message: "Report is null or undefined." };
+  }
+
+  if (!report.type) {
+    return { valid: false, message: "Report type is missing." };
+  }
+
+  if (!report.payload) {
+    return { valid: false, message: "Report payload is missing." };
+  }
+
+  if (report.type === "student") {
+    if (!report.payload.student) {
+      return { valid: false, message: "Student data is missing." };
+    }
+    if (!report.payload.charts) {
+      return { valid: false, message: "Charts data is missing." };
+    }
+  } else if (report.type === "cohort") {
+    if (!report.payload.selected) {
+      return { valid: false, message: "Selected data is missing." };
+    }
+    if (!report.payload.charts) {
+      return { valid: false, message: "Charts data is missing." };
+    }
+  }
+
+  return { valid: true, message: "Report data is valid." };
+}
+
+export function createTestReport() {
+  return {
+    type: "student",
+    generatedAt: new Date().toISOString(),
+    reportTitle: "Test Student Progress Report",
+    reportSubtitle: "Test Student / week",
+    payload: {
+      student: {
+        studentId: "123456",
+        studentName: "Test Student"
+      },
+      currentRange: "week",
+      selected: {
+        points: 150,
+        hours: 25,
+        percentile: 75,
+        pointsPctOfTop: 80,
+        hoursPctOfTop: 85,
+        gapToTopPoints: 20,
+        gapToTopHours: 5
+      },
+      summaries: {
+        week: {
+          points: 150,
+          hours: 25,
+          pointsPctOfTop: 80,
+          hoursPctOfTop: 85
+        },
+        month: {
+          points: 500,
+          hours: 80,
+          pointsPctOfTop: 75,
+          hoursPctOfTop: 80
+        },
+        overall: {
+          points: 1200,
+          hours: 200,
+          pointsPctOfTop: 70,
+          hoursPctOfTop: 75
+        }
+      },
+      today: {
+        status: "COMPLETED",
+        nextAction: "Done for today"
+      },
+      charts: {
+        weeklyPoints: [
+          { label: "Mon", value: 20 },
+          { label: "Tue", value: 30 },
+          { label: "Wed", value: 25 },
+          { label: "Thu", value: 35 },
+          { label: "Fri", value: 40 }
+        ],
+        weeklyHours: [
+          { label: "Mon", value: 4 },
+          { label: "Tue", value: 5 },
+          { label: "Wed", value: 4.5 },
+          { label: "Thu", value: 6 },
+          { label: "Fri", value: 5.5 }
+        ],
+        cumulative: [
+          { label: "Week 1", points: 50, hours: 10 },
+          { label: "Week 2", points: 100, hours: 20 },
+          { label: "Week 3", points: 150, hours: 25 }
+        ]
+      },
+      recentShifts: [
+        { localDate: "2024-01-01", site: "Site A", status: "COMPLETE", hoursDecimal: 5.5, totalPoints: 40 },
+        { localDate: "2024-01-02", site: "Site B", status: "COMPLETE", hoursDecimal: 6, totalPoints: 45 }
+      ],
+      exceptions: []
+    }
+  };
 }
 
 export function openBrowserPrint() {

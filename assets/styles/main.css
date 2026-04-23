@@ -1936,6 +1936,45 @@ body.has-announcement-modal-open {
   pointer-events: none;
 }
 
+.report-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.report-chart-container {
+  background: var(--surface-low);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 22%, transparent);
+}
+
+.report-chart-container canvas {
+  width: 100% !important;
+  height: 250px !important;
+}
+
+.report-bar {
+  width: 100%;
+  height: 8px;
+  background: color-mix(in srgb, var(--surface-high) 80%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.report-bar span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.report-bar.is-accent span {
+  background: var(--secondary);
+}
+
 .toast {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
