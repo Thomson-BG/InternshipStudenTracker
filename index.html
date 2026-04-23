@@ -1,1502 +1,617 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto Intern Tracker</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-    
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        school: {
-                            black: '#121212',
-                            red: '#cc0000',
-                            gold: '#FFD700', // Yellow/Gold
-                            darkRed: '#8b0000',
-                            lightRed: '#ff4d4d'
-                        }
-                    },
-                    animation: {
-                        'fade-in-up': 'fadeInUp 0.8s ease-out forwards',
-                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'gradient-x': 'gradientXY 15s ease infinite',
-                    },
-                    keyframes: {
-                        fadeInUp: {
-                            '0%': { opacity: '0', transform: 'translateY(20px)' },
-                            '100%': { opacity: '1', transform: 'translateY(0)' },
-                            shimmer: {
-        '0%': { transform: 'translateX(-100%)' },
-        '100%': { transform: 'translateX(100%)' }
-                        },
-                        animation: {
-    // ... existing animations ...
-    shimmer: 'shimmer 2s infinite linear',
-}
-                        },
-                        gradientXY: {
-                            '0%, 100%': { 'background-size': '200% 200%', 'background-position': 'left top' },
-                            '50%': { 'background-size': '200% 200%', 'background-position': 'right bottom' },
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
-    <style>
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
-        ::-webkit-scrollbar-thumb { background: rgba(136, 136, 136, 0.5); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(85, 85, 85, 0.8); }
-
-        /* Glassmorphism Utilities */
-        .glass {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-        .dark .glass {
-            background: rgba(34, 34, 40, 0.78);
-            border: 1px solid rgba(255, 255, 255, 0.16);
-        }
-
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-        }
-        .dark .glass-panel {
-            background: rgba(30, 30, 36, 0.86);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.24);
-        }
-
-        /* Animated Background */
-        .bg-animated {
-            background: linear-gradient(-45deg, #f3f4f6, #e5e7eb, #fecaca, #f3f4f6);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
-        }
-        .dark .bg-animated {
-            background: linear-gradient(-45deg, #1b1b20, #2a2022, #2b1d1d, #24242b);
-            background-size: 400% 400%;
-        }
-
-        .admin-card-dark {
-            background: rgba(255, 255, 255, 0.88);
-        }
-        .dark .admin-card-dark {
-            background: rgba(42, 42, 50, 0.9);
-        }
-
-        .dark #locationStatus,
-        .dark #adminToolbar,
-        .dark #studentDetailMeta,
-        .dark #studentDetailSummaryCard {
-            background: rgba(44, 44, 52, 0.82) !important;
-            border-color: rgba(255, 255, 255, 0.16) !important;
-        }
-
-        .dark #adminSearch,
-        .dark #adminPassword {
-            background: rgba(37, 37, 45, 0.92) !important;
-            color: #f5f5f5 !important;
-            border-color: rgba(255, 255, 255, 0.2) !important;
-        }
-
-        .dark #adminTableWrap {
-            background: rgba(30, 30, 36, 0.78);
-        }
-
-        .dark #adminTableWrap thead {
-            background: rgba(49, 49, 58, 0.98);
-        }
-
-        .dark #adminTableBody {
-            background: rgba(38, 38, 46, 0.72);
-        }
-
-        .export-report {
-            width: 960px;
-            max-width: 960px;
-            background: #ffffff;
-            color: #111827;
-            padding: 28px;
-            position: fixed;
-            left: -10000px;
-            top: 0;
-            z-index: -1;
-            border: 1px solid #e5e7eb;
-        }
-
-        .pdf-mode,
-        .pdf-mode * {
-            color: #111827 !important;
-            background-color: transparent;
-            box-shadow: none !important;
-            backdrop-filter: none !important;
-            filter: none !important;
-        }
-
-        #printReport {
-            display: none;
-            background: #ffffff;
-            color: #111827;
-        }
-
-        body.printing-student-report #printReport {
-            display: block;
-        }
-
-        @page {
-            margin: 0.55in;
-            size: letter;
-        }
-
-        @media print {
-            body * {
-                visibility: hidden !important;
-            }
-            body.printing-student-report #printReport,
-            body.printing-student-report #printReport * {
-                visibility: visible !important;
-            }
-            body.printing-student-report #printReport {
-                display: block !important;
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                padding: 0;
-                margin: 0;
-                background: #ffffff !important;
-                color: #111827 !important;
-            }
-            .no-print {
-                display: none !important;
-            }
-            .print-table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-            .print-table th,
-            .print-table td {
-                border: 1px solid #d1d5db;
-                padding: 6px 8px;
-                font-size: 10pt;
-                text-align: left;
-            }
-            .print-table thead {
-                display: table-header-group;
-            }
-            .print-row {
-                break-inside: avoid;
-                page-break-inside: avoid;
-            }
-        }
-
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        /* Loader */
-        .loader {
-            border: 3px solid rgba(255,255,255,0.3);
-            border-top: 3px solid #cc0000;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Intern Track</title>
+  <meta name="description" content="Intern Track — student attendance, progress dashboards, and admin analytics.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles/main.css">
+  <link rel="stylesheet" href="assets/styles/print.css" media="print">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 </head>
-<body class="bg-animated text-gray-800 dark:text-gray-100 transition-colors duration-500 min-h-screen flex flex-col font-sans">
-<div id="splash-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-black to-school-darkRed transition-opacity duration-700 ease-out">
-    
-    <div class="relative mb-4">
-        <div class="absolute inset-0 bg-school-gold blur-xl opacity-20 animate-pulse"></div>
-        <div class="relative bg-black/40 p-6 rounded-full border border-school-red/30 shadow-2xl backdrop-blur-sm animate-bounce">
-            <i class="fas fa-graduation-cap text-5xl text-transparent bg-clip-text bg-gradient-to-r from-school-gold to-school-red"></i>
-        </div>
-    </div>
+<body>
 
-    <h1 class="text-3xl font-black tracking-[0.2em] text-white uppercase mb-2 animate-pulse">
-        Intern <span class="text-school-red">Track</span>
-    </h1>
-    
-    <div class="w-48 h-1 bg-gray-800 rounded-full overflow-hidden mt-4">
-        <div class="h-full bg-gradient-to-r from-school-red via-school-gold to-school-red w-full animate-[shimmer_2s_infinite]"></div>
-    </div>
+  <div id="appShell" class="app-shell" aria-busy="false">
 
-    <p class="text-school-gold/60 text-xs font-mono mt-2 tracking-widest">INITIALIZING SYSTEM...</p>
-</div>
-    <nav class="glass sticky top-0 z-50 border-b-0 shadow-lg no-print">
-        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-school-black to-school-red flex items-center justify-center shadow-lg transform hover:rotate-12 transition-transform duration-300">
-                    <i class="fa-solid fa-wrench text-school-gold text-lg"></i>
-                </div>
-                <h1 class="text-xl font-bold tracking-wide uppercase bg-clip-text text-transparent bg-gradient-to-r from-gray-800 to-school-red dark:from-white dark:to-school-red drop-shadow-sm">
-                    Intern<span class="text-school-red">Track</span>
-                </h1>
+    <!-- ========== HEADER ========== -->
+    <header class="app-header">
+      <div class="header-left">
+        <span class="material-symbols-outlined brand-mark">pets</span>
+        <span class="app-header-title">BULLDOG GARAGE</span>
+      </div>
+      <div class="header-right">
+        <button id="themeToggle" class="header-icon-btn" type="button" aria-label="Toggle theme">
+          <span id="themeIconSun" class="material-symbols-outlined theme-icon">light_mode</span>
+          <span id="themeIconMoon" class="material-symbols-outlined theme-icon is-hidden">dark_mode</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="app-content">
+
+      <!-- ===== CLOCK VIEW ===== -->
+      <section id="clockView" class="view is-active">
+
+        <section class="workshop-card">
+          <div class="workshop-card-head">
+            <div>
+              <h1 class="workshop-title">INTERNSHIP HOURS</h1>
+              <p class="workshop-kicker">Session Authorization Required</p>
             </div>
-            <button id="themeToggle" class="w-10 h-10 rounded-full glass flex items-center justify-center hover:bg-school-gold/20 hover:scale-110 transition-all duration-300 text-school-gold shadow-sm">
-                <i class="fas fa-sun text-lg" id="themeIcon"></i>
+            <div class="geofence-pill">
+              <span class="geofence-dot"></span>
+              <span>Geofence Valid</span>
+            </div>
+          </div>
+
+          <div class="workshop-entry-grid">
+            <div class="student-entry-wrap">
+              <label class="student-entry-label" for="studentIdInput">Student ID#</label>
+              <input id="studentIdInput" data-testid="student-id-input" class="ios-input student-id-input" type="tel" inputmode="numeric" maxlength="6" placeholder="6-digit student ID" autocomplete="off">
+              <div id="studentLookupLoader" class="loading-row is-hidden">
+                <span class="loading-spinner"></span>
+                <span id="studentLookupLoaderText">Looking up student…</span>
+              </div>
+              <div id="studentNameValue" class="text-headline student-name-value">—</div>
+              <div id="studentNameCopy" class="text-footnote student-name-copy">No student loaded.</div>
+            </div>
+
+            <div class="action-buttons">
+              <button id="checkInButton" data-testid="check-in-button" class="action-btn checkin" type="button" disabled>
+                <span class="material-symbols-outlined">login</span>
+                <span>Check-In</span>
+              </button>
+              <button id="checkOutButton" data-testid="check-out-button" class="action-btn checkout" type="button" disabled>
+                <span class="material-symbols-outlined">logout</span>
+                <span>Check-Out</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="student-actions">
+            <button id="myStatsButton" class="ios-button accent is-hidden" type="button">
+              <span class="material-symbols-outlined">query_stats</span>
+              My Stats
             </button>
-        </div>
-        <div class="h-1 w-full bg-gradient-to-r from-school-black via-school-red to-school-gold"></div>
-    </nav>
+            <button id="clearStudentButton" class="link-button" type="button">Reset Session</button>
+          </div>
+        </section>
 
-    <main class="container mx-auto p-4 flex-grow flex flex-col gap-6 max-w-lg animate-fade-in-up no-print">
-        
-        <div id="userConfig" class="glass-panel p-5 rounded-2xl relative overflow-hidden group">
-            <div class="absolute top-0 left-0 w-1 h-full bg-school-gold"></div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Student Identification</label>
-            <div class="flex flex-col gap-2">
-                <input type="tel" id="studentIdInput" 
-                    placeholder="Enter Student ID #" 
-                    maxlength="6" 
-                    oninput="validateStudentId()"
-                    class="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/30 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red focus:border-transparent transition-all text-gray-800 dark:text-gray-200 text-center font-mono text-lg tracking-widest shadow-inner placeholder:font-sans placeholder:tracking-normal placeholder:text-gray-400">
-                <div id="studentNameDisplay" class="h-6 flex items-center justify-center transition-all duration-300 transform">
-                    <span class="text-sm italic text-gray-400">Please enter your 6-digit ID</span>
-                </div>
+        <section class="status-header">
+          <div class="status-header-copy">
+            <p class="status-kicker">Current Status</p>
+            <h2 id="todayHeadline" class="status-title">Ready to verify attendance</h2>
+            <p id="todayCopy" class="status-subtitle">Enter your student ID below to check in or out.</p>
+          </div>
+          <div class="status-timer">
+            <span class="material-symbols-outlined">timer</span>
+            <span id="shiftTimerValue">00:00:00</span>
+          </div>
+          <div id="heroStatusCard" class="hero-card">
+            <div class="badge-row">
+              <div id="nextActionBadge" class="status-pill" data-tone="info">Check In</div>
+              <div id="selectedSiteBadge" class="status-pill" data-tone="warning">Site pending</div>
             </div>
+          </div>
+        </section>
+
+        <section class="glass-card location-verification">
+          <div class="location-card-head">
+            <h3>Location Verification</h3>
+            <span class="material-symbols-outlined">location_on</span>
+          </div>
+          <div class="location-site-row">
+            <span class="material-symbols-outlined">radio_button_checked</span>
+            <span id="mapSiteName">HEMET HIGH SCHOOL BULLDOG GARAGE</span>
+          </div>
+          <div id="locationStatusBanner" class="info-banner" data-tone="info">Waiting for device GPS.</div>
+          <div class="location-map-shell">
+            <div id="locationMapCanvas" class="location-map-canvas" aria-label="Live internship location map"></div>
+            <div id="locationMapFallback" class="location-map-fallback">
+              <span class="material-symbols-outlined">map</span>
+              <span>Loading map...</span>
+            </div>
+            <div class="location-coordinates">
+              <div class="coord-item">
+                <span class="coord-label">LAT</span>
+                <span id="mapLatValue">--</span>
+              </div>
+              <div class="coord-item">
+                <span class="coord-label">LONG</span>
+                <span id="mapLngValue">--</span>
+              </div>
+            </div>
+          </div>
+          <div id="siteSelectWrap" class="site-select-wrap">
+            <label class="stat-label" for="siteSelect">Multiple sites detected - select yours:</label>
+            <select id="siteSelect" class="ios-select"></select>
+          </div>
+        </section>
+
+        <div id="clockMessage" data-testid="clock-message" class="feedback-message"></div>
+
+        <!-- Legacy hidden elements for JS compat -->
+        <div id="sidebarStudentName" class="is-hidden">-</div>
+        <div id="sidebarStudentMeta" class="is-hidden"></div>
+        <div id="sidebarLocationStatus" class="is-hidden">Searching</div>
+        <div id="sidebarLocationMeta" class="is-hidden"></div>
+        <div id="todayPointsStat" class="is-hidden">0</div>
+        <div id="todayHoursStat" class="is-hidden">0</div>
+        <div id="clockQuickStats" class="is-hidden"></div>
+        <button id="jumpToProgressButton" class="is-hidden" type="button"></button>
+        <div id="localHistoryList" class="is-hidden"></div>
+
+      </section>
+
+      <!-- ===== MY WEEK VIEW ===== -->
+      <section id="progressView" class="view">
+
+        <h1 class="view-large-title">CHECK-IN HISTORY</h1>
+
+        <!-- Empty state -->
+        <div id="progressEmptyState" class="glass-card padded empty-state" style="margin: 0 20px 8px;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--sys-gray3)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <h3 class="empty-title">No student loaded</h3>
+          <p class="empty-subtitle">Enter your student ID on the Clock tab first.</p>
+          <button class="ios-button primary" data-view-button="clock" type="button" style="margin-top: 4px;">Go to Clock</button>
         </div>
 
-        <div class="glass-panel p-6 rounded-2xl text-center relative">
-            <h2 class="text-lg font-bold mb-4 uppercase tracking-wide opacity-80">Attendance Action</h2>
-            
-            <div id="locationStatus" class="mb-6 text-sm text-gray-500 dark:text-gray-400 min-h-[44px] flex flex-col items-center justify-center bg-gray-100/50 dark:bg-black/20 rounded-lg p-2 border border-dashed border-gray-300 dark:border-gray-700">
-                <span><i class="fas fa-location-arrow animate-pulse"></i> Waiting for location...</span>
-            </div>
-
-            <div class="grid grid-cols-2 gap-5">
-                <button onclick="handleAction('Check In')" id="btnCheckIn" disabled 
-                    class="group relative overflow-hidden py-8 rounded-2xl bg-gradient-to-br from-school-red to-red-800 text-white shadow-xl hover:shadow-red-600/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-300 transform hover:-translate-y-1 active:scale-95">
-                    <div class="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-500 skew-x-12 -ml-4"></div>
-                    <div class="relative flex flex-col items-center gap-2 z-10">
-                        <i class="fas fa-sign-in-alt text-3xl text-school-gold drop-shadow-md group-hover:scale-110 transition-transform"></i>
-                        <span class="font-bold text-lg tracking-wider">CHECK IN</span>
-                    </div>
-                </button>
-
-                <button onclick="handleAction('Check Out')" id="btnCheckOut" disabled 
-                    class="group relative overflow-hidden py-8 rounded-2xl bg-gradient-to-br from-gray-700 to-gray-900 text-white shadow-xl hover:shadow-gray-700/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-300 transform hover:-translate-y-1 active:scale-95 border border-gray-600">
-                    <div class="absolute inset-0 bg-white/10 group-hover:translate-x-full transition-transform duration-500 skew-x-12 -ml-4"></div>
-                    <div class="relative flex flex-col items-center gap-2 z-10">
-                        <i class="fas fa-sign-out-alt text-3xl text-gray-300 drop-shadow-md group-hover:scale-110 transition-transform"></i>
-                        <span class="font-bold text-lg tracking-wider">CHECK OUT</span>
-                    </div>
-                </button>
-            </div>
-
-            <div class="h-6 mt-4 flex items-center justify-center">
-                <p id="actionMessage" class="text-sm font-semibold"></p>
-            </div>
+        <!-- Loading state -->
+        <div id="progressLoadingState" class="glass-card padded is-hidden" style="margin: 0 20px 8px;" aria-live="polite">
+          <div class="loading-row">
+            <span class="loading-spinner"></span>
+            <span>Loading your week…</span>
+          </div>
         </div>
 
-        <div class="glass-panel p-5 rounded-2xl">
-            <h3 class="font-bold border-b border-gray-200/50 dark:border-gray-700/50 pb-3 mb-3 flex justify-between items-center">
-                <span class="flex items-center"><i class="fas fa-history text-school-gold mr-2"></i> Recent History</span>
-                <span class="text-[10px] uppercase font-bold tracking-wider bg-gray-200/50 dark:bg-gray-700/50 px-2 py-1 rounded text-gray-600 dark:text-gray-300">7 Days</span>
-            </h3>
-            <ul id="localHistoryList" class="space-y-3 text-sm max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                <li class="text-gray-400 italic text-center py-4">No history yet.</li>
-            </ul>
-        </div>
+        <!-- Progress content -->
+        <div id="progressContent" class="is-hidden">
 
-        <div class="text-center mt-6">
-            <button onclick="toggleAdminPanel()" type="button" class="glass px-8 py-3 rounded-full text-sm font-bold text-gray-800 dark:text-gray-100 hover:bg-school-red hover:text-white hover:border-school-red transition-all duration-300 shadow-lg hover:shadow-red-500/40 transform hover:-translate-y-1 active:scale-95 flex items-center justify-center mx-auto gap-2 group backdrop-blur-xl border border-white/50 dark:border-white/10">
-                <i class="fas fa-lock text-school-red group-hover:text-white transition-colors"></i>
-                <span class="tracking-wide">Admin Dashboard</span>
+          <!-- Student name + stats button -->
+          <div style="padding: 4px 20px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div id="progressStudentName" class="text-title2" style="flex: 1;">—</div>
+            <button id="progressStatsButton" class="ios-button accent" type="button" style="font-size: 13px; padding: 8px 14px; white-space: nowrap;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              View Stats
             </button>
+          </div>
+
+          <!-- Week Stats Grid -->
+          <div class="week-stats-grid">
+            <div class="stat-box">
+              <div class="stat-box-label">Points</div>
+              <div id="weekPointsStat" class="stat-box-value">0</div>
+              <div class="stat-box-unit">pts</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-box-label">Hours</div>
+              <div id="weekHoursStat" class="stat-box-value">0</div>
+              <div class="stat-box-unit">hrs</div>
+            </div>
+          </div>
+
+          <!-- 7-Day History -->
+          <div class="section-group-header">Last 7 days</div>
+          <div class="glass-card grouped">
+            <div id="sevenDayHistoryList" class="history-list">
+              <div class="history-day-row">
+                <div class="history-date" style="color: var(--text-tertiary);">—</div>
+                <div class="history-events" style="color: var(--text-tertiary);">No activity</div>
+              </div>
+            </div>
+          </div>
+
         </div>
+      </section>
+
+      <!-- ===== ADMIN VIEW ===== -->
+      <section id="adminView" class="view">
+        <div class="view-header-compact">
+          <div class="section-label">Admin Dashboard</div>
+          <div id="adminAuthBadge" class="status-pill" data-tone="warning">Not signed in</div>
+        </div>
+
+        <!-- Login state -->
+        <div id="adminLoginState" class="admin-access-shell">
+          <div class="admin-access-accent admin-access-accent-one"></div>
+          <div class="admin-access-accent admin-access-accent-two"></div>
+          <div class="admin-access-card">
+            <div class="admin-access-card-sheen"></div>
+            <div class="admin-access-content">
+              <div class="admin-access-head">
+                <span class="admin-access-kicker">Secure Terminal</span>
+                <h3 class="login-title">Admin Access</h3>
+                <div class="admin-access-rule"></div>
+              </div>
+              <div class="login-form">
+                <label class="stat-label admin-password-label" for="adminPasswordInput">PASSWORD</label>
+                <input id="adminPasswordInput" class="ios-input admin-password-input" type="password" placeholder="........">
+                <button id="adminLoginButton" class="ios-button primary admin-login-btn" type="button">
+                  <span>Initiate Login</span>
+                  <span class="material-symbols-outlined">login</span>
+                </button>
+              </div>
+              <div class="admin-access-foot">
+                <div class="admin-system-status">
+                  <span class="status-dot"></span>
+                  <span>Workshop System Online</span>
+                </div>
+                <p class="login-subtitle">Authorized personnel only. All access attempts are logged under Hemet High School security protocols.</p>
+              </div>
+            </div>
+          </div>
+          <p class="admin-login-copyright">© 2026 HEMET HIGH BULLDOG GARAGE</p>
+        </div>
+
+        <!-- Admin content -->
+        <div id="adminContent" class="admin-layout is-hidden">
+          <div id="adminStateNotice" class="info-banner is-hidden" style="margin-bottom: 8px;"></div>
+
+          <!-- Student Records -->
+          <div class="glass-card admin-records-card">
+            <button id="adminOpenRecordsButton"
+                    class="ios-button primary"
+                    type="button"
+                    style="width: 100%; justify-content: center; gap: 8px;">
+              <span class="material-symbols-outlined">table_view</span>
+              Open Student Records
+            </button>
+            <div id="adminStudentRecordsSection" class="admin-records-section is-hidden">
+              <div class="admin-records-filter-grid">
+                <div class="filter-item">
+                  <label class="stat-label" for="adminRecordsStartDate">Start Date</label>
+                  <input id="adminRecordsStartDate" class="ios-input" type="date">
+                </div>
+                <div class="filter-item">
+                  <label class="stat-label" for="adminRecordsEndDate">End Date</label>
+                  <input id="adminRecordsEndDate" class="ios-input" type="date">
+                </div>
+                <div class="filter-item">
+                  <label class="stat-label" for="adminRecordsInternSearch">Intern Name / ID</label>
+                  <input id="adminRecordsInternSearch" class="ios-input" type="search" list="adminRecordsInternList" placeholder="Search intern">
+                  <datalist id="adminRecordsInternList"></datalist>
+                </div>
+                <div class="filter-item">
+                  <label class="stat-label" for="adminRecordsSiteSelect">Site</label>
+                  <select id="adminRecordsSiteSelect" class="ios-select">
+                    <option value="all">All Sites</option>
+                  </select>
+                </div>
+                <div class="filter-item">
+                  <label class="stat-label" for="adminRecordsLocationModeSelect">Location Filter</label>
+                  <select id="adminRecordsLocationModeSelect" class="ios-select">
+                    <option value="all">All Records</option>
+                    <option value="has_checkin">Has Check-In Map</option>
+                    <option value="has_checkout">Has Check-Out Map</option>
+                    <option value="has_both">Has Both Maps</option>
+                    <option value="missing_any">Missing Any Map</option>
+                  </select>
+                </div>
+              </div>
+              <div class="admin-records-filter-actions">
+                <button id="adminRecordsApplyButton" class="ios-button secondary" type="button">Apply Filters</button>
+                <button id="adminRecordsResetButton" class="ios-button secondary" type="button">Reset</button>
+              </div>
+              <div id="adminStudentRecordsSummary" class="metric-copy admin-records-summary">No records loaded yet.</div>
+              <div class="table-scroll">
+                <table class="ios-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>ID</th>
+                      <th>Date</th>
+                      <th>Site</th>
+                      <th>Check In</th>
+                      <th>Check Out</th>
+                      <th>Map (Check In)</th>
+                      <th>Map (Check Out)</th>
+                      <th>Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminStudentRecordsTableBody">
+                    <tr>
+                      <td colspan="9" class="empty-copy">Open Student Records to load data.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="admin-records-footer">
+                <div class="admin-records-attribution">Maps © OpenStreetMap contributors</div>
+                <div class="admin-records-pagination">
+                  <button id="adminRecordsPrevPageButton" class="ios-button secondary" type="button">Prev</button>
+                  <span id="adminRecordsPageInfo" class="metric-copy">Page 1 of 1</span>
+                  <button id="adminRecordsNextPageButton" class="ios-button secondary" type="button">Next</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="glass-card">
+            <div class="card-head">
+              <div class="section-label">Filters &amp; Tools</div>
+              <button id="adminLogoutButton" class="link-button danger" type="button">Sign Out</button>
+            </div>
+            <div class="filter-grid">
+              <div class="filter-item">
+                <label class="stat-label" for="adminRangeSelect">Range</label>
+                <select id="adminRangeSelect" class="ios-select">
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="overall" selected>Overall</option>
+                </select>
+              </div>
+              <div class="filter-item">
+                <label class="stat-label" for="adminSiteSelect">Site</label>
+                <select id="adminSiteSelect" class="ios-select">
+                  <option value="all">All Sites</option>
+                </select>
+              </div>
+              <div class="filter-item">
+                <label class="stat-label" for="adminStatusSelect">Status</label>
+                <select id="adminStatusSelect" class="ios-select">
+                  <option value="all">All</option>
+                  <option value="complete">Complete</option>
+                  <option value="open">Open</option>
+                  <option value="exception">Exception</option>
+                </select>
+              </div>
+              <div class="filter-item">
+                <label class="stat-label" for="adminSearchInput">Search</label>
+                <input id="adminSearchInput" class="ios-input" type="search" placeholder="Name or ID">
+              </div>
+            </div>
+            <div class="admin-intern-launcher">
+              <div class="filter-item">
+                <label class="stat-label" for="adminInternLookupInput">Intern Insights</label>
+                <input id="adminInternLookupInput" class="ios-input" type="search" list="adminInternLookupList" placeholder="Search intern name or ID">
+                <datalist id="adminInternLookupList"></datalist>
+              </div>
+              <button id="adminOpenInternInsightsButton" class="ios-button accent" type="button">Open Insights</button>
+            </div>
+            <div id="adminInternLookupHint" class="metric-copy">Open a specific intern to view detailed stats and charts.</div>
+            <div class="admin-actions-row">
+              <button id="adminRefreshButton" class="ios-button secondary" type="button">Refresh</button>
+              <button id="adminPrintCohortButton" class="ios-button secondary" type="button">Print</button>
+              <button id="adminPdfCohortButton" class="ios-button accent" type="button">PDF</button>
+              <button id="adminCsvButton" class="ios-button secondary" type="button">CSV</button>
+            </div>
+          </div>
+
+          <!-- KPIs -->
+          <div class="glass-card">
+            <div class="section-label">Cohort Health</div>
+            <div id="adminKpiGrid" class="stats-grid"></div>
+          </div>
+
+          <!-- Today's activity -->
+          <div class="glass-card">
+            <div class="card-head">
+              <div class="section-label">Today's Student Activity</div>
+              <div class="metric-copy">Check-in/out, active status, location, and worked duration</div>
+            </div>
+            <div class="table-scroll">
+              <table class="ios-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Check In</th>
+                    <th>Status</th>
+                    <th>Check Out</th>
+                    <th>Location</th>
+                    <th>Duration</th>
+                  </tr>
+                </thead>
+                <tbody id="adminTodayTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div class="chart-row">
+            <div class="glass-card chart-card">
+              <div class="card-head">
+                <div class="section-label">Cohort Trend</div>
+                <div class="metric-copy">Points and hours over time</div>
+              </div>
+              <div class="chart-frame chart-frame-lg">
+                <canvas id="adminOverviewTrendChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-row">
+            <div class="glass-card chart-card">
+              <div class="card-head">
+                <div class="section-label">Leaderboard</div>
+                <div class="metric-copy">Top students by points and hours</div>
+              </div>
+              <div class="chart-frame chart-frame-lg">
+                <canvas id="adminLeaderboardChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <details id="adminAdvancedDetails" class="glass-card collapsible">
+            <summary class="collapsible-header">
+              <div class="section-label">Advanced Analytics</div>
+              <svg class="chevron-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </summary>
+            <div class="collapsible-body advanced-grid">
+              <div class="chart-card chart-card-sm">
+                <div class="section-label">Points vs Hours</div>
+                <div class="chart-frame chart-frame-md">
+                  <canvas id="adminScatterChart"></canvas>
+                </div>
+              </div>
+              <div class="chart-card chart-card-sm">
+                <div class="section-label">Status Mix</div>
+                <div class="chart-frame chart-frame-md">
+                  <canvas id="adminExceptionChart"></canvas>
+                </div>
+              </div>
+              <div class="chart-card">
+                <div class="section-label">Sites Breakdown</div>
+                <div class="chart-frame chart-frame-md">
+                  <canvas id="adminSiteBreakdownChart"></canvas>
+                </div>
+              </div>
+              <div class="chart-card chart-card-heatmap">
+                <div class="section-label">Attendance Heatmap</div>
+                <div id="adminHeatmapLegend" class="heatmap-legend"></div>
+                <div id="adminHeatmap" class="heatmap"></div>
+              </div>
+            </div>
+          </details>
+
+          <!-- Student analysis table -->
+          <div class="glass-card">
+            <div class="section-label">Student Analysis</div>
+            <div class="table-scroll">
+              <table class="ios-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Week</th>
+                    <th>Month</th>
+                    <th>Overall</th>
+                    <th>Selected %</th>
+                    <th>Percentile</th>
+                    <th>Last Activity</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="adminStudentsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Exceptions + Audit -->
+          <details class="glass-card collapsible">
+            <summary class="collapsible-header">
+              <div class="section-label">Exceptions &amp; Audit Trail</div>
+              <svg class="chevron-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </summary>
+            <div class="collapsible-body">
+              <div id="adminExceptionList" class="exception-list"></div>
+              <div class="info-banner" style="margin-top:12px;">Audit trail: blocked duplicates, cooldowns, admin sign-ins.</div>
+              <div id="auditTrailList" class="exception-list" style="margin-top:12px;"></div>
+            </div>
+          </details>
+        </div>
+      </section>
 
     </main>
 
-<footer class="text-center py-8 mt-auto mb-4 no-print">
-    <div class="inline-flex flex-col items-center justify-center transform hover:scale-105 transition-transform duration-300 cursor-default">
-        <div class="flex items-center gap-2 mb-1">
-            <i class="fas fa-terminal text-school-gold text-xs opacity-80"></i>
-            <p class="text-lg font-black tracking-[0.2em] uppercase bg-clip-text text-transparent bg-gradient-to-r from-gray-700 via-school-red to-school-darkRed dark:from-gray-200 dark:via-school-red dark:to-school-gold drop-shadow-sm">
-                Built By <span class="text-school-red">Mr. Thomson</span>
-            </p>
-        </div>
+    <!-- ========== BOTTOM TAB BAR ========== -->
+    <nav class="tab-bar">
+      <button class="tab-item is-active" data-view-button="clock" type="button">
+        <span class="material-symbols-outlined tab-icon">dashboard</span>
+        <span>DASHBOARD</span>
+      </button>
+      <button class="tab-item" data-view-button="progress" type="button">
+        <span class="material-symbols-outlined tab-icon">history</span>
+        <span>HISTORY</span>
+      </button>
+      <button class="tab-item" data-view-button="admin" type="button">
+        <span class="material-symbols-outlined tab-icon">admin_panel_settings</span>
+        <span>ADMIN</span>
+      </button>
+    </nav>
+  </div>
 
-        <a href="tel:9514070924" class="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 hover:text-school-red dark:hover:text-school-gold transition-colors">
-            951-407-0924
-        </a>
-
-        <div class="h-0.5 w-3/4 bg-gradient-to-r from-transparent via-school-gold to-transparent opacity-60 rounded-full"></div>
+  <!-- ========== DETAIL DRAWER ========== -->
+  <aside id="studentDetailDrawer" class="detail-drawer">
+    <div class="drawer-handle"></div>
+    <div class="drawer-header">
+      <div>
+        <div class="section-label">Student Detail</div>
+        <h3 id="detailDrawerTitle" class="drawer-title">Select a student</h3>
+      </div>
+      <button id="closeDetailDrawerButton" class="link-button" type="button">Close</button>
     </div>
-</footer>
+    <div id="detailDrawerContent" class="drawer-content">Choose a student from the analysis table to open detailed metrics.</div>
+  </aside>
+  <div id="drawerOverlay" class="drawer-overlay"></div>
 
-    <div id="adminPanel" class="fixed inset-0 z-[100] hidden no-print">
-        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="toggleAdminPanel()"></div>
-        <div class="absolute inset-0 overflow-y-auto">
-            <div class="min-h-screen p-4 flex items-center justify-center">
-                <div class="relative w-full max-w-4xl glass-panel rounded-2xl shadow-2xl overflow-hidden transform transition-all animate-fade-in-up">
-                    
-                    <div class="p-4 bg-gradient-to-r from-school-black to-school-red flex justify-between items-center shadow-md">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-shield-alt text-school-gold"></i>
-                            <h2 class="text-white font-bold text-lg tracking-wide">Admin Dashboard</h2>
-                        </div>
-                        <button onclick="toggleAdminPanel()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-
-                    <div class="p-6">
-                        <div id="adminAuth" class="text-center py-12">
-                            <div class="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto flex items-center justify-center mb-4 shadow-inner">
-                                <i class="fas fa-lock text-2xl text-gray-500 dark:text-gray-400"></i>
-                            </div>
-                            <h3 class="text-xl font-bold mb-2">Security Check</h3>
-                            <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">Please enter the password.</p>
-                            <div class="flex justify-center max-w-xs mx-auto gap-2">
-                                <input type="password" id="adminPassword" class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-black/40 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red" placeholder="Password">
-                                <button onclick="verifyAdmin()" class="bg-school-gold text-school-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-400 shadow-md transition-colors">Login</button>
-                            </div>
-                        </div>
-
-                        <div id="adminData" class="hidden">
-                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white admin-card-dark p-4 rounded-xl border-l-4 border-blue-500 shadow-sm">
-        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked In</div>
-        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkin">0</div>
+  <!-- ========== STATS MODAL ========== -->
+  <div id="statsModal" class="stats-modal-overlay">
+    <div class="stats-modal-sheet">
+      <div class="drawer-handle"></div>
+      <div class="stats-modal-top">
+        <h2 class="stats-modal-title">My Progress</h2>
+        <button id="statsModalClose" class="link-button" type="button">Done</button>
+      </div>
+      <div id="statsModalContent" class="stats-modal-body">
+        <div class="stats-modal-empty">Enter your student ID on the Clock tab first.</div>
+      </div>
     </div>
-    
-    <div class="bg-white admin-card-dark p-4 rounded-xl border-l-4 border-green-500 shadow-sm">
-        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Checked Out</div>
-        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-checkout">0</div>
+  </div>
+
+  <!-- ========== REPORT MODAL ========== -->
+  <div id="reportModal" class="modal-overlay">
+    <div class="modal-sheet">
+      <div class="drawer-handle"></div>
+      <div class="modal-header">
+        <div>
+          <div class="section-label">Report Center</div>
+          <h3 id="reportTitleText" class="card-title">Preview</h3>
+        </div>
+        <div class="modal-actions">
+          <button id="reportPrintButton" class="ios-button secondary" type="button">Print</button>
+          <button id="reportPdfButton" class="ios-button accent" type="button">PDF</button>
+          <button id="reportCloseButton" class="link-button" type="button">Close</button>
+        </div>
+      </div>
+      <div id="reportStage" class="report-stage"></div>
     </div>
+  </div>
 
-    <div class="bg-white admin-card-dark p-4 rounded-xl border-l-4 border-yellow-500 shadow-sm">
-        <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Still Checked In</div>
-        <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-pending">0</div>
+  <!-- ========== DATABASE TRANSITION NOTICE ========== -->
+  <div id="migrationNoticeModal" class="announcement-modal-overlay" aria-hidden="true">
+    <div class="announcement-modal-card" role="dialog" aria-modal="true" aria-labelledby="migrationNoticeTitle" aria-describedby="migrationNoticeBody">
+      <div class="section-label">System Update</div>
+      <h3 id="migrationNoticeTitle" class="card-title">Database Upgrade Complete</h3>
+      <div id="migrationNoticeBody" class="announcement-modal-body">
+        <p>
+          Intern Track has successfully transitioned to a database server. Load times should now be significantly faster.
+        </p>
+        <p>
+          Thank you for helping pilot this app and improve it for future internship students.
+        </p>
+      </div>
+      <button id="migrationNoticeCloseButton" class="ios-button accent announcement-modal-close" type="button">
+        Continue
+      </button>
     </div>
+  </div>
 
-   <div class="bg-white admin-card-dark p-4 rounded-xl border-l-4 border-purple-500 shadow-sm">
-    <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Total Active Today</div>
-    <div class="text-2xl font-black text-gray-800 dark:text-gray-100" id="stat-absent">0</div>
-</div>
-</div>
-                            <div id="adminToolbar" class="flex flex-col md:flex-row justify-between items-center mb-4 gap-3 bg-gray-100/50 dark:bg-black/20 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                                <div class="w-full md:w-auto flex-grow relative">
-                                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                                    <input type="text" id="adminSearch" oninput="filterAdminData()" placeholder="Search logs (name, date, action)..." class="w-full pl-10 pr-4 py-2 rounded-lg bg-white dark:bg-black/50 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-school-red text-sm transition-all">
-                                </div>
-                                <div class="flex gap-2 w-full md:w-auto justify-end">
-                                    <a href="https://docs.google.com/spreadsheets/d/1Dd4qJ3SkARcigi-kmM9wCUc9NkRqpQoEkFVri7_FKlY/edit?gid=0#gid=0" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2 whitespace-nowrap">
-                                        <i class="fas fa-table"></i> Open Sheet
-                                    </a>
-                                    <button id="adminPdfButton" onclick="downloadAdminPdf()" class="bg-red-700 hover:bg-red-800 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2 whitespace-nowrap">
-                                        <i class="fas fa-file-pdf"></i> Download PDF
-                                    </button>
-                                    <button onclick="fetchAdminData()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-2 whitespace-nowrap">
-                                        <i class="fas fa-sync"></i> Refresh
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="mb-4 bg-yellow-100 dark:bg-yellow-900/30 p-3 rounded-lg border border-yellow-200 dark:border-yellow-700/50 text-xs text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
-                                <i class="fas fa-info-circle mt-0.5"></i>
-                                <span><strong>Important:</strong> Ensure your Google Sheet has a tab named exactly "<strong>Logs</strong>" (case-sensitive). If the tab is named "Sheet1", the data sync will fail.</span>
-                            </div>
-
-                            <div class="mb-4 bg-white/70 dark:bg-black/20 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                                <div class="flex items-center justify-between mb-3">
-                                    <h3 class="text-sm font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Admin Overview Trend</h3>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">Last 7 Days</span>
-                                </div>
-                                <canvas id="adminOverviewTrendChart" height="105"></canvas>
-                            </div>
-
-                            <div id="adminTableWrap" class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner max-h-[60vh]">
-                                <table class="w-full text-sm text-left text-gray-600 dark:text-gray-300">
-                                    <thead class="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-800 dark:text-gray-400 sticky top-0 shadow-sm z-10">
-                                        <tr>
-                                            <th class="px-4 py-3">Time</th>
-                                            <th class="px-4 py-3">Student</th>
-                                            <th class="px-4 py-3">Action</th>
-                                            <th class="px-4 py-3">Site</th>
-                                            <th class="px-4 py-3 text-center">Map</th>
-                                            <th class="px-4 py-3 text-center">Detail</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="adminTableBody" class="divide-y divide-gray-200 dark:divide-gray-700 bg-white/50 dark:bg-black/20">
-                                        <tr>
-                                            <td colspan="6" class="px-4 py-8 text-center text-gray-500">Loading data...</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- ========== GLOBAL LOADING MODAL ========== -->
+  <div id="globalLoadingModal" class="global-loading-modal" aria-hidden="true">
+    <div class="global-loading-card" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="Loading">
+      <span class="loading-spinner global-loading-spinner" aria-hidden="true"></span>
+      <div id="globalLoadingMessage" class="global-loading-message" aria-live="polite">Loading…</div>
     </div>
+  </div>
 
-    <div id="studentDetailModal" class="fixed inset-0 z-[110] hidden no-print">
-        <div class="absolute inset-0 bg-black/65 backdrop-blur-sm" onclick="closeStudentDetailModal()"></div>
-        <div class="absolute inset-0 overflow-y-auto p-4">
-            <div class="max-w-5xl mx-auto min-h-screen flex items-center justify-center">
-                <div id="studentDetailContent" class="w-full rounded-2xl glass-panel overflow-hidden shadow-2xl border border-white/20">
-                    <div class="p-4 bg-gradient-to-r from-school-black to-school-red flex justify-between items-center">
-                        <h2 id="studentDetailTitle" class="text-white font-bold text-lg tracking-wide">Student Detail</h2>
-                        <button onclick="closeStudentDetailModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="p-5 space-y-4">
-                        <div id="studentDetailMeta" class="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-black/20 text-sm flex flex-wrap gap-4 justify-between">
-                            <div><span class="font-bold">Student:</span> <span id="studentDetailStudentName">-</span></div>
-                            <div><span class="font-bold">Most Recent Site:</span> <span id="studentDetailSite">-</span></div>
-                            <div><span class="font-bold">Total Shifts:</span> <span id="studentDetailTotalShifts">0</span></div>
-                        </div>
+  <!-- ========== TOAST NOTIFICATIONS ========== -->
+  <div id="toastRack" class="toast-rack"></div>
 
-                        <div id="studentDetailSummaryCard" class="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-black/20">
-                            <div class="admin-card-dark p-3 rounded-lg border-l-4 border-green-500">
-                                <div class="text-xs uppercase text-gray-500">Check Ins</div>
-                                <div id="studentCheckinCount" class="text-xl font-black">0</div>
-                            </div>
-                            <div class="admin-card-dark p-3 rounded-lg border-l-4 border-slate-500">
-                                <div class="text-xs uppercase text-gray-500">Check Outs</div>
-                                <div id="studentCheckoutCount" class="text-xl font-black">0</div>
-                            </div>
-                            <div class="admin-card-dark p-3 rounded-lg border-l-4 border-red-500">
-                                <div class="text-xs uppercase text-gray-500">Pending</div>
-                                <div id="studentPendingCount" class="text-xl font-black">0</div>
-                            </div>
-                            <div class="admin-card-dark p-3 rounded-lg border-l-4 border-yellow-500">
-                                <div class="text-xs uppercase text-gray-500">Hours Logged</div>
-                                <div id="studentHoursCount" class="text-xl font-black">0.0</div>
-                            </div>
-                        </div>
+  <!-- Hidden compat elements -->
+  <div id="themeIndicator" class="is-hidden">Dark</div>
+  <div id="topbarSummary" class="is-hidden"></div>
+  <div id="studentSessionBadge" class="is-hidden" data-tone="info">No student loaded</div>
 
-                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                            <div class="flex items-center gap-2">
-                                <span class="text-sm font-bold uppercase tracking-wide">Recent Shifts Detail Log</span>
-                                <span id="studentShiftViewCount" class="text-xs text-gray-500 dark:text-gray-300">Showing 0 of 0</span>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <button id="studentShiftRecentButton" onclick="setStudentShiftViewMode('recent')" class="px-3 py-2 rounded-lg text-xs font-bold bg-school-red text-white">Recent</button>
-                                <button id="studentShiftAllButton" onclick="setStudentShiftViewMode('all')" class="px-3 py-2 rounded-lg text-xs font-bold bg-gray-300 text-gray-800 dark:bg-gray-700 dark:text-gray-100">All Shifts</button>
-                                <button onclick="downloadStudentPdf()" class="px-3 py-2 rounded-lg text-xs font-bold bg-red-700 text-white hover:bg-red-800 flex items-center gap-2">
-                                    <i class="fas fa-file-pdf"></i> Download Student PDF
-                                </button>
-                                <button onclick="printStudentReport('visible')" class="px-3 py-2 rounded-lg text-xs font-bold bg-blue-700 text-white hover:bg-blue-800 flex items-center gap-2">
-                                    <i class="fas fa-print"></i> Print Student
-                                </button>
-                                <button onclick="printStudentReport('all')" class="px-3 py-2 rounded-lg text-xs font-bold bg-school-gold text-school-black hover:bg-yellow-300 flex items-center gap-2">
-                                    <i class="fas fa-print"></i> Print All Shifts
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 max-h-[52vh] bg-white/70 dark:bg-black/20">
-                            <table class="w-full text-sm">
-                                <thead class="text-xs uppercase bg-gray-100 dark:bg-gray-800 sticky top-0">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left">Time</th>
-                                        <th class="px-4 py-3 text-left">Action</th>
-                                        <th class="px-4 py-3 text-left">Site</th>
-                                        <th class="px-4 py-3 text-center">Map</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="studentDetailShiftBody" class="divide-y divide-gray-200 dark:divide-gray-700"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <section id="printReport">
-        <div class="px-2 py-1">
-            <h1 id="printReportTitle" class="text-2xl font-black mb-1">Student Shift Report</h1>
-            <p id="printReportSubtitle" class="text-sm mb-3 text-gray-600">Intern Track</p>
-            <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><strong>Student:</strong> <span id="printStudentName">-</span></div>
-                <div><strong>Generated:</strong> <span id="printGeneratedAt">-</span></div>
-                <div><strong>Total Shifts:</strong> <span id="printTotalShifts">0</span></div>
-                <div><strong>Hours Logged:</strong> <span id="printHoursLogged">0.0</span></div>
-            </div>
-            <table class="print-table">
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Action</th>
-                        <th>Site</th>
-                        <th>Map Coordinates</th>
-                    </tr>
-                </thead>
-                <tbody id="printShiftBody"></tbody>
-            </table>
-        </div>
-    </section>
-
-    <section id="adminPdfReport" class="export-report hidden">
-        <h1 class="text-2xl font-black mb-1">Admin Dashboard Report</h1>
-        <p id="adminPdfGeneratedAt" class="text-sm text-gray-600 mb-4">Generated:</p>
-        <div class="grid grid-cols-4 gap-3 mb-4">
-            <div class="border rounded p-2"><div class="text-xs uppercase text-gray-500">Total Checked In</div><div id="adminPdfCheckin" class="text-xl font-black">0</div></div>
-            <div class="border rounded p-2"><div class="text-xs uppercase text-gray-500">Total Checked Out</div><div id="adminPdfCheckout" class="text-xl font-black">0</div></div>
-            <div class="border rounded p-2"><div class="text-xs uppercase text-gray-500">Still Checked In</div><div id="adminPdfPending" class="text-xl font-black">0</div></div>
-            <div class="border rounded p-2"><div class="text-xs uppercase text-gray-500">Total Active Today</div><div id="adminPdfActive" class="text-xl font-black">0</div></div>
-        </div>
-        <div class="border rounded p-3 mb-4">
-            <div class="text-sm font-bold mb-2">Overview Trend</div>
-            <img id="adminPdfTrendImage" alt="Admin trend chart" class="w-full h-auto border rounded" />
-        </div>
-        <table class="w-full text-xs border-collapse">
-            <thead>
-                <tr>
-                    <th class="border p-1 text-left">Time</th>
-                    <th class="border p-1 text-left">Student</th>
-                    <th class="border p-1 text-left">Action</th>
-                    <th class="border p-1 text-left">Site</th>
-                </tr>
-            </thead>
-            <tbody id="adminPdfTableBody"></tbody>
-        </table>
-    </section>
-
-    <section id="studentPdfReport" class="export-report hidden">
-        <h1 id="studentPdfTitle" class="text-2xl font-black mb-1">Student Detail Report</h1>
-        <p id="studentPdfSubtitle" class="text-sm text-gray-600 mb-4">Generated:</p>
-        <div class="grid grid-cols-4 gap-3 mb-4">
-            <div class="border rounded p-2"><div class="text-xs uppercase text-gray-500">Check Ins</div><div id="studentPdfCheckin" class="text-xl font-black">0</div></div>
-            <div class="border rounded p-2"><div class="text-xs uppercase text-gray-500">Check Outs</div><div id="studentPdfCheckout" class="text-xl font-black">0</div></div>
-            <div class="border rounded p-2"><div class="text-xs uppercase text-gray-500">Pending</div><div id="studentPdfPending" class="text-xl font-black">0</div></div>
-            <div class="border rounded p-2"><div class="text-xs uppercase text-gray-500">Hours Logged</div><div id="studentPdfHours" class="text-xl font-black">0.0</div></div>
-        </div>
-        <table class="w-full text-xs border-collapse">
-            <thead>
-                <tr>
-                    <th class="border p-1 text-left">Time</th>
-                    <th class="border p-1 text-left">Action</th>
-                    <th class="border p-1 text-left">Site</th>
-                    <th class="border p-1 text-left">Coordinates</th>
-                </tr>
-            </thead>
-            <tbody id="studentPdfTableBody"></tbody>
-        </table>
-    </section>
-
-    <script>
-        // SPLASH SCREEN LOGIC
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
-                const splash = document.getElementById('splash-screen');
-                if (splash) {
-                    splash.classList.add('opacity-0', 'pointer-events-none');
-                    setTimeout(() => splash.remove(), 800);
-                }
-            }, 3500);
-        });
-
-        // --- Configuration ---
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3GBhNTbtaOlSVBL6r9SJqXX1CuTgSNP0DOnp8jxH0zvTofzyZkmK_OWruVqq9Fbs/exec';
-
-        // Internship Sites
-        const SITES = [
-            { name: "Alliance Diesel", lat: 33.7681647078012, lng: -116.96797385328925 },
-            { name: "Phils Auto Clinic", lat: 33.74851138217792, lng: -116.92004436101942 },
-            { name: "Levi's Automotive", lat: 33.74788219854886, lng: -116.97554790660938 },
-            { name: "HUSD Transportation Dept.", lat: 33.74189676349582, lng: -116.99100203721602 },
-            { name: "Tim Moran Ford", lat: 33.73933869093443, lng: -117.03070412707285},
-            { name: "Tim Moran Hyundai", lat: 33.73934670369273, lng: -117.03000554135964},
-            { name: "Tim Moran Chevrolet", lat: 33.74099416475308, lng: -117.02873711340769 },
-            { name: "Hemet High Bulldog Garage", lat: 33.728014603500704, lng: -116.93369905999955 }
-        ];
-        const ALLOWED_RADIUS_METERS = 91.44;
-        const STUDENT_DB = {
-            "131923": "Jordan Belvin",
-            "168115": "Jonah Chavez",
-            "131523": "Adrian Delgado Hernandez",
-            "160601": "Lenore Ditmore",
-            "132819": "Scarlet Grady",
-            "126607": "Adrian Herrera",
-            "132120": "Ethan Little",
-            "131352": "Diego Ochoa",
-            "159660": "Azriel Perez",
-            "133569": "Porter Preston",
-            "160166": "Maximus Robles",
-            "131356": "Adrian Rodriguez Valdes",
-            "155404": "Carlos Salgado",
-            "132483": "James Windham",
-            "125814": "Zacharias Bramhall",
-            "010101": "Mr. Thomson"
-        };
-        const RECENT_SHIFT_LIMIT = 10;
-
-        // --- Sound System ---
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-        function playSound(type) {
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-
-            if (type === 'success') {
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(1046.5, audioCtx.currentTime + 0.1);
-                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.5);
-            } else if (type === 'error') {
-                oscillator.type = 'sawtooth';
-                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
-                oscillator.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
-                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.3);
-            }
-        }
-
-        // --- State
-        let currentUserPos = null;
-        let selectedSite = null;
-        let nearbySites = [];
-        let watchId = null;
-        let resolvedStudentName = null;
-        let adminDataCache = [];
-        let adminFilteredData = [];
-        let currentStudentDetail = null;
-        let studentShiftViewMode = 'recent';
-        const chartInstances = {};
-
-        // --- Core Functions ---
-        function toggleAdminPanel() {
-            const panel = document.getElementById('adminPanel');
-            if (panel) panel.classList.toggle('hidden');
-        }
-
-        // --- Init ---
-        document.addEventListener('DOMContentLoaded', () => {
-            try {
-                loadTheme();
-                renderLocalHistory();
-                const toggleBtn = document.getElementById('themeToggle');
-                if (toggleBtn) toggleBtn.addEventListener('click', toggleTheme);
-                startLocationWatch();
-                window.addEventListener('afterprint', () => {
-                    document.body.classList.remove('printing-student-report');
-                });
-            } catch(e) {
-                console.error("Init error:", e);
-            }
-        });
-
-        // --- Theme Logic ---
-        function loadTheme() {
-            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-            updateThemeIcon();
-        }
-
-        function toggleTheme() {
-            const html = document.documentElement;
-            if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                localStorage.theme = 'light';
-            } else {
-                html.classList.add('dark');
-                localStorage.theme = 'dark';
-            }
-            updateThemeIcon();
-        }
-        
-        function updateThemeIcon() {
-            const icon = document.getElementById('themeIcon');
-            if (document.documentElement.classList.contains('dark')) {
-                icon.classList.remove('fa-sun');
-                icon.classList.add('fa-moon');
-            } else {
-                icon.classList.remove('fa-moon');
-                icon.classList.add('fa-sun');
-            }
-        }
-
-        // --- User Logic ---
-        function validateStudentId() {
-            const input = document.getElementById('studentIdInput');
-            const display = document.getElementById('studentNameDisplay');
-            const id = input.value.trim();
-            resolvedStudentName = null;
-            if (id.length >= 6) {
-                if (STUDENT_DB[id]) {
-                    resolvedStudentName = STUDENT_DB[id];
-                    display.innerHTML = `<span class="text-green-600 dark:text-green-400 font-bold animate-pulse">Welcome, ${resolvedStudentName}</span>`;
-                } else {
-                    display.innerHTML = `<span class="text-school-red font-bold">ID Not Found</span>`;
-                }
-            } else if (id.length > 0) {
-                display.innerHTML = `<span class="text-gray-400">Typing...</span>`;
-            } else {
-                display.innerHTML = `<span class="text-sm italic text-gray-400">Please enter your 6-digit ID</span>`;
-            }
-            checkButtons();
-        }
-
-        // --- Location Logic ---
-        function startLocationWatch() {
-            if (!navigator.geolocation) {
-                updateLocationStatus('error', 'Geolocation not supported');
-                return;
-            }
-
-            const options = {
-                enableHighAccuracy: true,
-                maximumAge: 0,
-                timeout: 10000
-            };
-            updateLocationStatus('loading');
-            watchId = navigator.geolocation.watchPosition(
-                (position) => {
-                    currentUserPos = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
-                    validateLocation();
-                },
-                (error) => {
-                    console.warn("Watch Position Error:", error.message);
-                    updateLocationStatus('error', error.message);
-                },
-                options
-            );
-        }
-
-        function forceRefreshLocation() {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    currentUserPos = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
-                    validateLocation();
-                },
-                (error) => {
-                    updateLocationStatus('error', error.message);
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
-        }
-
-        function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const dLat = deg2rad(lat2 - lat1);
-            const dLon = deg2rad(lon2 - lon1);
-            const a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            const d = R * c;
-            return d * 1000;
-        }
-
-        function deg2rad(deg) {
-            return deg * (Math.PI / 180);
-        }
-
-        function validateLocation() {
-            if (!currentUserPos) return;
-            nearbySites = SITES.map((site, index) => {
-                const dist = getDistanceFromLatLonInMeters(currentUserPos.lat, currentUserPos.lng, site.lat, site.lng);
-                return { ...site, distance: dist, originalIndex: index };
-            }).filter(site => site.distance <= ALLOWED_RADIUS_METERS);
-            nearbySites.sort((a, b) => a.distance - b.distance);
-            const statusEl = document.getElementById('locationStatus');
-
-            if (nearbySites.length === 0) {
-                selectedSite = null;
-                let minDistance = Infinity;
-                let closest = null;
-                SITES.forEach(site => {
-                    const d = getDistanceFromLatLonInMeters(currentUserPos.lat, currentUserPos.lng, site.lat, site.lng);
-                    if (d < minDistance) {
-                        minDistance = d;
-                        closest = site;
-                    }
-                });
-
-                statusEl.innerHTML = `
-                    <span class="text-school-red font-bold flex flex-col items-center leading-tight">
-                        <span class="flex items-center gap-2"><i class="fas fa-times-circle"></i> Too far from site.</span>
-                        <span class="text-xs font-normal text-gray-500 dark:text-gray-400 mt-1">Nearest: ${closest ? closest.name : 'Unknown'} (~${Math.round(minDistance)}m)</span>
-                    </span>
-                    <button onclick="forceRefreshLocation()" class="mt-2 text-[10px] text-blue-500 underline">Refresh GPS</button>
-                `;
-                disableButtons();
-            } else if (nearbySites.length === 1) {
-                selectedSite = nearbySites[0];
-                statusEl.innerHTML = `
-                    <div class="flex flex-col items-center">
-                        <span class="text-green-600 dark:text-green-400 font-bold flex items-center gap-2">
-                            <i class="fas fa-check-circle"></i> Location Verified
-                        </span>
-                        <span class="text-xs font-bold text-gray-700 dark:text-gray-300 mt-1">${selectedSite.name}</span>
-                        <span class="text-[10px] text-gray-400">Accuracy: ~${Math.round(selectedSite.distance)}m</span>
-                    </div>
-                `;
-                checkButtons();
-            } else {
-                if (!selectedSite || !nearbySites.find(s => s.name === selectedSite.name)) {
-                    selectedSite = nearbySites[0];
-                }
-
-                let optionsHtml = '';
-                nearbySites.forEach((site, idx) => {
-                    const isSelected = (site.name === selectedSite.name) ? 'selected' : '';
-                    optionsHtml += `<option value="${idx}" ${isSelected}>${site.name} (${Math.round(site.distance)}m)</option>`;
-                });
-
-                statusEl.innerHTML = `
-                    <div class="flex flex-col items-center w-full max-w-xs">
-                        <span class="text-yellow-600 dark:text-yellow-500 font-bold text-xs mb-1"><i class="fas fa-exclamation-circle"></i> Multiple locations detected</span>
-                        <select onchange="manualSelectSite(this.value)" class="w-full text-sm p-2 rounded border border-school-gold bg-white dark:bg-black/50 dark:border-gray-600 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-school-red">
-                            ${optionsHtml}
-                        </select>
-                        <p class="text-[10px] text-gray-400 mt-1">Please confirm your specific site.</p>
-                    </div>`;
-                checkButtons();
-            }
-        }
-
-        function manualSelectSite(index) {
-            selectedSite = nearbySites[index];
-            checkButtons();
-        }
-
-        function updateLocationStatus(state, msg = "") {
-            const statusEl = document.getElementById('locationStatus');
-            if (state === 'loading') {
-                statusEl.innerHTML = `<span><i class="fas fa-location-arrow animate-pulse"></i> Waiting for location...</span>`;
-                disableButtons();
-            } else if (state === 'error') {
-                statusEl.innerHTML = `
-                    <div class="flex flex-col items-center gap-2">
-                        <span class="text-red-500 font-bold text-sm"><i class="fas fa-exclamation-triangle"></i> Location Error</span>
-                        <span class="text-xs text-gray-400">${msg}</span>
-                        <button onclick="forceRefreshLocation()" class="text-xs bg-school-red text-white px-3 py-1 rounded shadow hover:bg-red-700 transition">
-                            <i class="fas fa-sync"></i> Force Retry
-                        </button>
-                    </div>`;
-                disableButtons();
-            }
-        }
-
-        function disableButtons() {
-            const b1 = document.getElementById('btnCheckIn');
-            const b2 = document.getElementById('btnCheckOut');
-            b1.disabled = true;
-            b2.disabled = true;
-        }
-
-        function checkButtons() {
-            const b1 = document.getElementById('btnCheckIn');
-            const b2 = document.getElementById('btnCheckOut');
-            if (resolvedStudentName && selectedSite) {
-                b1.disabled = false;
-                b2.disabled = false;
-            } else {
-                b1.disabled = true;
-                b2.disabled = true;
-            }
-        }
-
-        // --- Action Handlers ---
-        function handleAction(action) {
-            if (!resolvedStudentName || !selectedSite) return;
-            const ONE_HOUR = 60 * 60 * 1000;
-            const lastTime = localStorage.getItem('last_' + action);
-            const now = Date.now();
-            if (lastTime && (now - parseInt(lastTime)) < ONE_HOUR) {
-                const minutesLeft = Math.ceil((ONE_HOUR - (now - parseInt(lastTime))) / 60000);
-                const msgEl = document.getElementById('actionMessage');
-                msgEl.className = "text-sm font-semibold text-school-red animate-pulse";
-                msgEl.innerHTML = `<i class="fas fa-clock"></i> Please wait ${minutesLeft} min to ${action} again.`;
-                playSound('error');
-                return;
-            }
-
-            const studentId = document.getElementById('studentIdInput').value;
-            const msgEl = document.getElementById('actionMessage');
-            msgEl.className = "text-sm font-semibold text-blue-500";
-            msgEl.innerText = `Submitting ${action}...`;
-
-            const payload = {
-                studentId: studentId,
-                studentName: resolvedStudentName,
-                action: action,
-                site: selectedSite.name,
-                lat: currentUserPos.lat,
-                lng: currentUserPos.lng,
-                timestamp: new Date().toISOString()
-            };
-
-            fetch(APPS_SCRIPT_URL, {
-                method: "POST",
-                mode: "no-cors", 
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(payload)
-            })
-            .then(() => {
-                playSound('success');
-                msgEl.className = "text-sm font-semibold text-green-600 dark:text-green-400";
-                msgEl.innerText = `${action} Recorded Successfully!`;
-                localStorage.setItem('last_' + action, Date.now());
-                addToHistory(action, selectedSite.name);
-                setTimeout(() => { msgEl.innerText = ""; }, 3000);
-                if (!document.getElementById('adminData').classList.contains('hidden')) {
-                    fetchAdminData();
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                playSound('error');
-                msgEl.className = "text-sm font-semibold text-school-red";
-                msgEl.innerText = "Submission Failed. Try again.";
-            });
-        }
-
-        function addToHistory(action, site) {
-            const list = document.getElementById('localHistoryList');
-            if (list.querySelector('.text-center')) {
-                list.innerHTML = '';
-            }
-            const now = new Date();
-            const timeStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            const li = document.createElement('li');
-            li.className = "bg-white/40 dark:bg-black/40 p-3 rounded-lg border-l-4 border-school-red animate-fade-in-up flex justify-between items-center";
-            li.innerHTML = `
-                <div>
-                    <span class="font-bold block text-gray-800 dark:text-gray-200">${action}</span>
-                    <span class="text-xs text-gray-500 dark:text-gray-400">${site}</span>
-                </div>
-                <span class="text-[10px] font-mono opacity-70">${timeStr}</span>
-            `;
-            list.prepend(li);
-        }
-
-        function renderLocalHistory() {
-            const list = document.getElementById('localHistoryList');
-            if (!list.innerHTML.trim()) {
-                list.innerHTML = '<li class="text-gray-400 italic text-center py-4">No history yet.</li>';
-            }
-        }
-
-        function formatTimestamp(ts) {
-            try {
-                const d = new Date(ts);
-                if (Number.isNaN(d.getTime())) return String(ts || '');
-                return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            } catch (error) {
-                return String(ts || '');
-            }
-        }
-
-        function normalizeLogData(raw) {
-            if (!Array.isArray(raw)) return [];
-            return raw.map((row, idx) => ({
-                ...row,
-                _rowId: row._rowId || `${row.studentName || 'unknown'}-${row.timestamp || 'na'}-${idx}`
-            }));
-        }
-
-        function destroyChart(canvasId) {
-            const canvas = document.getElementById(canvasId);
-            const existing = (window.Chart && canvas) ? Chart.getChart(canvas) : null;
-            const localRef = chartInstances[canvasId];
-            if (existing) existing.destroy();
-            if (localRef && localRef !== existing) localRef.destroy();
-            delete chartInstances[canvasId];
-        }
-
-        function renderChart(canvasId, config) {
-            if (!window.Chart) return null;
-            destroyChart(canvasId);
-            const canvas = document.getElementById(canvasId);
-            if (!canvas) return null;
-            const ctx = canvas.getContext('2d');
-            const chart = new Chart(ctx, config);
-            chartInstances[canvasId] = chart;
-            return chart;
-        }
-
-        function renderAdminOverviewTrend(data) {
-            const valid = Array.isArray(data) ? data : [];
-            const dayBuckets = {};
-            const dayLabels = [];
-            for (let i = 6; i >= 0; i -= 1) {
-                const d = new Date();
-                d.setDate(d.getDate() - i);
-                const key = d.toLocaleDateString();
-                dayBuckets[key] = { checkin: 0, checkout: 0 };
-                dayLabels.push({
-                    key,
-                    label: d.toLocaleDateString([], { month: 'short', day: 'numeric' })
-                });
-            }
-
-            valid.forEach((row) => {
-                const key = new Date(row.timestamp).toLocaleDateString();
-                if (!dayBuckets[key]) return;
-                if (row.action === 'Check In') dayBuckets[key].checkin += 1;
-                if (row.action === 'Check Out') dayBuckets[key].checkout += 1;
-            });
-
-            renderChart('adminOverviewTrendChart', {
-                type: 'line',
-                data: {
-                    labels: dayLabels.map(d => d.label),
-                    datasets: [
-                        {
-                            label: 'Check In',
-                            data: dayLabels.map(d => dayBuckets[d.key].checkin),
-                            borderColor: '#cc0000',
-                            backgroundColor: 'rgba(204, 0, 0, 0.18)',
-                            tension: 0.35,
-                            fill: true,
-                            pointRadius: 2.5
-                        },
-                        {
-                            label: 'Check Out',
-                            data: dayLabels.map(d => dayBuckets[d.key].checkout),
-                            borderColor: '#374151',
-                            backgroundColor: 'rgba(55, 65, 81, 0.18)',
-                            tension: 0.35,
-                            fill: true,
-                            pointRadius: 2.5
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    scales: {
-                        y: { beginAtZero: true, ticks: { precision: 0 } }
-                    }
-                }
-            });
-        }
-
-        function computeStudentSummary(shifts) {
-            const sortedAsc = [...shifts].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-            let checkins = 0;
-            let checkouts = 0;
-            let pending = 0;
-            let hours = 0;
-            let openCheckin = null;
-
-            sortedAsc.forEach((row) => {
-                if (row.action === 'Check In') {
-                    checkins += 1;
-                    pending += 1;
-                    openCheckin = new Date(row.timestamp);
-                } else if (row.action === 'Check Out') {
-                    checkouts += 1;
-                    if (pending > 0) pending -= 1;
-                    const outTime = new Date(row.timestamp);
-                    if (openCheckin && !Number.isNaN(outTime.getTime()) && !Number.isNaN(openCheckin.getTime()) && outTime > openCheckin) {
-                        hours += (outTime.getTime() - openCheckin.getTime()) / 3600000;
-                        openCheckin = null;
-                    }
-                }
-            });
-
-            return { checkins, checkouts, pending, hours };
-        }
-
-        function getStudentShifts(studentName) {
-            if (!studentName) return [];
-            const key = studentName.trim().toLowerCase();
-            return adminDataCache
-                .filter((row) => String(row.studentName || '').trim().toLowerCase() === key)
-                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        }
-
-        function setStudentShiftViewMode(mode) {
-            studentShiftViewMode = mode === 'all' ? 'all' : 'recent';
-            renderStudentDetail();
-        }
-
-        function openStudentDetailByEncoded(encodedName) {
-            const name = decodeURIComponent(encodedName);
-            const shifts = getStudentShifts(name);
-            currentStudentDetail = { studentName: name, shifts };
-            studentShiftViewMode = 'recent';
-            renderStudentDetail();
-            document.getElementById('studentDetailModal').classList.remove('hidden');
-        }
-
-        function closeStudentDetailModal() {
-            document.getElementById('studentDetailModal').classList.add('hidden');
-        }
-
-        function renderStudentDetail() {
-            if (!currentStudentDetail) return;
-            const { studentName, shifts } = currentStudentDetail;
-            const visibleShifts = studentShiftViewMode === 'all' ? shifts : shifts.slice(0, RECENT_SHIFT_LIMIT);
-            const summary = computeStudentSummary(shifts);
-            const mostRecentSite = shifts.length ? (shifts[0].site || 'Unknown') : '-';
-
-            document.getElementById('studentDetailTitle').innerText = `${studentName} | Student Detail`;
-            document.getElementById('studentDetailStudentName').innerText = studentName;
-            document.getElementById('studentDetailSite').innerText = mostRecentSite;
-            document.getElementById('studentDetailTotalShifts').innerText = shifts.length;
-            document.getElementById('studentCheckinCount').innerText = summary.checkins;
-            document.getElementById('studentCheckoutCount').innerText = summary.checkouts;
-            document.getElementById('studentPendingCount').innerText = summary.pending;
-            document.getElementById('studentHoursCount').innerText = summary.hours.toFixed(1);
-            document.getElementById('studentShiftViewCount').innerText = `Showing ${visibleShifts.length} of ${shifts.length}`;
-
-            const recentBtn = document.getElementById('studentShiftRecentButton');
-            const allBtn = document.getElementById('studentShiftAllButton');
-            if (studentShiftViewMode === 'all') {
-                allBtn.className = 'px-3 py-2 rounded-lg text-xs font-bold bg-school-red text-white';
-                recentBtn.className = 'px-3 py-2 rounded-lg text-xs font-bold bg-gray-300 text-gray-800 dark:bg-gray-700 dark:text-gray-100';
-            } else {
-                recentBtn.className = 'px-3 py-2 rounded-lg text-xs font-bold bg-school-red text-white';
-                allBtn.className = 'px-3 py-2 rounded-lg text-xs font-bold bg-gray-300 text-gray-800 dark:bg-gray-700 dark:text-gray-100';
-            }
-
-            const tbody = document.getElementById('studentDetailShiftBody');
-            if (!visibleShifts.length) {
-                tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">No shifts found for this student.</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = visibleShifts.map((row) => `
-                <tr class="border-b border-gray-100 dark:border-gray-800">
-                    <td class="px-4 py-3 text-xs font-mono">${formatTimestamp(row.timestamp)}</td>
-                    <td class="px-4 py-3 text-xs font-bold">${row.action || '-'}</td>
-                    <td class="px-4 py-3 text-xs">${row.site || '-'}</td>
-                    <td class="px-4 py-3 text-center">
-                        ${(row.lat && row.lng) ? `<a href="https://www.google.com/maps/search/?api=1&query=${row.lat},${row.lng}" target="_blank" class="text-blue-600"><i class="fas fa-map-marker-alt"></i></a>` : '<span class="text-gray-400">-</span>'}
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        // --- Admin Functions ---
-        async function verifyAdmin() {
-            const pass = document.getElementById('adminPassword').value;
-            const errorMsg = "Incorrect Password";
-            if (!pass) return;
-            const encoder = new TextEncoder();
-            const data = encoder.encode(pass);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            const correctHash = "79f0da1b920dade97eb4e9e02df79a606c265d69349a600a65c0d4e289feaa44";
-
-            if (hashHex === correctHash) {
-                document.getElementById('adminAuth').classList.add('hidden');
-                document.getElementById('adminData').classList.remove('hidden');
-                fetchAdminData();
-            } else {
-                alert(errorMsg);
-                playSound('error');
-            }
-        }
-
-        function fetchAdminData() {
-            const tbody = document.getElementById('adminTableBody');
-            tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500"><span class="loader"></span> Loading...</td></tr>';
-            fetch(APPS_SCRIPT_URL)
-                .then(res => res.json())
-                .then(data => {
-                    adminDataCache = normalizeLogData(data);
-                    adminFilteredData = [...adminDataCache];
-                    renderAdminTable(adminFilteredData);
-                    calculateDailyStats(adminDataCache);
-                    renderAdminOverviewTrend(adminFilteredData);
-                })
-                .catch((error) => {
-                    console.error(error);
-                    tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-red-500">Error loading data.</td></tr>';
-                });
-        }
-
-        function renderAdminTable(data) {
-            const tbody = document.getElementById('adminTableBody');
-            if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No logs found.</td></tr>';
-                return;
-            }
-            const reversedData = [...data].reverse();
-            tbody.innerHTML = reversedData.map(row => {
-                const timeStr = formatTimestamp(row.timestamp);
-                const encodedName = encodeURIComponent(row.studentName || 'Unknown');
-                return `
-                <tr class="hover:bg-school-gold/10 transition-colors border-b border-gray-100 dark:border-gray-800">
-                    <td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-gray-500">${timeStr}</td>
-                    <td class="px-4 py-3 font-bold text-gray-800 dark:text-gray-200">${row.studentName || 'Unknown'}</td>
-                    <td class="px-4 py-3">
-                        <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${row.action === 'Check In' ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-800'}">
-                            ${row.action}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 text-xs">${row.site}</td>
-                    <td class="px-4 py-3 text-center">
-                        <a href="https://www.google.com/maps/search/?api=1&query=${row.lat},${row.lng}" target="_blank" class="text-blue-500 hover:text-blue-700">
-                            <i class="fas fa-map-marker-alt"></i>
-                        </a>
-                    </td>
-                    <td class="px-4 py-3 text-center">
-                        <button onclick="openStudentDetailByEncoded('${encodedName}')" class="px-2 py-1 rounded bg-school-red text-white text-[10px] font-bold uppercase tracking-wide hover:bg-red-800">
-                            Detail
-                        </button>
-                    </td>
-                </tr>
-                `;
-            }).join('');
-        }
-
-        function calculateDailyStats(data) {
-            if (!data) return;
-            const today = new Date().toLocaleDateString();
-            const todaysLogs = data.filter(row => {
-                try {
-                    const rowDate = new Date(row.timestamp).toLocaleDateString();
-                    return rowDate === today;
-                } catch (e) {
-                    return false;
-                }
-            });
-            todaysLogs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-            const checkedInStudents = new Set();
-            const checkedOutStudents = new Set();
-            const activeStudents = new Set();
-            const lastActionMap = {};
-
-            todaysLogs.forEach(log => {
-                const name = log.studentName;
-                activeStudents.add(name);
-                if (log.action === 'Check In') {
-                    checkedInStudents.add(name);
-                    lastActionMap[name] = 'Check In';
-                } else if (log.action === 'Check Out') {
-                    checkedOutStudents.add(name);
-                    lastActionMap[name] = 'Check Out';
-                }
-            });
-
-            const pendingCount = Object.values(lastActionMap).filter(action => action === 'Check In').length;
-            document.getElementById('stat-checkin').innerText = checkedInStudents.size;
-            document.getElementById('stat-checkout').innerText = checkedOutStudents.size;
-            document.getElementById('stat-pending').innerText = pendingCount;
-            document.getElementById('stat-absent').innerText = activeStudents.size;
-        }
-
-        function filterAdminData() {
-            const query = document.getElementById('adminSearch').value.toLowerCase();
-            if (!adminDataCache) return;
-            adminFilteredData = adminDataCache.filter(row => {
-                return Object.values(row).some(val => 
-                    String(val).toLowerCase().includes(query)
-                );
-            });
-            renderAdminTable(adminFilteredData);
-            renderAdminOverviewTrend(adminFilteredData);
-        }
-
-        function buildCoordsText(row) {
-            if (!row.lat || !row.lng) return '-';
-            return `${row.lat}, ${row.lng}`;
-        }
-
-        function populatePrintReport(studentName, shifts, title) {
-            const summary = computeStudentSummary(shifts);
-            document.getElementById('printReportTitle').innerText = title;
-            document.getElementById('printReportSubtitle').innerText = 'Intern Track Student Detail Log';
-            document.getElementById('printStudentName').innerText = studentName;
-            document.getElementById('printGeneratedAt').innerText = new Date().toLocaleString();
-            document.getElementById('printTotalShifts').innerText = shifts.length;
-            document.getElementById('printHoursLogged').innerText = summary.hours.toFixed(1);
-
-            const tbody = document.getElementById('printShiftBody');
-            if (!shifts.length) {
-                tbody.innerHTML = '<tr><td colspan="4">No shifts found.</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = shifts.map((row) => `
-                <tr class="print-row">
-                    <td>${formatTimestamp(row.timestamp)}</td>
-                    <td>${row.action || '-'}</td>
-                    <td>${row.site || '-'}</td>
-                    <td>${buildCoordsText(row)}</td>
-                </tr>
-            `).join('');
-        }
-
-        function printStudentReport(mode) {
-            if (!currentStudentDetail) return;
-            const allShifts = currentStudentDetail.shifts;
-            const shifts = mode === 'all' ? allShifts : (studentShiftViewMode === 'all' ? allShifts : allShifts.slice(0, RECENT_SHIFT_LIMIT));
-            const title = mode === 'all' ? 'Student Shift Report | All Shifts' : 'Student Shift Report';
-            populatePrintReport(currentStudentDetail.studentName, shifts, title);
-            document.body.classList.add('printing-student-report');
-            window.print();
-        }
-
-        async function exportElementToPdf(element, fileName) {
-            const elementWasHidden = element.classList.contains('hidden');
-            if (elementWasHidden) element.classList.remove('hidden');
-            const canvas = await html2canvas(element, {
-                scale: 2,
-                backgroundColor: '#ffffff',
-                useCORS: true,
-                onclone: (doc) => {
-                    doc.body.classList.add('pdf-mode');
-                }
-            });
-            if (elementWasHidden) element.classList.add('hidden');
-
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'pt', 'letter');
-            const margin = 24;
-            const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
-            const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
-            const imageData = canvas.toDataURL('image/png');
-            const scaledHeight = (canvas.height * pageWidth) / canvas.width;
-
-            let remaining = scaledHeight;
-            let offset = 0;
-            while (remaining > 0) {
-                if (offset > 0) pdf.addPage();
-                pdf.addImage(imageData, 'PNG', margin, margin - offset, pageWidth, scaledHeight, undefined, 'FAST');
-                remaining -= pageHeight;
-                offset += pageHeight;
-            }
-            pdf.save(fileName);
-        }
-
-        function populateAdminPdfReport(data) {
-            document.getElementById('adminPdfGeneratedAt').innerText = `Generated: ${new Date().toLocaleString()}`;
-            document.getElementById('adminPdfCheckin').innerText = document.getElementById('stat-checkin').innerText;
-            document.getElementById('adminPdfCheckout').innerText = document.getElementById('stat-checkout').innerText;
-            document.getElementById('adminPdfPending').innerText = document.getElementById('stat-pending').innerText;
-            document.getElementById('adminPdfActive').innerText = document.getElementById('stat-absent').innerText;
-
-            const trendImage = document.getElementById('adminPdfTrendImage');
-            const overviewChart = chartInstances.adminOverviewTrendChart;
-            if (overviewChart) {
-                trendImage.src = overviewChart.toBase64Image('image/png', 1);
-            } else {
-                trendImage.removeAttribute('src');
-            }
-
-            const rows = [...data].reverse().slice(0, 70);
-            const body = document.getElementById('adminPdfTableBody');
-            body.innerHTML = rows.map((row) => `
-                <tr>
-                    <td class="border p-1">${formatTimestamp(row.timestamp)}</td>
-                    <td class="border p-1">${row.studentName || 'Unknown'}</td>
-                    <td class="border p-1">${row.action || '-'}</td>
-                    <td class="border p-1">${row.site || '-'}</td>
-                </tr>
-            `).join('');
-        }
-
-        async function downloadAdminPdf() {
-            const btn = document.getElementById('adminPdfButton');
-            const exportData = adminFilteredData.length ? adminFilteredData : adminDataCache;
-            if (!exportData.length) {
-                alert('No admin data available to export.');
-                return;
-            }
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Building PDF...';
-            try {
-                populateAdminPdfReport(exportData);
-                await exportElementToPdf(
-                    document.getElementById('adminPdfReport'),
-                    `admin-dashboard-${new Date().toISOString().slice(0, 10)}.pdf`
-                );
-            } catch (error) {
-                console.error(error);
-                alert('Admin PDF export failed. Please try again.');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-file-pdf"></i> Download PDF';
-            }
-        }
-
-        function populateStudentPdfReport() {
-            if (!currentStudentDetail) return;
-            const { studentName, shifts } = currentStudentDetail;
-            const summary = computeStudentSummary(shifts);
-            document.getElementById('studentPdfTitle').innerText = `${studentName} | Student Detail Report`;
-            document.getElementById('studentPdfSubtitle').innerText = `Generated: ${new Date().toLocaleString()}`;
-            document.getElementById('studentPdfCheckin').innerText = summary.checkins;
-            document.getElementById('studentPdfCheckout').innerText = summary.checkouts;
-            document.getElementById('studentPdfPending').innerText = summary.pending;
-            document.getElementById('studentPdfHours').innerText = summary.hours.toFixed(1);
-            document.getElementById('studentPdfTableBody').innerHTML = shifts.map((row) => `
-                <tr>
-                    <td class="border p-1">${formatTimestamp(row.timestamp)}</td>
-                    <td class="border p-1">${row.action || '-'}</td>
-                    <td class="border p-1">${row.site || '-'}</td>
-                    <td class="border p-1">${buildCoordsText(row)}</td>
-                </tr>
-            `).join('');
-        }
-
-        async function downloadStudentPdf() {
-            if (!currentStudentDetail) return;
-            try {
-                populateStudentPdfReport();
-                await exportElementToPdf(
-                    document.getElementById('studentPdfReport'),
-                    `${currentStudentDetail.studentName.replace(/\s+/g, '-').toLowerCase()}-detail-report.pdf`
-                );
-            } catch (error) {
-                console.error(error);
-                alert('Student PDF export failed. Please try again.');
-            }
-        }
-    </script>
+  <script type="module" src="assets/js/app.js"></script>
 </body>
 </html>
