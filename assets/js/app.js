@@ -142,6 +142,7 @@ const dom = {
   shiftEditSaveBtn: document.getElementById("shiftEditSaveBtn"),
   shiftEditCancelBtn: document.getElementById("shiftEditCancelBtn"),
   shiftEditDeleteBtn: document.getElementById("shiftEditDeleteBtn"),
+  shiftEditFailedCheckout: document.getElementById("shiftEditFailedCheckout"),
   reportModal: document.getElementById("reportModal"),
   reportTitleText: document.getElementById("reportTitleText"),
   reportStage: document.getElementById("reportStage"),
@@ -623,6 +624,16 @@ function bindEvents() {
         executeDeleteShift();
       } else {
         dom.shiftEditDialog.setAttribute("data-confirming-delete", "");
+      }
+    });
+  }
+  if (dom.shiftEditFailedCheckout) {
+    dom.shiftEditFailedCheckout.addEventListener("change", () => {
+      if (dom.shiftEditFailedCheckout.checked && !dom.shiftEditCheckOut.value) {
+        const localDate = dom.shiftEditDialog.dataset.localDate;
+        if (localDate) {
+          dom.shiftEditCheckOut.value = `${localDate}T16:30`;
+        }
       }
     });
   }
@@ -1702,6 +1713,7 @@ function renderRecentShiftsRows(rows) {
           data-check-out="${escapeHtml(row.checkOutUtc || "")}"
           data-local-date="${escapeHtml(row.localDate || "")}"
           data-site="${escapeHtml(row.site || "")}"
+          data-status="${escapeHtml(row.status || "")}"
           type="button">Edit</button>
       </td>
     </tr>
@@ -3084,9 +3096,11 @@ function utcToDatetimeLocal(utcString) {
 
 function openShiftEditDialog(shiftData) {
   dom.shiftEditDialog.removeAttribute("data-confirming-delete");
+  dom.shiftEditDialog.dataset.localDate = shiftData.localDate || "";
   dom.shiftEditMeta.textContent = `${shiftData.localDate || ""} · ${shiftData.site || "Unknown site"}`;
   dom.shiftEditCheckIn.value = utcToDatetimeLocal(shiftData.checkIn);
   dom.shiftEditCheckOut.value = utcToDatetimeLocal(shiftData.checkOut);
+  dom.shiftEditFailedCheckout.checked = shiftData.status === "FAILED_TO_CHECKOUT";
   dom.shiftEditSaveBtn.dataset.shiftId = shiftData.shiftId || "";
   dom.shiftEditSaveBtn.dataset.studentId = shiftData.studentId || "";
   dom.shiftEditDialog.showModal();
@@ -3123,10 +3137,11 @@ async function saveShiftEdit() {
 
   const checkInUtc = new Date(checkInLocal).toISOString();
   const checkOutUtc = checkOutLocal ? new Date(checkOutLocal).toISOString() : "";
+  const failedToCheckout = dom.shiftEditFailedCheckout.checked;
 
   dom.shiftEditSaveBtn.disabled = true;
   try {
-    await fetchAdminEditShift({ token: state.admin.token, shiftId, studentId, checkInUtc, checkOutUtc });
+    await fetchAdminEditShift({ token: state.admin.token, shiftId, studentId, checkInUtc, checkOutUtc, failedToCheckout });
     dom.shiftEditDialog.close();
     showToast("Shift updated.", "success");
     await openStudentDetail(studentId);
@@ -3173,7 +3188,8 @@ function bindStudentDetailActions(detail) {
         checkIn: btn.dataset.checkIn,
         checkOut: btn.dataset.checkOut,
         localDate: btn.dataset.localDate,
-        site: btn.dataset.site
+        site: btn.dataset.site,
+        status: btn.dataset.status
       });
     });
   });

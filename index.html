@@ -606,7 +606,11 @@
     <label class="stat-label" for="shiftEditCheckIn">Check-In Time</label>
     <input id="shiftEditCheckIn" class="ios-input" type="datetime-local" style="display:block;width:100%;margin-bottom:14px;">
     <label class="stat-label" for="shiftEditCheckOut">Check-Out Time <span class="metric-copy">(leave blank if shift is still open)</span></label>
-    <input id="shiftEditCheckOut" class="ios-input" type="datetime-local" style="display:block;width:100%;margin-bottom:22px;">
+    <input id="shiftEditCheckOut" class="ios-input" type="datetime-local" style="display:block;width:100%;margin-bottom:14px;">
+    <label class="shift-edit-checkbox-label" for="shiftEditFailedCheckout">
+      <input id="shiftEditFailedCheckout" type="checkbox">
+      Student failed to check out — award 0 checkout points
+    </label>
     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;">
       <button id="shiftEditDeleteBtn" class="ios-button destructive" type="button">Delete Entry</button>
       <div style="display:flex;gap:8px;">

@@ -1723,6 +1723,16 @@ details[open] .chevron-icon {
   padding: 4px 8px;
 }
 
+.shift-edit-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+
 .shift-edit-dialog[data-confirming-delete] #shiftEditDeleteBtn::before {
   content: "Confirm? \2192  ";
 }

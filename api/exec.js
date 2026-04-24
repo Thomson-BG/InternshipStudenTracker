@@ -605,6 +605,7 @@ async function handleAdminEditShift(req, res, sql) {
   const studentId = normalizeStudentId(stringify(body.studentId));
   const checkInUtc = stringify(body.checkInUtc).trim();
   const checkOutUtc = stringify(body.checkOutUtc || "").trim();
+  const failedToCheckout = Boolean(body.failedToCheckout);
 
   await requireAdminToken(sql, token);
 
@@ -626,10 +627,12 @@ async function handleAdminEditShift(req, res, sql) {
     if (checkOutDate.getTime() <= checkInDate.getTime()) {
       return jsonResponse(res, errorPayload(RESPONSE_CODES.invalidPayload, "Check-out must be after check-in."));
     }
-    const diffMinutes = (checkOutDate.getTime() - checkInDate.getTime()) / 60000;
-    if (diffMinutes < CONFIG.minMinutesBetweenInOut) {
-      return jsonResponse(res, errorPayload(RESPONSE_CODES.cooldownNotMet,
-        `Minimum ${CONFIG.minMinutesBetweenInOut} minutes required between check-in and check-out.`));
+    if (!failedToCheckout) {
+      const diffMinutes = (checkOutDate.getTime() - checkInDate.getTime()) / 60000;
+      if (diffMinutes < CONFIG.minMinutesBetweenInOut) {
+        return jsonResponse(res, errorPayload(RESPONSE_CODES.cooldownNotMet,
+          `Minimum ${CONFIG.minMinutesBetweenInOut} minutes required between check-in and check-out.`));
+      }
     }
   }
 
@@ -651,8 +654,13 @@ async function handleAdminEditShift(req, res, sql) {
     if (checkOutDate) {
       durationMinutes = Math.max(0, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / 60000));
       hoursDecimal = Math.round((durationMinutes / 60) * 100) / 100;
-      checkOutPoints = eligibleForPoints ? CONFIG.pointsPerAction : 0;
-      status = eligibleForPoints ? "COMPLETE" : "BACKFILLED_COMPLETE";
+      if (failedToCheckout) {
+        checkOutPoints = 0;
+        status = "FAILED_TO_CHECKOUT";
+      } else {
+        checkOutPoints = eligibleForPoints ? CONFIG.pointsPerAction : 0;
+        status = eligibleForPoints ? "COMPLETE" : "BACKFILLED_COMPLETE";
+      }
     }
 
     const updatedShift = {

@@ -1245,11 +1245,11 @@ export async function fetchAdminDeleteShift({ token, shiftId, studentId }) {
   });
 }
 
-export async function fetchAdminEditShift({ token, shiftId, studentId, checkInUtc, checkOutUtc }) {
+export async function fetchAdminEditShift({ token, shiftId, studentId, checkInUtc, checkOutUtc, failedToCheckout }) {
   return requestJson(`${API_ENDPOINTS.submit}?mode=admin_edit_shift`, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ token, shiftId, studentId, checkInUtc, checkOutUtc: checkOutUtc || "" })
+    body: JSON.stringify({ token, shiftId, studentId, checkInUtc, checkOutUtc: checkOutUtc || "", failedToCheckout: Boolean(failedToCheckout) })
   });
 }
 
