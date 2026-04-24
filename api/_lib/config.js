@@ -4,7 +4,9 @@ const CONFIG = {
   pointsPerAction: 5,
   minMinutesBetweenInOut: 60,
   adminSessionHours: 8,
-  defaultAdminPasswordHash: "79f0da1b920dade97eb4e9e02df79a606c265d69349a600a65c0d4e289feaa44"
+  defaultAdminPasswordHash: "79f0da1b920dade97eb4e9e02df79a606c265d69349a600a65c0d4e289feaa44",
+  autoCheckoutHour: 16,
+  autoCheckoutMinute: 30
 };
 
 const RANGE_KEYS = ["week", "month", "overall"];

@@ -11,6 +11,7 @@ import {
 import {
   adminAuth,
   fetchAdminDashboard,
+  fetchAdminDeleteShift,
   fetchAdminEditShift,
   fetchReportData,
   fetchRoster,
@@ -140,6 +141,7 @@ const dom = {
   shiftEditMeta: document.getElementById("shiftEditMeta"),
   shiftEditSaveBtn: document.getElementById("shiftEditSaveBtn"),
   shiftEditCancelBtn: document.getElementById("shiftEditCancelBtn"),
+  shiftEditDeleteBtn: document.getElementById("shiftEditDeleteBtn"),
   reportModal: document.getElementById("reportModal"),
   reportTitleText: document.getElementById("reportTitleText"),
   reportStage: document.getElementById("reportStage"),
@@ -610,7 +612,19 @@ function bindEvents() {
     dom.shiftEditSaveBtn.addEventListener("click", saveShiftEdit);
   }
   if (dom.shiftEditCancelBtn) {
-    dom.shiftEditCancelBtn.addEventListener("click", () => dom.shiftEditDialog.close());
+    dom.shiftEditCancelBtn.addEventListener("click", () => {
+      dom.shiftEditDialog.removeAttribute("data-confirming-delete");
+      dom.shiftEditDialog.close();
+    });
+  }
+  if (dom.shiftEditDeleteBtn) {
+    dom.shiftEditDeleteBtn.addEventListener("click", () => {
+      if (dom.shiftEditDialog.hasAttribute("data-confirming-delete")) {
+        executeDeleteShift();
+      } else {
+        dom.shiftEditDialog.setAttribute("data-confirming-delete", "");
+      }
+    });
   }
   dom.adminRangeSelect.addEventListener("change", () => {
     state.admin.range = dom.adminRangeSelect.value;
@@ -3069,12 +3083,31 @@ function utcToDatetimeLocal(utcString) {
 }
 
 function openShiftEditDialog(shiftData) {
+  dom.shiftEditDialog.removeAttribute("data-confirming-delete");
   dom.shiftEditMeta.textContent = `${shiftData.localDate || ""} · ${shiftData.site || "Unknown site"}`;
   dom.shiftEditCheckIn.value = utcToDatetimeLocal(shiftData.checkIn);
   dom.shiftEditCheckOut.value = utcToDatetimeLocal(shiftData.checkOut);
   dom.shiftEditSaveBtn.dataset.shiftId = shiftData.shiftId || "";
   dom.shiftEditSaveBtn.dataset.studentId = shiftData.studentId || "";
   dom.shiftEditDialog.showModal();
+}
+
+async function executeDeleteShift() {
+  const shiftId = dom.shiftEditSaveBtn.dataset.shiftId;
+  const studentId = dom.shiftEditSaveBtn.dataset.studentId;
+  dom.shiftEditDeleteBtn.disabled = true;
+  try {
+    await fetchAdminDeleteShift({ token: state.admin.token, shiftId, studentId });
+    dom.shiftEditDialog.close();
+    dom.shiftEditDialog.removeAttribute("data-confirming-delete");
+    showToast("Shift deleted.", "success");
+    await openStudentDetail(studentId);
+    loadAdminDashboard({ silent: true });
+  } catch (error) {
+    showToast(error.message || "Failed to delete shift.", "danger");
+  } finally {
+    dom.shiftEditDeleteBtn.disabled = false;
+  }
 }
 
 async function saveShiftEdit() {

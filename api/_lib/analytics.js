@@ -163,7 +163,7 @@ function aggregateMetricsByStudent(shifts, studentDirectory) {
     if (shift.status === "OPEN") {
       target.openShifts += 1;
     }
-    if (shift.status === "EXCEPTION") {
+    if (shift.status === "EXCEPTION" || shift.status === "FAILED_TO_CHECKOUT") {
       target.exceptionCount += 1;
     }
     target.activityDays += 1;
@@ -234,7 +234,7 @@ function summarizeRange(shifts, rankedList) {
     if (shift.status === "OPEN") {
       openShifts += 1;
     }
-    if (shift.status === "EXCEPTION") {
+    if (shift.status === "EXCEPTION" || shift.status === "FAILED_TO_CHECKOUT") {
       exceptionCount += 1;
     }
   });
@@ -499,16 +499,22 @@ function buildExceptionBreakdown(shifts) {
   ];
 }
 
+function exceptionMessage(shift) {
+  if (shift.status === "OPEN") return "Check-out still missing for this day.";
+  if (shift.status === "FAILED_TO_CHECKOUT") return "Auto-checked out at end of day — student did not check out.";
+  return shift.notes || "Shift needs review.";
+}
+
 function buildStudentExceptions(studentShifts) {
   return studentShifts
-    .filter((shift) => shift.status === "EXCEPTION" || shift.status === "OPEN")
+    .filter((shift) => shift.status === "EXCEPTION" || shift.status === "OPEN" || shift.status === "FAILED_TO_CHECKOUT")
     .sort(sortShiftsDesc)
     .slice(0, 10)
     .map((shift) => ({
       localDate: shift.localDate,
       status: shift.status,
       site: shift.site,
-      message: shift.status === "OPEN" ? "Check-out still missing for this day." : (shift.notes || "Shift needs review."),
+      message: exceptionMessage(shift),
       checkInUtc: shift.checkInUtc,
       checkOutUtc: shift.checkOutUtc
     }));
@@ -516,7 +522,7 @@ function buildStudentExceptions(studentShifts) {
 
 function buildAdminExceptions(shifts) {
   return shifts
-    .filter((shift) => shift.status === "EXCEPTION" || shift.status === "OPEN")
+    .filter((shift) => shift.status === "EXCEPTION" || shift.status === "OPEN" || shift.status === "FAILED_TO_CHECKOUT")
     .sort(sortShiftsDesc)
     .slice(0, 20)
     .map((shift) => ({
@@ -525,7 +531,7 @@ function buildAdminExceptions(shifts) {
       localDate: shift.localDate,
       status: shift.status,
       site: shift.site,
-      message: shift.status === "OPEN" ? "Checkout still missing." : (shift.notes || "Shift needs review."),
+      message: exceptionMessage(shift),
       lastActivityUtc: shift.checkOutUtc || shift.checkInUtc || ""
     }));
 }
@@ -558,7 +564,7 @@ function buildTodaySummary(allShifts, site) {
     } else if (shift.status === "OPEN") {
       openShifts += 1;
       checkedInNow[shift.studentId] = true;
-    } else if (shift.status === "EXCEPTION") {
+    } else if (shift.status === "EXCEPTION" || shift.status === "FAILED_TO_CHECKOUT") {
       exceptions += 1;
     }
   });

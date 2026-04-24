@@ -405,6 +405,22 @@ async function findShiftById(sql, shiftId) {
   return rows.length ? mapShiftRow(rows[0]) : null;
 }
 
+async function deleteShift(sql, shiftId) {
+  await sql`DELETE FROM shifts WHERE shift_id = ${shiftId}`;
+}
+
+async function listOpenShiftsForDate(sql, localDate) {
+  const rows = await sql`
+    SELECT shift_id, local_date, student_id, student_name, site, check_in_utc, check_out_utc,
+           duration_minutes, hours_decimal, check_in_points, check_out_points, total_points,
+           status, source, notes
+    FROM shifts
+    WHERE local_date = ${localDate}
+      AND status = 'OPEN'
+  `;
+  return rows.map(mapShiftRow);
+}
+
 async function upsertShift(sql, shift) {
   await sql`
     INSERT INTO shifts (
@@ -547,9 +563,11 @@ module.exports = {
   cleanupExpiredSessions,
   closeSql,
   createAdminSession,
+  deleteShift,
   findRosterStudent,
   findShiftById,
   findShiftForDayForUpdate,
+  listOpenShiftsForDate,
   getSql,
   initSchema,
   insertLog,

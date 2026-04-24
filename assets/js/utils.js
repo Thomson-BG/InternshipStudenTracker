@@ -105,6 +105,7 @@ export function statusTone(status) {
   if (["COMPLETE", "BACKFILLED_COMPLETE", "COMPLETED"].includes(status)) return "success";
   if (["CHECKED_IN", "OPEN"].includes(status)) return "warning";
   if (["EXCEPTION", "AUTH_REQUIRED", "ALREADY_CHECKED_IN", "ALREADY_CHECKED_OUT", "INVALID_CREDENTIALS"].includes(status)) return "danger";
+  if (status === "FAILED_TO_CHECKOUT") return "blue";
   return "info";
 }
 

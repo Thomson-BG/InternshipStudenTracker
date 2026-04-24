@@ -1616,6 +1616,12 @@ details[open] .chevron-icon {
   color: var(--primary);
 }
 
+.table-chip[data-tone="blue"],
+.inline-badge[data-tone="blue"] {
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  color: #3b82f6;
+}
+
 .table-link {
   border: 0;
   background: transparent;
@@ -1715,6 +1721,15 @@ details[open] .chevron-icon {
 .shift-edit-btn {
   font-size: 0.75rem;
   padding: 4px 8px;
+}
+
+.shift-edit-dialog[data-confirming-delete] #shiftEditDeleteBtn::before {
+  content: "Confirm? \2192  ";
+}
+
+.shift-edit-dialog[data-confirming-delete] #shiftEditSaveBtn {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .drawer-handle {

@@ -1237,6 +1237,14 @@ export async function fetchPoints(token) {
   return requestJson(API_ENDPOINTS.points(token));
 }
 
+export async function fetchAdminDeleteShift({ token, shiftId, studentId }) {
+  return requestJson(`${API_ENDPOINTS.submit}?mode=admin_delete_shift`, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ token, shiftId, studentId })
+  });
+}
+
 export async function fetchAdminEditShift({ token, shiftId, studentId, checkInUtc, checkOutUtc }) {
   return requestJson(`${API_ENDPOINTS.submit}?mode=admin_edit_shift`, {
     method: "POST",

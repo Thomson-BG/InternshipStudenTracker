@@ -12,6 +12,7 @@ const {
   appendAudit,
   buildMaterializedState,
   createAdminSession,
+  deleteShift,
   findRosterStudent,
   findShiftById,
   findShiftForDayForUpdate,
@@ -561,6 +562,42 @@ async function handleGet(req, res, sql) {
   return jsonResponse(res, errorPayload(RESPONSE_CODES.invalidMode, `Unsupported mode: ${mode}`));
 }
 
+async function handleAdminDeleteShift(req, res, sql) {
+  const body = await parseJsonBody(req);
+  const token = stringify(body.token);
+  const shiftId = stringify(body.shiftId).trim();
+  const studentId = normalizeStudentId(stringify(body.studentId));
+
+  await requireAdminToken(sql, token);
+  if (!shiftId || !studentId) {
+    return jsonResponse(res, errorPayload(RESPONSE_CODES.missingField, "shiftId and studentId are required."));
+  }
+
+  const txResult = await sql.begin(async (tx) => {
+    const existing = await findShiftById(tx, shiftId);
+    if (!existing || existing.studentId !== studentId) {
+      return { error: { code: RESPONSE_CODES.invalidPayload, message: "Shift not found for this student." } };
+    }
+    await deleteShift(tx, shiftId);
+    await upsertPointsForStudent(tx, studentId, existing.studentName);
+    await appendAudit(tx, {
+      actorType: "ADMIN",
+      studentId,
+      action: "Admin Delete Shift",
+      outcomeCode: "SHIFT_DELETED",
+      message: `Deleted shift ${shiftId} (${existing.localDate}, ${existing.site}).`,
+      site: existing.site,
+      metadata: { shiftId }
+    });
+    return { ok: true };
+  });
+
+  if (txResult.error) {
+    return jsonResponse(res, errorPayload(txResult.error.code, txResult.error.message));
+  }
+  return jsonResponse(res, { ok: true });
+}
+
 async function handleAdminEditShift(req, res, sql) {
   const body = await parseJsonBody(req);
   const token = stringify(body.token);
@@ -674,6 +711,9 @@ module.exports = async function handler(req, res) {
       }
       if (mode === "admin_edit_shift") {
         return await handleAdminEditShift(req, res, sql);
+      }
+      if (mode === "admin_delete_shift") {
+        return await handleAdminDeleteShift(req, res, sql);
       }
       return await handleAttendancePost(req, res, sql);
     }
