@@ -11,6 +11,7 @@ import {
 import {
   adminAuth,
   fetchAdminDashboard,
+  fetchAdminEditShift,
   fetchReportData,
   fetchRoster,
   fetchStudentDashboard,
@@ -133,6 +134,12 @@ const dom = {
   closeDetailDrawerButton: document.getElementById("closeDetailDrawerButton"),
   detailDrawerTitle: document.getElementById("detailDrawerTitle"),
   detailDrawerContent: document.getElementById("detailDrawerContent"),
+  shiftEditDialog: document.getElementById("shiftEditDialog"),
+  shiftEditCheckIn: document.getElementById("shiftEditCheckIn"),
+  shiftEditCheckOut: document.getElementById("shiftEditCheckOut"),
+  shiftEditMeta: document.getElementById("shiftEditMeta"),
+  shiftEditSaveBtn: document.getElementById("shiftEditSaveBtn"),
+  shiftEditCancelBtn: document.getElementById("shiftEditCancelBtn"),
   reportModal: document.getElementById("reportModal"),
   reportTitleText: document.getElementById("reportTitleText"),
   reportStage: document.getElementById("reportStage"),
@@ -598,6 +605,12 @@ function bindEvents() {
   dom.adminRefreshButton.addEventListener("click", loadAdminDashboard);
   if (dom.adminLiveRefreshToggle) {
     dom.adminLiveRefreshToggle.addEventListener("click", toggleLiveRefresh);
+  }
+  if (dom.shiftEditSaveBtn) {
+    dom.shiftEditSaveBtn.addEventListener("click", saveShiftEdit);
+  }
+  if (dom.shiftEditCancelBtn) {
+    dom.shiftEditCancelBtn.addEventListener("click", () => dom.shiftEditDialog.close());
   }
   dom.adminRangeSelect.addEventListener("change", () => {
     state.admin.range = dom.adminRangeSelect.value;
@@ -1657,7 +1670,7 @@ function buildRecentPacificDays(count) {
 
 function renderRecentShiftsRows(rows) {
   if (!rows.length) {
-    return `<tr><td colspan="5" class="empty-copy">No shifts yet.</td></tr>`;
+    return `<tr><td colspan="6" class="empty-copy">No shifts yet.</td></tr>`;
   }
   return rows.map((row) => `
     <tr>
@@ -1666,6 +1679,17 @@ function renderRecentShiftsRows(rows) {
       <td><span class="table-chip" data-tone="${escapeHtml(statusTone(row.status))}">${escapeHtml(row.status || "-")}</span></td>
       <td>${escapeHtml(formatHours(row.hoursDecimal || 0))}</td>
       <td>${escapeHtml(formatPoints(row.totalPoints || 0))}</td>
+      <td>
+        <button class="ios-button secondary shift-edit-btn"
+          data-shift-edit
+          data-shift-id="${escapeHtml(row.shiftId || "")}"
+          data-student-id="${escapeHtml(row.studentId || "")}"
+          data-check-in="${escapeHtml(row.checkInUtc || "")}"
+          data-check-out="${escapeHtml(row.checkOutUtc || "")}"
+          data-local-date="${escapeHtml(row.localDate || "")}"
+          data-site="${escapeHtml(row.site || "")}"
+          type="button">Edit</button>
+      </td>
     </tr>
   `).join("");
 }
@@ -3032,6 +3056,55 @@ async function openStudentDetail(studentId) {
   }
 }
 
+function utcToDatetimeLocal(utcString) {
+  if (!utcString) {
+    return "";
+  }
+  const d = new Date(utcString);
+  if (isNaN(d.getTime())) {
+    return "";
+  }
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function openShiftEditDialog(shiftData) {
+  dom.shiftEditMeta.textContent = `${shiftData.localDate || ""} · ${shiftData.site || "Unknown site"}`;
+  dom.shiftEditCheckIn.value = utcToDatetimeLocal(shiftData.checkIn);
+  dom.shiftEditCheckOut.value = utcToDatetimeLocal(shiftData.checkOut);
+  dom.shiftEditSaveBtn.dataset.shiftId = shiftData.shiftId || "";
+  dom.shiftEditSaveBtn.dataset.studentId = shiftData.studentId || "";
+  dom.shiftEditDialog.showModal();
+}
+
+async function saveShiftEdit() {
+  const shiftId = dom.shiftEditSaveBtn.dataset.shiftId;
+  const studentId = dom.shiftEditSaveBtn.dataset.studentId;
+  const checkInLocal = dom.shiftEditCheckIn.value;
+  const checkOutLocal = dom.shiftEditCheckOut.value;
+
+  if (!checkInLocal) {
+    showToast("Check-in time is required.", "danger");
+    return;
+  }
+
+  const checkInUtc = new Date(checkInLocal).toISOString();
+  const checkOutUtc = checkOutLocal ? new Date(checkOutLocal).toISOString() : "";
+
+  dom.shiftEditSaveBtn.disabled = true;
+  try {
+    await fetchAdminEditShift({ token: state.admin.token, shiftId, studentId, checkInUtc, checkOutUtc });
+    dom.shiftEditDialog.close();
+    showToast("Shift updated.", "success");
+    await openStudentDetail(studentId);
+    loadAdminDashboard({ silent: true });
+  } catch (error) {
+    showToast(error.message || "Failed to update shift.", "danger");
+  } finally {
+    dom.shiftEditSaveBtn.disabled = false;
+  }
+}
+
 function bindStudentDetailActions(detail) {
   const studentId = detail?.student?.studentId || state.admin.selectedStudent?.studentId || "";
   dom.detailDrawerContent.querySelector("[data-detail-print]")?.addEventListener("click", () => {
@@ -3058,6 +3131,18 @@ function bindStudentDetailActions(detail) {
   });
   dom.detailDrawerContent.querySelector("[data-detail-history-scope='all']")?.addEventListener("click", () => {
     setStudentDetailHistoryScope(detail, "all");
+  });
+  dom.detailDrawerContent.querySelectorAll("[data-shift-edit]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      openShiftEditDialog({
+        shiftId: btn.dataset.shiftId,
+        studentId: btn.dataset.studentId,
+        checkIn: btn.dataset.checkIn,
+        checkOut: btn.dataset.checkOut,
+        localDate: btn.dataset.localDate,
+        site: btn.dataset.site
+      });
+    });
   });
 }
 
@@ -3182,7 +3267,7 @@ function detailDrawerMarkup(detail, historyScope = "recent") {
       <div class="card-header"><div><div class="card-label">Recent Shifts</div><h3 class="card-title">Detail log</h3></div></div>
       <div class="data-table-wrap">
         <table class="data-table">
-          <thead><tr><th>Date</th><th>Site</th><th>Status</th><th>Hours</th><th>Points</th></tr></thead>
+          <thead><tr><th>Date</th><th>Site</th><th>Status</th><th>Hours</th><th>Points</th><th></th></tr></thead>
           <tbody>${renderRecentShiftsRows(shifts)}</tbody>
         </table>
       </div>

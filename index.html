@@ -599,6 +599,20 @@
   </aside>
   <div id="drawerOverlay" class="drawer-overlay"></div>
 
+  <!-- ========== SHIFT EDIT DIALOG ========== -->
+  <dialog id="shiftEditDialog" class="shift-edit-dialog">
+    <h3 class="drawer-title" style="margin-bottom:10px;">Edit Shift</h3>
+    <p id="shiftEditMeta" class="metric-copy" style="margin-bottom:16px;"></p>
+    <label class="stat-label" for="shiftEditCheckIn">Check-In Time</label>
+    <input id="shiftEditCheckIn" class="ios-input" type="datetime-local" style="display:block;width:100%;margin-bottom:14px;">
+    <label class="stat-label" for="shiftEditCheckOut">Check-Out Time <span class="metric-copy">(leave blank if shift is still open)</span></label>
+    <input id="shiftEditCheckOut" class="ios-input" type="datetime-local" style="display:block;width:100%;margin-bottom:22px;">
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="shiftEditCancelBtn" class="ios-button secondary" type="button">Cancel</button>
+      <button id="shiftEditSaveBtn" class="ios-button accent" type="button">Save Changes</button>
+    </div>
+  </dialog>
+
   <!-- ========== STATS MODAL ========== -->
   <div id="statsModal" class="stats-modal-overlay">
     <div class="stats-modal-sheet">

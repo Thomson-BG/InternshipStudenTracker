@@ -13,6 +13,7 @@ const {
   buildMaterializedState,
   createAdminSession,
   findRosterStudent,
+  findShiftById,
   findShiftForDayForUpdate,
   getSql,
   initSchema,
@@ -560,6 +561,97 @@ async function handleGet(req, res, sql) {
   return jsonResponse(res, errorPayload(RESPONSE_CODES.invalidMode, `Unsupported mode: ${mode}`));
 }
 
+async function handleAdminEditShift(req, res, sql) {
+  const body = await parseJsonBody(req);
+  const token = stringify(body.token);
+  const shiftId = stringify(body.shiftId).trim();
+  const studentId = normalizeStudentId(stringify(body.studentId));
+  const checkInUtc = stringify(body.checkInUtc).trim();
+  const checkOutUtc = stringify(body.checkOutUtc || "").trim();
+
+  await requireAdminToken(sql, token);
+
+  if (!shiftId || !studentId || !checkInUtc) {
+    return jsonResponse(res, errorPayload(RESPONSE_CODES.missingField, "shiftId, studentId, and checkInUtc are required."));
+  }
+
+  const checkInDate = new Date(checkInUtc);
+  if (isNaN(checkInDate.getTime())) {
+    return jsonResponse(res, errorPayload(RESPONSE_CODES.invalidPayload, "Invalid checkInUtc timestamp."));
+  }
+
+  let checkOutDate = null;
+  if (checkOutUtc) {
+    checkOutDate = new Date(checkOutUtc);
+    if (isNaN(checkOutDate.getTime())) {
+      return jsonResponse(res, errorPayload(RESPONSE_CODES.invalidPayload, "Invalid checkOutUtc timestamp."));
+    }
+    if (checkOutDate.getTime() <= checkInDate.getTime()) {
+      return jsonResponse(res, errorPayload(RESPONSE_CODES.invalidPayload, "Check-out must be after check-in."));
+    }
+    const diffMinutes = (checkOutDate.getTime() - checkInDate.getTime()) / 60000;
+    if (diffMinutes < CONFIG.minMinutesBetweenInOut) {
+      return jsonResponse(res, errorPayload(RESPONSE_CODES.cooldownNotMet,
+        `Minimum ${CONFIG.minMinutesBetweenInOut} minutes required between check-in and check-out.`));
+    }
+  }
+
+  const txResult = await sql.begin(async (tx) => {
+    const existing = await findShiftById(tx, shiftId);
+    if (!existing || existing.studentId !== studentId) {
+      return { error: { code: RESPONSE_CODES.invalidPayload, message: "Shift not found for this student." } };
+    }
+
+    const localDate = existing.localDate;
+    const eligibleForPoints = localDate >= CONFIG.goLiveDate;
+    const checkInPoints = eligibleForPoints ? CONFIG.pointsPerAction : 0;
+
+    let checkOutPoints = 0;
+    let durationMinutes = 0;
+    let hoursDecimal = 0;
+    let status = "OPEN";
+
+    if (checkOutDate) {
+      durationMinutes = Math.max(0, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / 60000));
+      hoursDecimal = Math.round((durationMinutes / 60) * 100) / 100;
+      checkOutPoints = eligibleForPoints ? CONFIG.pointsPerAction : 0;
+      status = eligibleForPoints ? "COMPLETE" : "BACKFILLED_COMPLETE";
+    }
+
+    const updatedShift = {
+      ...existing,
+      checkInUtc,
+      checkOutUtc: checkOutUtc || "",
+      durationMinutes,
+      hoursDecimal,
+      checkInPoints,
+      checkOutPoints,
+      totalPoints: checkInPoints + checkOutPoints,
+      status,
+      source: "admin"
+    };
+
+    await upsertShift(tx, updatedShift);
+    await upsertPointsForStudent(tx, studentId, existing.studentName);
+    await appendAudit(tx, {
+      actorType: "ADMIN",
+      studentId,
+      action: "Admin Edit Shift",
+      outcomeCode: "SHIFT_EDITED",
+      message: `Shift ${shiftId}: check-in=${checkInUtc}, check-out=${checkOutUtc || "N/A"}`,
+      site: existing.site,
+      metadata: { shiftId, checkInUtc, checkOutUtc }
+    });
+
+    return { ok: true, shift: updatedShift };
+  });
+
+  if (txResult.error) {
+    return jsonResponse(res, errorPayload(txResult.error.code, txResult.error.message));
+  }
+  return jsonResponse(res, { ok: true, data: txResult.shift });
+}
+
 module.exports = async function handler(req, res) {
   try {
     applyCorsHeaders(res);
@@ -579,6 +671,9 @@ module.exports = async function handler(req, res) {
       const mode = parseMode(req);
       if (mode === "admin_auth") {
         return await handleAdminAuth(req, res, sql);
+      }
+      if (mode === "admin_edit_shift") {
+        return await handleAdminEditShift(req, res, sql);
       }
       return await handleAttendancePost(req, res, sql);
     }

@@ -395,6 +395,16 @@ async function findShiftForDayForUpdate(sql, studentId, localDate) {
   return mapShiftRow(rows[0]);
 }
 
+async function findShiftById(sql, shiftId) {
+  const rows = await sql`
+    SELECT shift_id, local_date, student_id, student_name, site, check_in_utc, check_out_utc, duration_minutes,
+           hours_decimal, check_in_points, check_out_points, total_points, status, source, notes
+    FROM shifts
+    WHERE shift_id = ${shiftId}
+  `;
+  return rows.length ? mapShiftRow(rows[0]) : null;
+}
+
 async function upsertShift(sql, shift) {
   await sql`
     INSERT INTO shifts (
@@ -538,6 +548,7 @@ module.exports = {
   closeSql,
   createAdminSession,
   findRosterStudent,
+  findShiftById,
   findShiftForDayForUpdate,
   getSql,
   initSchema,
