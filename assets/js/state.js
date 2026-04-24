@@ -68,8 +68,8 @@ export const state = {
     selectedStudent: null,
     selectedStudentDetail: null,
     selectedStudentHistoryScope: "recent",
-    liveRefreshEnabled: false,
-    liveRefreshInterval: 10000,
+    liveRefreshEnabled: true,
+    liveRefreshInterval: 20000,
     liveRefreshTimer: null
   }
 };

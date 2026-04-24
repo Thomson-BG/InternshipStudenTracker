@@ -596,6 +596,9 @@ function bindEvents() {
     });
   }
   dom.adminRefreshButton.addEventListener("click", loadAdminDashboard);
+  if (dom.adminLiveRefreshToggle) {
+    dom.adminLiveRefreshToggle.addEventListener("click", toggleLiveRefresh);
+  }
   dom.adminRangeSelect.addEventListener("change", () => {
     state.admin.range = dom.adminRangeSelect.value;
     loadAdminDashboard();
@@ -1959,6 +1962,7 @@ async function handleAdminLogin() {
     renderAdminState();
     showToast("Admin session started.", "success");
     await loadAdminDashboard();
+    startLiveRefresh();
     finishPerf("ok");
   } catch (error) {
     finishPerf("error", {
@@ -2001,6 +2005,7 @@ function clearAdminSession() {
   state.admin.dataQuality = "";
   state.admin.selectedStudent = null;
   sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  stopLiveRefresh();
   renderAdminState();
 }
 
@@ -2011,7 +2016,7 @@ function startLiveRefresh() {
   state.admin.liveRefreshEnabled = true;
   state.admin.liveRefreshTimer = setInterval(async () => {
     if (state.admin.token && state.currentView === "admin") {
-      await loadAdminDashboard({ silent: true });
+      await loadAdminDashboard({ silent: true, retries: 1 });
     }
   }, state.admin.liveRefreshInterval);
 }
@@ -2049,6 +2054,12 @@ function renderAdminState() {
   dom.adminAuthBadge.dataset.tone = authenticated ? "success" : "warning";
   dom.adminLoginState.classList.toggle("is-hidden", authenticated);
   dom.adminContent.classList.toggle("is-hidden", !authenticated);
+  if (dom.adminLiveRefreshToggle) {
+    const on = state.admin.liveRefreshEnabled;
+    dom.adminLiveRefreshToggle.textContent = on ? "Auto-Refresh: On" : "Auto-Refresh: Off";
+    dom.adminLiveRefreshToggle.classList.toggle("accent", on);
+    dom.adminLiveRefreshToggle.classList.toggle("secondary", !on);
+  }
   syncAdminRecordsFilterControls();
   updateAdminRecordsButton();
   if (dom.adminStudentRecordsSection) {
@@ -2448,7 +2459,7 @@ async function toggleAdminStudentRecordsSection() {
   }
 }
 
-async function loadAdminDashboard(retries = 3) {
+async function loadAdminDashboard({ silent = false, retries = 3 } = {}) {
   if (!state.admin.token) {
     renderAdminState();
     return;
@@ -2456,9 +2467,11 @@ async function loadAdminDashboard(retries = 3) {
 
   state.admin.loading = true;
   state.admin.error = "";
-  renderAdminLoadingState(retries < 3 ? "Retrying admin analytics…" : "Loading admin analytics…");
+  if (!silent) {
+    renderAdminLoadingState("Loading admin analytics…");
+  }
 
-  const loaderToken = beginBlockingLoad("Loading dashboard…");
+  const loaderToken = silent ? null : beginBlockingLoad("Loading dashboard…");
   const finishPerf = startPerfTimer("admin_dashboard_load", {
     range: state.admin.range,
     site: state.admin.site
@@ -2523,7 +2536,9 @@ async function loadAdminDashboard(retries = 3) {
       code: error?.code || "unknown"
     });
   } finally {
-    endBlockingLoad(loaderToken);
+    if (loaderToken) {
+      endBlockingLoad(loaderToken);
+    }
   }
 }
 
