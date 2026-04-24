@@ -240,6 +240,7 @@ function summarizeRange(shifts, rankedList) {
   });
 
   const activeCount = Object.keys(activeStudents).length;
+  const totalShifts = completedShifts + openShifts + exceptionCount;
   return {
     activeStudents: activeCount,
     pointsTotal: roundTo(pointsTotal, 1),
@@ -247,6 +248,7 @@ function summarizeRange(shifts, rankedList) {
     completedShifts,
     openShifts,
     exceptionCount,
+    attendanceRate: totalShifts > 0 ? Math.round((completedShifts / totalShifts) * 100) : 0,
     averagePoints: activeCount ? roundTo(pointsTotal / activeCount, 1) : 0,
     averageHours: activeCount ? roundTo(hoursTotal / activeCount, 2) : 0,
     topPoints: rankedList.length ? rankedList[0].topPoints : 0,
@@ -545,6 +547,7 @@ function buildTodaySummary(allShifts, site) {
   const todaysShifts = filterShiftsBySite(allShifts, site).filter((shift) => shift.localDate === today);
 
   const activeStudents = {};
+  const checkedInNow = {};
   let completedShifts = 0;
   let openShifts = 0;
   let exceptions = 0;
@@ -554,6 +557,7 @@ function buildTodaySummary(allShifts, site) {
       completedShifts += 1;
     } else if (shift.status === "OPEN") {
       openShifts += 1;
+      checkedInNow[shift.studentId] = true;
     } else if (shift.status === "EXCEPTION") {
       exceptions += 1;
     }
@@ -562,6 +566,7 @@ function buildTodaySummary(allShifts, site) {
   return {
     localDate: today,
     activeStudents: Object.keys(activeStudents).length,
+    checkedInNow: Object.keys(checkedInNow).length,
     completedShifts,
     openShifts,
     exceptionCount: exceptions
@@ -748,12 +753,48 @@ function getStudentDashboardPayload(state, studentId, range) {
   };
 }
 
+function buildSiteKPIsForToday(allShifts, siteNames) {
+  const today = formatLocalDate(new Date(), CONFIG.timezone);
+  const todaysShifts = allShifts.filter((s) => s.localDate === today);
+
+  return siteNames.map((site) => {
+    const siteShifts = todaysShifts.filter((s) => s.site === site);
+    const checkedInNow = new Set();
+    const completedToday = new Set();
+    const activeToday = new Set();
+
+    siteShifts.forEach((shift) => {
+      activeToday.add(shift.studentId);
+      if (shift.status === "OPEN") {
+        checkedInNow.add(shift.studentId);
+      }
+      if (COMPLETE_STATUSES[shift.status]) {
+        completedToday.add(shift.studentId);
+      }
+    });
+
+    return {
+      site,
+      checkedInNow: checkedInNow.size,
+      completedToday: completedToday.size,
+      activeToday: activeToday.size
+    };
+  }).filter((s) => s.activeToday > 0);
+}
+
 function getAdminDashboardPayload(state, range, site) {
   const analytics = buildAnalyticsBundle(state.shifts, state.studentDirectory, site);
   const selectedRange = analytics.ranges[range];
   const filteredShifts = selectedRange.filteredShifts;
   const todaySummary = buildTodaySummary(state.shifts, site);
   const todayStudents = buildTodayStudentRows(state.shifts, site);
+
+  const overallRanked = analytics.ranges.overall.rankedList;
+  const topByHours = overallRanked.slice().sort((a, b) => b.hours - a.hours)[0] || null;
+  const overallStats = {
+    topPointsStudent: overallRanked.length ? { name: overallRanked[0].studentName, points: overallRanked[0].points } : null,
+    topHoursStudent: topByHours ? { name: topByHours.studentName, hours: topByHours.hours } : null
+  };
 
   return {
     currentRange: range,
@@ -774,6 +815,8 @@ function getAdminDashboardPayload(state, range, site) {
     exceptions: buildAdminExceptions(filteredShifts),
     auditTrail: filterAuditTrailForRange(state.audits, range).slice(0, 15),
     recentShifts: filteredShifts.slice().sort(sortShiftsDesc).slice(0, 12),
+    overallStats,
+    siteKPIs: buildSiteKPIsForToday(state.shifts, state.sites),
     printable: {
       title: "Cohort Summary Report",
       subtitle: `${rangeLabel(range)} / ${siteLabel(site)}`,

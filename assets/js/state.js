@@ -67,7 +67,10 @@ export const state = {
     search: "",
     selectedStudent: null,
     selectedStudentDetail: null,
-    selectedStudentHistoryScope: "recent"
+    selectedStudentHistoryScope: "recent",
+    liveRefreshEnabled: false,
+    liveRefreshInterval: 10000,
+    liveRefreshTimer: null
   }
 };
 

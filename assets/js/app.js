@@ -48,6 +48,8 @@ const dom = {
   themeIndicator: document.getElementById("themeIndicator"),
   topbarSummary: document.getElementById("topbarSummary"),
   navButtons: Array.from(document.querySelectorAll("[data-view-button]")),
+  adminLiveRefreshToggle: document.getElementById("adminLiveRefreshToggle"),
+  adminLiveRefreshInterval: document.getElementById("adminLiveRefreshInterval"),
   views: {
     clock: document.getElementById("clockView"),
     progress: document.getElementById("progressView"),
@@ -119,6 +121,7 @@ const dom = {
   adminInternLookupHint: document.getElementById("adminInternLookupHint"),
   adminStateNotice: document.getElementById("adminStateNotice"),
   adminKpiGrid: document.getElementById("adminKpiGrid"),
+  adminSiteKpiGrid: document.getElementById("adminSiteKpiGrid"),
   adminTodayTableBody: document.getElementById("adminTodayTableBody"),
   adminStudentsTableBody: document.getElementById("adminStudentsTableBody"),
   adminExceptionList: document.getElementById("adminExceptionList"),
@@ -2001,6 +2004,45 @@ function clearAdminSession() {
   renderAdminState();
 }
 
+function startLiveRefresh() {
+  if (state.admin.liveRefreshTimer) {
+    clearInterval(state.admin.liveRefreshTimer);
+  }
+  state.admin.liveRefreshEnabled = true;
+  state.admin.liveRefreshTimer = setInterval(async () => {
+    if (state.admin.token && state.currentView === "admin") {
+      await loadAdminDashboard({ silent: true });
+    }
+  }, state.admin.liveRefreshInterval);
+}
+
+function stopLiveRefresh() {
+  if (state.admin.liveRefreshTimer) {
+    clearInterval(state.admin.liveRefreshTimer);
+    state.admin.liveRefreshTimer = null;
+  }
+  state.admin.liveRefreshEnabled = false;
+}
+
+function toggleLiveRefresh() {
+  if (state.admin.liveRefreshEnabled) {
+    stopLiveRefresh();
+  } else {
+    startLiveRefresh();
+  }
+  renderAdminState();
+}
+
+function updateLiveRefreshInterval() {
+  const interval = parseInt(dom.adminLiveRefreshInterval.value);
+  if (!isNaN(interval) && interval >= 5000) {
+    state.admin.liveRefreshInterval = interval;
+    if (state.admin.liveRefreshEnabled) {
+      startLiveRefresh();
+    }
+  }
+}
+
 function renderAdminState() {
   const authenticated = Boolean(state.admin.token && state.admin.expiresAt && new Date(state.admin.expiresAt).getTime() > Date.now());
   dom.adminAuthBadge.textContent = authenticated ? `Signed in until ${formatTimeOnly(state.admin.expiresAt)}` : "Not signed in";
@@ -2567,6 +2609,7 @@ function renderAdminDashboard() {
   dom.adminStatusSelect.value = state.admin.statusFilter;
   dom.adminSearchInput.value = state.admin.search;
   dom.adminKpiGrid.innerHTML = adminKpiMarkup(state.admin.dashboard);
+  dom.adminSiteKpiGrid.innerHTML = adminSiteKpiMarkup(state.admin.dashboard);
   populateAdminInternLookupOptions();
   renderAdminTodayTable();
   renderAdminTables();
@@ -2632,6 +2675,7 @@ function renderAdminLoadingState(message = "Loading admin analytics…") {
       <span>${escapeHtml(message)}</span>
     </div>
   `;
+  dom.adminSiteKpiGrid.innerHTML = "";
   if (dom.adminTodayTableBody) {
     dom.adminTodayTableBody.innerHTML = `<tr><td colspan="6" class="empty-copy">Loading today's activity…</td></tr>`;
   }
@@ -2643,6 +2687,7 @@ function renderAdminLoadingState(message = "Loading admin analytics…") {
 function renderAdminErrorState(message) {
   setAdminNotice(message || "Unable to load admin analytics.", "danger");
   dom.adminKpiGrid.innerHTML = `<div class="empty-copy">${escapeHtml(message || "Unable to load admin analytics.")}</div>`;
+  dom.adminSiteKpiGrid.innerHTML = "";
   if (dom.adminTodayTableBody) {
     dom.adminTodayTableBody.innerHTML = `<tr><td colspan="6" class="empty-copy">No today's activity data available because the dashboard failed to load.</td></tr>`;
   }
@@ -2755,18 +2800,34 @@ function resolveTodayDurationHours(row) {
 function adminKpiMarkup(dashboard) {
   const selected = dashboard.selected || {};
   const today = dashboard.today || {};
-  return [
+  const overall = dashboard.overallStats || {};
+  const cards = [
     { label: "Active Today", value: String(today.activeStudents || 0), copy: "Students with any shift activity today." },
     { label: "Completed Today", value: String(today.completedShifts || 0), copy: "Students who fully completed today's shift." },
-    { label: "Open Shifts", value: String(selected.openShifts || 0), copy: "Selected range shifts still missing checkout." },
-    { label: `${toRangeLabel(state.admin.range)} Points`, value: formatPoints(selected.pointsTotal || 0), copy: `${selected.topStudentName || "No benchmark yet"} leads the cohort.` },
-    { label: `${toRangeLabel(state.admin.range)} Hours`, value: formatHours(selected.hoursTotal || 0), copy: `${formatHours(selected.topHours || 0)} is the top benchmark.` },
-    { label: "Exceptions", value: String(selected.exceptionCount || 0), copy: "Historical or live shifts needing review." }
-  ].map((card) => `
+    { label: "Checked In Now", value: String(today.checkedInNow || 0), copy: "Students currently on-site with an open shift." },
+    { label: "Attendance Rate", value: `${selected.attendanceRate ?? 0}%`, copy: `${toRangeLabel(state.admin.range)} shifts completed with both check-in and check-out.` },
+    { label: "Hours Leader", value: overall.topHoursStudent ? overall.topHoursStudent.name : "—", copy: overall.topHoursStudent ? `${formatHours(overall.topHoursStudent.hours)} hrs all time` : "No data yet.", nameValue: true },
+    { label: "Points Leader", value: overall.topPointsStudent ? overall.topPointsStudent.name : "—", copy: overall.topPointsStudent ? `${formatPoints(overall.topPointsStudent.points)} pts all time` : "No data yet.", nameValue: true }
+  ];
+  return cards.map((card) => `
     <div class="metric-card" data-tone="brand">
       <div class="stat-label">${escapeHtml(card.label)}</div>
-      <div class="metric-value">${escapeHtml(card.value)}</div>
+      <div class="${card.nameValue ? "metric-value metric-value--sm" : "metric-value"}">${escapeHtml(card.value)}</div>
       <div class="metric-copy">${escapeHtml(card.copy)}</div>
+    </div>
+  `).join("");
+}
+
+function adminSiteKpiMarkup(dashboard) {
+  const siteKPIs = dashboard.siteKPIs || [];
+  if (!siteKPIs.length) {
+    return '<div class="empty-copy">No site activity today.</div>';
+  }
+  return siteKPIs.map((s) => `
+    <div class="metric-card" data-tone="brand">
+      <div class="stat-label">${escapeHtml(s.site)}</div>
+      <div class="metric-value metric-value--sm">${escapeHtml(String(s.checkedInNow))} / ${escapeHtml(String(s.completedToday))}</div>
+      <div class="metric-copy">Checked in now / Completed today &middot; ${escapeHtml(String(s.activeToday))} active</div>
     </div>
   `).join("");
 }
