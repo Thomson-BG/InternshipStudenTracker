@@ -486,7 +486,7 @@ async function init() {
   syncLocationMapFields();
   animateViewEntrance(state.currentView);
   state.announcement.loading = true;
-  fetchAnnouncement()
+  const announcementFetchPromise = fetchAnnouncement()
     .then((response) => {
       state.announcement.data = response.data || null;
       state.announcement.loading = false;
@@ -497,7 +497,8 @@ async function init() {
     });
 
   const splashPromise = runSplashSequence();
-  splashPromise.then((shouldShowModal) => {
+  Promise.all([splashPromise, announcementFetchPromise]).then(([shouldShowModal]) => {
+    renderAnnouncementCard();
     if (shouldShowModal) {
       maybeShowAnnouncementModal();
     }
