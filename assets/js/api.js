@@ -1263,3 +1263,27 @@ export async function fetchRoster(options = {}) {
     };
   }
 }
+
+export async function fetchAnnouncement() {
+  try {
+    return await requestJson(API_ENDPOINTS.getAnnouncement);
+  } catch {
+    return { ok: true, data: null };
+  }
+}
+
+export async function adminSetAnnouncement({ token, label, title, body, durationDays }) {
+  return requestJson(API_ENDPOINTS.setAnnouncement, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ token, label, title, body, durationDays })
+  });
+}
+
+export async function adminClearAnnouncement({ token }) {
+  return requestJson(API_ENDPOINTS.clearAnnouncement, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ token })
+  });
+}

@@ -77,7 +77,10 @@ export const API_ENDPOINTS = {
   },
   logs: (token) => `${API_BASE_URL}?mode=logs&token=${encodeURIComponent(token)}`,
   points: (token) => `${API_BASE_URL}?mode=points&token=${encodeURIComponent(token)}`,
-  getRoster: () => `${API_BASE_URL}?mode=get_roster`
+  getRoster: () => `${API_BASE_URL}?mode=get_roster`,
+  getAnnouncement: `${API_BASE_URL}?mode=get_announcement`,
+  setAnnouncement: `${API_BASE_URL}?mode=admin_set_announcement`,
+  clearAnnouncement: `${API_BASE_URL}?mode=admin_clear_announcement`
 };
 
 export const ACTION_COOLDOWN_MS = 60 * 60 * 1000;
@@ -87,6 +90,7 @@ export const STUDENT_DASHBOARD_PREFETCH_DELAY_MS = 180;
 export const LOCAL_HISTORY_KEY = "intern-track-local-history";
 export const ADMIN_SESSION_KEY = "intern-track-admin-session";
 export const THEME_KEY = "intern-track-theme";
+export const ANNOUNCEMENT_SEEN_KEY = "intern-track-announcement-seen";
 export const DB_MIGRATION_NOTICE_START_ISO = "2026-04-22T08:00:00-07:00";
 export const DB_MIGRATION_NOTICE_WINDOW_DAYS = 7;
 

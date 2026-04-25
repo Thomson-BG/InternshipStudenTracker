@@ -70,7 +70,13 @@ export const state = {
     selectedStudentHistoryScope: "recent",
     liveRefreshEnabled: true,
     liveRefreshInterval: 20000,
-    liveRefreshTimer: null
+    liveRefreshTimer: null,
+    announcementSaving: false
+  },
+  announcement: {
+    loading: false,
+    data: null,
+    error: ""
   }
 };
 

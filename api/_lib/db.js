@@ -143,6 +143,12 @@ async function initSchema(sql = getSql()) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions (expires_at);
+
+    CREATE TABLE IF NOT EXISTS config (
+      key TEXT PRIMARY KEY,
+      value JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 }
 
@@ -326,6 +332,20 @@ async function createAdminSession(sql = getSql(), token, expiresAt) {
     VALUES (${token}, ${expiresAt})
     ON CONFLICT (token)
     DO UPDATE SET expires_at = EXCLUDED.expires_at
+  `;
+}
+
+async function getConfig(sql, key) {
+  const rows = await sql`SELECT value FROM config WHERE key = ${key} LIMIT 1`;
+  return rows[0]?.value ?? null;
+}
+
+async function setConfig(sql, key, value) {
+  await sql`
+    INSERT INTO config (key, value, updated_at)
+    VALUES (${key}, ${JSON.stringify(value)}::jsonb, NOW())
+    ON CONFLICT (key)
+    DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
   `;
 }
 
@@ -559,6 +579,8 @@ async function upsertPointsForStudent(sql, studentId, studentName) {
 
 module.exports = {
   appendAudit,
+  getConfig,
+  setConfig,
   buildMaterializedState,
   cleanupExpiredSessions,
   closeSql,

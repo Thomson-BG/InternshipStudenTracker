@@ -1,5 +1,6 @@
 import {
   ADMIN_SESSION_KEY,
+  ANNOUNCEMENT_SEEN_KEY,
   DB_MIGRATION_NOTICE_START_ISO,
   DB_MIGRATION_NOTICE_WINDOW_DAYS,
   LOCAL_HISTORY_KEY,
@@ -10,9 +11,12 @@ import {
 } from "./config.js";
 import {
   adminAuth,
+  adminClearAnnouncement,
+  adminSetAnnouncement,
   fetchAdminDashboard,
   fetchAdminDeleteShift,
   fetchAdminEditShift,
+  fetchAnnouncement,
   fetchReportData,
   fetchRoster,
   fetchStudentDashboard,
@@ -151,6 +155,15 @@ const dom = {
   reportCloseButton: document.getElementById("reportCloseButton"),
   migrationNoticeModal: document.getElementById("migrationNoticeModal"),
   migrationNoticeCloseButton: document.getElementById("migrationNoticeCloseButton"),
+  migrationNoticeLabel: document.getElementById("migrationNoticeLabel"),
+  adminAnnouncementCard: document.getElementById("adminAnnouncementCard"),
+  adminAnnouncementStatus: document.getElementById("adminAnnouncementStatus"),
+  adminAnnouncementLabel: document.getElementById("adminAnnouncementLabel"),
+  adminAnnouncementTitle: document.getElementById("adminAnnouncementTitle"),
+  adminAnnouncementBody: document.getElementById("adminAnnouncementBody"),
+  adminAnnouncementDuration: document.getElementById("adminAnnouncementDuration"),
+  adminPublishAnnouncementButton: document.getElementById("adminPublishAnnouncementButton"),
+  adminDeactivateAnnouncementButton: document.getElementById("adminDeactivateAnnouncementButton"),
   globalLoadingModal: document.getElementById("globalLoadingModal"),
   globalLoadingMessage: document.getElementById("globalLoadingMessage"),
   toastRack: document.getElementById("toastRack"),
@@ -358,23 +371,6 @@ async function runSplashSequence() {
   return true;
 }
 
-function isDbMigrationNoticeWindowActive(now = Date.now()) {
-  const startMs = Date.parse(DB_MIGRATION_NOTICE_START_ISO);
-  if (!Number.isFinite(startMs)) {
-    return false;
-  }
-  const durationMs = Math.max(0, Number(DB_MIGRATION_NOTICE_WINDOW_DAYS) || 0) * 24 * 60 * 60 * 1000;
-  const endMs = startMs + durationMs;
-  return now >= startMs && now < endMs;
-}
-
-function shouldShowDbMigrationNotice() {
-  if (!dom.migrationNoticeModal || !dom.migrationNoticeCloseButton) {
-    return false;
-  }
-  return isDbMigrationNoticeWindowActive();
-}
-
 function openDbMigrationNoticeModal() {
   if (!dom.migrationNoticeModal) {
     return;
@@ -399,11 +395,48 @@ function closeDbMigrationNoticeModal() {
   dom.body.classList.remove("has-announcement-modal-open");
 }
 
-function maybeShowDbMigrationNoticeModal() {
-  if (!shouldShowDbMigrationNotice()) {
+function hasSeenAnnouncement(startIso) {
+  try {
+    return localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) === startIso;
+  } catch {
+    return false;
+  }
+}
+
+function markAnnouncementSeen(startIso) {
+  try {
+    localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, startIso);
+  } catch {}
+}
+
+function populateAnnouncementModal(ann) {
+  if (dom.migrationNoticeLabel) {
+    dom.migrationNoticeLabel.textContent = ann.label || "Announcement";
+  }
+  const titleEl = document.getElementById("migrationNoticeTitle");
+  if (titleEl) {
+    titleEl.textContent = ann.title || "";
+  }
+  const bodyEl = document.getElementById("migrationNoticeBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = ann.body || "";
+  }
+}
+
+function maybeShowAnnouncementModal() {
+  const ann = state.announcement.data;
+  if (!ann || !ann.active || !ann.title) {
     return;
   }
+  if (hasSeenAnnouncement(ann.startIso)) {
+    return;
+  }
+  if (!dom.migrationNoticeModal || !dom.migrationNoticeCloseButton) {
+    return;
+  }
+  populateAnnouncementModal(ann);
   openDbMigrationNoticeModal();
+  markAnnouncementSeen(ann.startIso);
 }
 
 function prefersReducedMotion() {
@@ -452,10 +485,21 @@ async function init() {
   startLocationWatch();
   syncLocationMapFields();
   animateViewEntrance(state.currentView);
+  state.announcement.loading = true;
+  fetchAnnouncement()
+    .then((response) => {
+      state.announcement.data = response.data || null;
+      state.announcement.loading = false;
+    })
+    .catch(() => {
+      state.announcement.data = null;
+      state.announcement.loading = false;
+    });
+
   const splashPromise = runSplashSequence();
   splashPromise.then((shouldShowModal) => {
     if (shouldShowModal) {
-      maybeShowDbMigrationNoticeModal();
+      maybeShowAnnouncementModal();
     }
   });
 
@@ -714,6 +758,12 @@ function bindEvents() {
         closeDbMigrationNoticeModal();
       }
     });
+  }
+  if (dom.adminPublishAnnouncementButton) {
+    dom.adminPublishAnnouncementButton.addEventListener("click", handlePublishAnnouncement);
+  }
+  if (dom.adminDeactivateAnnouncementButton) {
+    dom.adminDeactivateAnnouncementButton.addEventListener("click", handleDeactivateAnnouncement);
   }
 
   ["click", "keydown", "touchstart"].forEach((eventName) => {
@@ -1991,6 +2041,97 @@ function clearStudentSession(message, options = {}) {
   }
 }
 
+function renderAnnouncementCard() {
+  if (!dom.adminAnnouncementCard) {
+    return;
+  }
+  const ann = state.announcement.data;
+  const statusEl = dom.adminAnnouncementStatus;
+
+  if (ann && ann.active) {
+    const endMs = Date.parse(ann.startIso) + (Number(ann.durationDays) || 0) * 86400000;
+    const daysLeft = Math.max(0, Math.ceil((endMs - Date.now()) / 86400000));
+    if (statusEl) {
+      statusEl.textContent = `Active — expires in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}`;
+      statusEl.style.color = "var(--color-success, #30D158)";
+    }
+    if (dom.adminAnnouncementLabel) {
+      dom.adminAnnouncementLabel.value = ann.label || "";
+    }
+    if (dom.adminAnnouncementTitle) {
+      dom.adminAnnouncementTitle.value = ann.title || "";
+    }
+    if (dom.adminAnnouncementBody) {
+      dom.adminAnnouncementBody.value = ann.body || "";
+    }
+    const days = String(ann.durationDays || 7);
+    if (dom.adminAnnouncementDuration) {
+      dom.adminAnnouncementDuration.value = ["1", "3", "7", "14", "30"].includes(days) ? days : "7";
+    }
+  } else {
+    if (statusEl) {
+      statusEl.textContent = "No active announcement";
+      statusEl.style.color = "";
+    }
+  }
+
+  if (dom.adminDeactivateAnnouncementButton) {
+    dom.adminDeactivateAnnouncementButton.disabled = !(ann && ann.active);
+  }
+  if (dom.adminPublishAnnouncementButton) {
+    dom.adminPublishAnnouncementButton.disabled = Boolean(state.admin.announcementSaving);
+    dom.adminPublishAnnouncementButton.textContent = state.admin.announcementSaving ? "Publishing…" : "Publish Now";
+  }
+}
+
+async function handlePublishAnnouncement() {
+  const label = (dom.adminAnnouncementLabel?.value || "").trim();
+  const title = (dom.adminAnnouncementTitle?.value || "").trim();
+  const body = (dom.adminAnnouncementBody?.value || "").trim();
+  const durationDays = Number(dom.adminAnnouncementDuration?.value || 7);
+
+  if (!title) {
+    showToast("Title is required to publish an announcement.", "danger");
+    return;
+  }
+
+  state.admin.announcementSaving = true;
+  renderAnnouncementCard();
+
+  try {
+    const response = await adminSetAnnouncement({
+      token: state.admin.token,
+      label,
+      title,
+      body,
+      durationDays
+    });
+    state.announcement.data = response.data || null;
+    showToast("Announcement published.", "success");
+  } catch (error) {
+    showToast(error.message || "Failed to publish announcement.", "danger");
+  } finally {
+    state.admin.announcementSaving = false;
+    renderAnnouncementCard();
+  }
+}
+
+async function handleDeactivateAnnouncement() {
+  state.admin.announcementSaving = true;
+  renderAnnouncementCard();
+
+  try {
+    await adminClearAnnouncement({ token: state.admin.token });
+    state.announcement.data = null;
+    showToast("Announcement deactivated.", "success");
+  } catch (error) {
+    showToast(error.message || "Failed to deactivate announcement.", "danger");
+  } finally {
+    state.admin.announcementSaving = false;
+    renderAnnouncementCard();
+  }
+}
+
 async function handleAdminLogin() {
   const password = dom.adminPasswordInput.value;
   if (!password) {
@@ -2112,6 +2253,7 @@ function renderAdminState() {
   }
   syncAdminRecordsFilterControls();
   updateAdminRecordsButton();
+  renderAnnouncementCard();
   if (dom.adminStudentRecordsSection) {
     dom.adminStudentRecordsSection.classList.toggle("is-hidden", !state.admin.studentRecordsVisible || !authenticated);
   }

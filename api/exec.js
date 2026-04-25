@@ -16,6 +16,7 @@ const {
   findRosterStudent,
   findShiftById,
   findShiftForDayForUpdate,
+  getConfig,
   getSql,
   initSchema,
   insertLog,
@@ -23,6 +24,7 @@ const {
   listLogs,
   listPoints,
   requireAdminToken,
+  setConfig,
   upsertPointsForStudent,
   upsertShift
 } = require("./_lib/db");
@@ -559,6 +561,18 @@ async function handleGet(req, res, sql) {
     return jsonResponse(res, { ok: true, data: roster });
   }
 
+  if (mode === "get_announcement") {
+    const raw = await getConfig(sql, "active_announcement");
+    if (!raw || !raw.title) {
+      return jsonResponse(res, { ok: true, data: null });
+    }
+    const now = Date.now();
+    const startMs = Date.parse(raw.startIso);
+    const endMs = startMs + (Number(raw.durationDays) || 0) * 86400000;
+    const active = Number.isFinite(startMs) && now >= startMs && now < endMs;
+    return jsonResponse(res, { ok: true, data: { ...raw, active } });
+  }
+
   return jsonResponse(res, errorPayload(RESPONSE_CODES.invalidMode, `Unsupported mode: ${mode}`));
 }
 
@@ -697,6 +711,61 @@ async function handleAdminEditShift(req, res, sql) {
   return jsonResponse(res, { ok: true, data: txResult.shift });
 }
 
+async function handleAdminSetAnnouncement(req, res, sql) {
+  const body = await parseJsonBody(req);
+  const token = stringify(body.token);
+  const label = stringify(body.label || "").trim();
+  const title = stringify(body.title || "").trim();
+  const bodyText = stringify(body.body || "").trim();
+  const durationDays = Number(body.durationDays) || 0;
+
+  const auth = await requireAdminToken(sql, token);
+  if (!auth.ok) {
+    return jsonResponse(res, errorPayload(RESPONSE_CODES.authRequired, auth.message));
+  }
+  if (!title) {
+    return jsonResponse(res, errorPayload(RESPONSE_CODES.missingField, "title is required."));
+  }
+  if (durationDays < 1 || durationDays > 365) {
+    return jsonResponse(res, errorPayload(RESPONSE_CODES.invalidPayload, "durationDays must be between 1 and 365."));
+  }
+
+  const announcement = { label, title, body: bodyText, startIso: new Date().toISOString(), durationDays };
+  await setConfig(sql, "active_announcement", announcement);
+  await appendAudit(sql, {
+    actorType: "ADMIN",
+    studentId: "admin",
+    action: "Admin Set Announcement",
+    outcomeCode: "ANNOUNCEMENT_SET",
+    message: `Published announcement: ${title}`,
+    site: "admin",
+    metadata: { durationDays }
+  });
+  return jsonResponse(res, { ok: true, data: { ...announcement, active: true } });
+}
+
+async function handleAdminClearAnnouncement(req, res, sql) {
+  const body = await parseJsonBody(req);
+  const token = stringify(body.token);
+
+  const auth = await requireAdminToken(sql, token);
+  if (!auth.ok) {
+    return jsonResponse(res, errorPayload(RESPONSE_CODES.authRequired, auth.message));
+  }
+
+  await setConfig(sql, "active_announcement", {});
+  await appendAudit(sql, {
+    actorType: "ADMIN",
+    studentId: "admin",
+    action: "Admin Clear Announcement",
+    outcomeCode: "ANNOUNCEMENT_CLEARED",
+    message: "Deactivated announcement banner.",
+    site: "admin",
+    metadata: {}
+  });
+  return jsonResponse(res, { ok: true });
+}
+
 module.exports = async function handler(req, res) {
   try {
     applyCorsHeaders(res);
@@ -722,6 +791,12 @@ module.exports = async function handler(req, res) {
       }
       if (mode === "admin_delete_shift") {
         return await handleAdminDeleteShift(req, res, sql);
+      }
+      if (mode === "admin_set_announcement") {
+        return await handleAdminSetAnnouncement(req, res, sql);
+      }
+      if (mode === "admin_clear_announcement") {
+        return await handleAdminClearAnnouncement(req, res, sql);
       }
       return await handleAttendancePost(req, res, sql);
     }
