@@ -34,7 +34,17 @@ function getSql() {
     prepare: false,
     idle_timeout: 20,
     connect_timeout: 30,
-    onnotice: () => {}
+    onnotice: () => {},
+    types: {
+      // Neon's connection pooler returns JSONB as raw strings; register a parser
+      // to ensure all JSONB columns are returned as JavaScript objects.
+      jsonb: {
+        to: 3802,
+        from: [3802],
+        serialize: (x) => JSON.stringify(x),
+        parse: (x) => (typeof x === "string" ? JSON.parse(x) : x)
+      }
+    }
   });
 
   return sqlClient;
@@ -337,7 +347,11 @@ async function createAdminSession(sql = getSql(), token, expiresAt) {
 
 async function getConfig(sql, key) {
   const rows = await sql`SELECT value FROM config WHERE key = ${key} LIMIT 1`;
-  return rows[0]?.value ?? null;
+  const raw = rows[0]?.value ?? null;
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+  return raw;
 }
 
 async function setConfig(sql, key, value) {
