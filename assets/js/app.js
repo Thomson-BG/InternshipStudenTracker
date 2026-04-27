@@ -164,6 +164,7 @@ const dom = {
   adminAnnouncementDuration: document.getElementById("adminAnnouncementDuration"),
   adminPublishAnnouncementButton: document.getElementById("adminPublishAnnouncementButton"),
   adminDeactivateAnnouncementButton: document.getElementById("adminDeactivateAnnouncementButton"),
+  adminAnnouncementForceShow: document.getElementById("adminAnnouncementForceShow"),
   globalLoadingModal: document.getElementById("globalLoadingModal"),
   globalLoadingMessage: document.getElementById("globalLoadingMessage"),
   toastRack: document.getElementById("toastRack"),
@@ -428,7 +429,7 @@ function maybeShowAnnouncementModal() {
   if (!ann || !ann.active || !ann.title) {
     return;
   }
-  if (hasSeenAnnouncement(ann.startIso)) {
+  if (!ann.forceShow && hasSeenAnnouncement(ann.startIso)) {
     return;
   }
   if (!dom.migrationNoticeModal || !dom.migrationNoticeCloseButton) {
@@ -2069,10 +2070,16 @@ function renderAnnouncementCard() {
     if (dom.adminAnnouncementDuration) {
       dom.adminAnnouncementDuration.value = ["1", "3", "7", "14", "30"].includes(days) ? days : "7";
     }
+    if (dom.adminAnnouncementForceShow) {
+      dom.adminAnnouncementForceShow.checked = Boolean(ann.forceShow);
+    }
   } else {
     if (statusEl) {
       statusEl.textContent = "No active announcement";
       statusEl.style.color = "";
+    }
+    if (dom.adminAnnouncementForceShow) {
+      dom.adminAnnouncementForceShow.checked = false;
     }
   }
 
@@ -2090,6 +2097,7 @@ async function handlePublishAnnouncement() {
   const title = (dom.adminAnnouncementTitle?.value || "").trim();
   const body = (dom.adminAnnouncementBody?.value || "").trim();
   const durationDays = Number(dom.adminAnnouncementDuration?.value || 7);
+  const forceShow = Boolean(dom.adminAnnouncementForceShow?.checked);
 
   if (!title) {
     showToast("Title is required to publish an announcement.", "danger");
@@ -2105,7 +2113,8 @@ async function handlePublishAnnouncement() {
       label,
       title,
       body,
-      durationDays
+      durationDays,
+      forceShow
     });
     state.announcement.data = response.data || null;
     showToast("Announcement published.", "success");

@@ -730,7 +730,8 @@ async function handleAdminSetAnnouncement(req, res, sql) {
     return jsonResponse(res, errorPayload(RESPONSE_CODES.invalidPayload, "durationDays must be between 1 and 365."));
   }
 
-  const announcement = { label, title, body: bodyText, startIso: new Date().toISOString(), durationDays };
+  const forceShow = Boolean(body.forceShow);
+  const announcement = { label, title, body: bodyText, startIso: new Date().toISOString(), durationDays, forceShow };
   await setConfig(sql, "active_announcement", announcement);
   await appendAudit(sql, {
     actorType: "ADMIN",

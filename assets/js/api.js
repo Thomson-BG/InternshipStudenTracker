@@ -1272,11 +1272,11 @@ export async function fetchAnnouncement() {
   }
 }
 
-export async function adminSetAnnouncement({ token, label, title, body, durationDays }) {
+export async function adminSetAnnouncement({ token, label, title, body, durationDays, forceShow }) {
   return requestJson(API_ENDPOINTS.setAnnouncement, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ token, label, title, body, durationDays })
+    body: JSON.stringify({ token, label, title, body, durationDays, forceShow })
   });
 }
 
